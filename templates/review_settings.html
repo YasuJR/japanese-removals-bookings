@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Google review requests{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <p class="breadcrumb muted"><a href="{{ url_for('settings') }}">Settings</a> → Google review requests</p>
+  <h2>Google review requests</h2>
+  <p class="hint">Schedule a review request when a booking is marked Completed (default: 24 hours later).</p>
+
+  {% if status.review_automation_enabled %}
+  <p class="status-pill ok">Automation enabled</p>
+  {% else %}
+  <p class="status-pill off">Automation disabled or missing Google review URL</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>Settings</h3>
+  <form method="post" class="settings-form">
+    <input type="hidden" name="action" value="save">
+
+    <label class="checkbox-row">
+      <input type="checkbox" name="automation_enabled" {% if review_form.automation_enabled %}checked{% endif %}>
+      Enable Google review automation
+    </label>
+
+    <div class="form-grid">
+      <label>
+        Wait after Completed (hours)
+        <input type="number" name="wait_hours" min="1" max="168" value="{{ review_form.wait_hours }}">
+      </label>
+      <label>
+        Send via
+        <select name="channel">
+          {% for value, label in review_form.channel_choices %}
+          <option value="{{ value }}" {% if review_form.channel == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="full-width">
+        Google review URL
+        <input type="url" name="google_review_url" placeholder="https://g.page/r/..."
+               value="{{ review_form.google_review_url }}">
+      </label>
+      <label>
+        Total Google reviews
+        <input type="number" name="google_review_count" min="0" step="1" placeholder="From Google Business"
+               value="{{ review_form.google_review_count if review_form.google_review_count is not none else '' }}">
+      </label>
+      <label>
+        Average Google rating
+        <input type="number" name="google_average_rating" min="1" max="5" step="0.1" placeholder="e.g. 4.8"
+               value="{{ review_form.google_average_rating if review_form.google_average_rating is not none else '' }}">
+      </label>
+    </div>
+    <p class="muted form-hint">Sync total reviews and average rating from Google Business Profile for the Executive dashboard.</p>
+
+    <article class="sms-template-card">
+      <h4>SMS message</h4>
+      <label>
+        <textarea name="sms_template" rows="6" class="sms-template-input"
+          {% if not status.sms_configured %}disabled{% endif %}>{{ review_form.sms_template }}</textarea>
+      </label>
+      {% if not status.sms_configured %}<p class="muted">SMS requires Twilio in .env</p>{% endif %}
+    </article>
+
+    <article class="sms-template-card">
+      <h4>Email message</h4>
+      <label>
+        Subject
+        <input type="text" name="email_subject" value="{{ review_form.email_subject }}"
+          {% if not status.email_configured %}disabled{% endif %}>
+      </label>
+      <label>
+        Body
+        <textarea name="email_body" rows="8" class="sms-template-input"
+          {% if not status.email_configured %}disabled{% endif %}>{{ review_form.email_body }}</textarea>
+      </label>
+      {% if not status.email_configured %}<p class="muted">Email requires SMTP settings in .env</p>{% endif %}
+    </article>
+
+    <p class="muted form-hint">Placeholders: {{ review_form.placeholder_help }}</p>
+    <p class="muted form-hint"><code>{review_link}</code> uses a tracked link (Sent → Clicked). <code>{review_confirm_link}</code> lets customers confirm they reviewed.</p>
+
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">Save settings</button>
+      <a class="btn-secondary" href="{{ url_for('settings') }}">Back</a>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>Test send</h3>
+  <form method="post" class="settings-form">
+    <input type="hidden" name="action" value="test_send">
+    <div class="form-grid">
+      <label>
+        Channel
+        <select name="test_channel">
+          <option value="sms">SMS</option>
+          <option value="email">Email</option>
+        </select>
+      </label>
+      <label>
+        Test phone
+        <input type="tel" name="test_phone" placeholder="04xx xxx xxx" autocomplete="tel">
+      </label>
+      <label>
+        Test email
+        <input type="email" name="test_email" placeholder="you@example.com" autocomplete="email">
+      </label>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn-secondary">Send test</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>Run due requests</h3>
+  <p class="muted">Sends review requests whose wait period has elapsed.</p>
+  <form method="post" class="inline-form">
+    <input type="hidden" name="action" value="run_scheduled">
+    <button type="submit" class="btn-secondary btn-sm">Run now</button>
+  </form>
+  <p class="muted form-hint">Schedule hourly: <code>python scripts/run_review_automation.py</code></p>
+</section>
+
+<section class="panel">
+  <h3>Review tracking</h3>
+  {% if review_requests %}
+  <div class="table-scroll">
+    <table class="sheet automation-log-sheet">
+      <thead>
+        <tr>
+          <th>Booking</th>
+          <th>Customer</th>
+          <th>Channel</th>
+          <th>Status</th>
+          <th>Scheduled</th>
+          <th>Sent</th>
+          <th>Clicked</th>
+          <th>Reviewed</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in review_requests %}
+        <tr>
+          <td class="nowrap"><a href="{{ url_for('edit_booking', booking_id=row.booking_id) }}">#{{ row.booking_id }}</a></td>
+          <td>{{ row.customer_name or '—' }}</td>
+          <td class="nowrap">{{ row.channel }}</td>
+          <td class="nowrap"><span class="automation-status automation-status-{{ row.status }}">{{ row.status }}</span></td>
+          <td class="nowrap">{{ row.scheduled_at[:16] if row.scheduled_at else '—' }}</td>
+          <td class="nowrap">{{ row.sent_at[:16] if row.sent_at else '—' }}</td>
+          <td class="nowrap">{{ row.clicked_at[:16] if row.clicked_at else '—' }}</td>
+          <td class="nowrap">{{ row.reviewed_at[:16] if row.reviewed_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No review requests yet.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>Automation log</h3>
+  {% if automation_logs %}
+  <div class="table-scroll">
+    <table class="sheet automation-log-sheet">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Booking</th>
+          <th>Status</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in automation_logs %}
+        <tr>
+          <td class="nowrap">{{ entry.created_at[:16] }}</td>
+          <td class="nowrap">
+            {% if entry.booking_id %}
+            <a href="{{ url_for('edit_booking', booking_id=entry.booking_id) }}">#{{ entry.booking_id }}</a>
+            {% else %}—{% endif %}
+          </td>
+          <td class="nowrap"><span class="automation-status automation-status-{{ entry.status }}">{{ entry.status }}</span></td>
+          <td>{{ entry.message }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No log entries yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

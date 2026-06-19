@@ -1,0 +1,108 @@
+{
+  "steps": [
+    "Booking #41 created from email.",
+    "Pending \u2192 Confirmed automation",
+    "On Route + ETA SMS",
+    "Stripe payment \u2192 Paid"
+  ],
+  "gmail_create": {
+    "ok": true,
+    "message": "Booking #41 created from email.",
+    "booking_id": 41
+  },
+  "after_gmail": {
+    "status": "Pending"
+  },
+  "after_confirmed": {
+    "status": "Confirmed",
+    "integration_messages": [
+      "SMS sent (Phase 10 mock)",
+      "Added to Google Calendar.",
+      "Staff notification sent (Phase 10 mock)",
+      "Xero invoice INV-0020 created and approved."
+    ],
+    "phase9_logs": {
+      "confirmation_sms_sent": {
+        "id": 79,
+        "booking_id": 41,
+        "automation_type": "confirmation_sms_sent",
+        "status": "sent",
+        "message": "SMS sent (Phase 10 mock)",
+        "created_at": "2026-06-18 12:53:36"
+      },
+      "calendar_event_synced": {
+        "id": 80,
+        "booking_id": 41,
+        "automation_type": "calendar_event_synced",
+        "status": "success",
+        "message": "Added to Google Calendar.",
+        "created_at": "2026-06-18 12:53:36"
+      },
+      "staff_notification_sent": {
+        "id": 81,
+        "booking_id": 41,
+        "automation_type": "staff_notification_sent",
+        "status": "success",
+        "message": "Staff notification sent (Phase 10 mock)",
+        "created_at": "2026-06-18 12:53:36"
+      }
+    },
+    "xero_invoice_id": "3eee7836-8f22-4c38-9ac0-a773d539ff77"
+  },
+  "after_on_route": {
+    "ok": true,
+    "message": "On route \u2014 ETA 25 minutes. SMS sent (Phase 10 mock)",
+    "status": "On Route",
+    "on_route_at": "2026-06-18T12:53:39",
+    "eta_sms_sent_at": "2026-06-18T12:53:39",
+    "eta_minutes": 25,
+    "driver_name": "Yasu",
+    "phase10_logs": {
+      "on_route_started": {
+        "id": 83,
+        "booking_id": 41,
+        "automation_type": "on_route_started",
+        "status": "success",
+        "message": "Driver Yasu en route \u2014 ETA 25 min (manual).",
+        "created_at": "2026-06-18 12:53:39"
+      },
+      "eta_sms_sent": {
+        "id": 84,
+        "booking_id": 41,
+        "automation_type": "eta_sms_sent",
+        "status": "sent",
+        "message": "SMS sent (Phase 10 mock)",
+        "created_at": "2026-06-18 12:53:39"
+      }
+    }
+  },
+  "dedupe": {
+    "ok": true,
+    "message": "Already on route \u2014 ETA updated to 30 minutes.",
+    "partial_logs": {
+      "on_route_started": 0,
+      "eta_sms_sent": 1
+    },
+    "eta_sms_log_count": 2
+  },
+  "after_stripe": {
+    "checkout_ok": true,
+    "webhook_ok": true,
+    "status": "Paid",
+    "payment_status": "Paid",
+    "xero_payment_id": "14700e6f-0eae-4162-9249-14b62e4f7e92",
+    "xero_amount_due": -1.0
+  },
+  "phase9_automation_ok": true,
+  "phase10_automation_ok": true,
+  "passed": [
+    {
+      "id": 88,
+      "booking_id": 41,
+      "automation_type": "stripe_payment_received",
+      "status": "success",
+      "message": "Stripe payment received for INV-0020 \u2014 booking marked Paid.",
+      "created_at": "2026-06-18 12:53:40"
+    }
+  ]
+}

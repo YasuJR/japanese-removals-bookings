@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Daily checklist{% endblock %}
+
+{% block content %}
+<section class="panel daily-checklist-header">
+  <div class="panel-head">
+    <div>
+      <h2>Daily job checklist</h2>
+      <p class="hint">
+        Confirmed &amp; Paid jobs · {{ checklist.range_start }}{% if checklist.range_start != checklist.range_end %} – {{ checklist.range_end }}{% endif %}
+        · {{ checklist.job_count }} job{% if checklist.job_count != 1 %}s{% endif %}
+        {% if checklist.warning_total %}
+        · <strong class="checklist-warning-count">{{ checklist.warning_total }} warning{% if checklist.warning_total != 1 %}s{% endif %}</strong>
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <nav class="filter-bar" aria-label="Checklist date filters">
+    {% for key, label in checklist.filters %}
+    <a href="{{ url_for('daily_checklist', filter=key) }}"
+       class="filter-pill{% if active_filter == key %} active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+</section>
+
+{% if checklist.jobs %}
+<div class="daily-checklist-list">
+  {% for job in checklist.jobs %}
+  <article class="panel daily-checklist-card{% if job.warning_count %} daily-checklist-card-warn{% endif %}">
+    <header class="daily-checklist-card-head">
+      <div>
+        <p class="daily-checklist-time">{{ job.move_date }} · {{ job.start_display }}{% if job.finish_display %} – {{ job.finish_display }}{% endif %}</p>
+        <h3>{{ job.customer_name }}</h3>
+        <p class="muted daily-checklist-meta">
+          Crew: {{ job.crew_display }}
+          {% if job.truck_assigned %} · Truck: {{ job.truck_assigned }}{% endif %}
+        </p>
+      </div>
+      <div class="daily-checklist-badges">
+        {% with status=job.status %}
+        {% include '_status_badge.html' %}
+        {% endwith %}
+        {% with payment_status=job.payment_status %}{% include '_payment_badge.html' %}{% endwith %}
+        {% if job.double_booking_badge %}
+        {% with double_booking_badge=job.double_booking_badge %}
+        {% include '_double_booking_badge.html' %}
+        {% endwith %}
+        {% endif %}
+      </div>
+    </header>
+
+    {% if job.warnings %}
+    <ul class="daily-checklist-warnings">
+      {% for warning in job.warnings %}
+      <li class="checklist-warning-pill">{{ warning.label }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    <div class="daily-checklist-sections">
+      <section class="checklist-section">
+        <h4>Before job</h4>
+        <ul class="checklist-items">
+          {% for item in job.checklist.before_job %}
+          <li class="checklist-item{% if item.done %} checklist-item-done{% else %} checklist-item-pending{% endif %}">
+            <span class="checklist-mark" aria-hidden="true">{% if item.done %}✓{% else %}○{% endif %}</span>
+            {{ item.label }}
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+      <section class="checklist-section">
+        <h4>On route</h4>
+        <ul class="checklist-items">
+          {% for item in job.checklist.on_route %}
+          <li class="checklist-item{% if item.done %} checklist-item-done{% else %} checklist-item-pending{% endif %}">
+            <span class="checklist-mark" aria-hidden="true">{% if item.done %}✓{% else %}○{% endif %}</span>
+            {{ item.label }}
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+      <section class="checklist-section">
+        <h4>After job</h4>
+        <ul class="checklist-items">
+          {% for item in job.checklist.after_job %}
+          <li class="checklist-item{% if item.done %} checklist-item-done{% else %} checklist-item-pending{% endif %}">
+            <span class="checklist-mark" aria-hidden="true">{% if item.done %}✓{% else %}○{% endif %}</span>
+            {{ item.label }}
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+    </div>
+
+    {% if job.notes %}
+    <p class="daily-checklist-notes"><span>Notes:</span> {{ job.notes }}</p>
+    {% endif %}
+
+    <div class="daily-checklist-actions">
+      <a class="btn-primary btn-sm" href="{{ url_for('edit_booking', booking_id=job.booking_id) }}">Open booking</a>
+      {% if job.phone and job.phone|tel_href %}
+      <a class="btn-secondary btn-sm" href="{{ job.phone|tel_href }}">Call customer</a>
+      {% else %}
+      <span class="btn-secondary btn-sm checklist-btn-disabled">Call customer</span>
+      {% endif %}
+      {% if job.phone and job.phone|sms_href %}
+      <a class="btn-secondary btn-sm" href="{{ job.phone|sms_href }}">Text customer</a>
+      {% else %}
+      <span class="btn-secondary btn-sm checklist-btn-disabled">Text customer</span>
+      {% endif %}
+      {% if job.pickup_address %}
+      <a class="btn-secondary btn-sm" href="{{ job.pickup_address|apple_maps_url }}" target="_blank" rel="noopener noreferrer">Open map</a>
+      {% else %}
+      <span class="btn-secondary btn-sm checklist-btn-disabled">Open map</span>
+      {% endif %}
+      {% if job.can_mark_completed %}
+      <form method="post" class="inline-form">
+        <input type="hidden" name="action" value="mark_completed">
+        <input type="hidden" name="booking_id" value="{{ job.booking_id }}">
+        <input type="hidden" name="filter" value="{{ active_filter }}">
+        <button type="submit" class="btn-secondary btn-sm">Mark completed</button>
+      </form>
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<section class="panel">
+  <p class="empty">No Confirmed or Paid jobs for this period.</p>
+</section>
+{% endif %}
+{% endblock %}

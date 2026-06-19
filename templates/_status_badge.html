@@ -1,0 +1,6 @@
+{% set label = status|default('') %}
+{% if label %}
+<span class="status-badge status-{{ label|job_status_css }}">{{ label }}</span>
+{% else %}
+<span class="status-badge status-quote">Quote</span>
+{% endif %}

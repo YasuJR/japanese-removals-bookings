@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Outstanding invoices{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>Outstanding invoices</h2>
+      <p class="hint">Track unpaid and overdue invoices · {{ inv.today }}</p>
+    </div>
+  </div>
+
+  <div class="invoice-summary-grid">
+    <article class="stat-card">
+      <h3>Outstanding</h3>
+      <p class="stat-value">{{ inv.summary.outstanding_total|format_aud }}</p>
+      <p class="stat-label">{{ inv.summary.outstanding_count }} invoice{% if inv.summary.outstanding_count != 1 %}s{% endif %}</p>
+    </article>
+    <article class="stat-card stat-card-overdue">
+      <h3>Overdue</h3>
+      <p class="stat-value{% if inv.summary.overdue_total > 0 %} profit-negative{% endif %}">{{ inv.summary.overdue_total|format_aud }}</p>
+      <p class="stat-label">{{ inv.summary.overdue_count }} overdue</p>
+    </article>
+    <article class="stat-card stat-card-profit">
+      <h3>Paid this month</h3>
+      <p class="stat-value">{{ inv.summary.paid_month_total|format_aud }}</p>
+      <p class="stat-label">{{ inv.summary.paid_month_count }} paid</p>
+    </article>
+    <article class="stat-card">
+      <h3>Avg payment days</h3>
+      <p class="stat-value">{% if inv.summary.avg_payment_days is not none %}{{ inv.summary.avg_payment_days }}{% else %}—{% endif %}</p>
+      <p class="stat-label">this month</p>
+    </article>
+  </div>
+
+  <nav class="filter-bar" aria-label="Invoice filters">
+    {% for key, label in invoice_filters %}
+    <a href="{{ url_for('outstanding_invoices', filter=key) }}"
+       class="filter-pill{% if active_filter == key %} active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+  <p class="muted invoice-filter-count">{{ inv.summary.invoice_count }} shown</p>
+</section>
+
+<section class="panel">
+  {% if inv.invoices %}
+  <div class="invoice-list">
+    {% for row in inv.invoices %}
+    <article class="invoice-row-card{% if row.days_overdue %} invoice-row-overdue{% endif %}">
+      <div class="invoice-row-head">
+        <div>
+          <p class="invoice-row-number">{{ row.invoice_number }}</p>
+          <a href="{{ url_for('edit_booking', booking_id=row.booking_id) }}" class="invoice-row-customer">{{ row.customer_name }}</a>
+          <p class="invoice-row-phone muted">{{ row.phone or 'No phone' }}</p>
+        </div>
+        <div class="invoice-row-amount">
+          <span class="invoice-amount-label">Amount</span>
+          <strong>{{ row.amount|format_aud }}</strong>
+        </div>
+      </div>
+
+      <dl class="invoice-row-dates">
+        <div><dt>Issue</dt><dd>{{ row.issue_date or '—' }}</dd></div>
+        <div><dt>Due</dt><dd>{{ row.due_date or '—' }}</dd></div>
+        <div><dt>Days overdue</dt><dd class="{% if row.days_overdue %} profit-negative{% endif %}">{{ row.days_overdue_label }}</dd></div>
+      </dl>
+
+      <div class="invoice-row-actions">
+        {% if row.phone and row.phone|tel_href %}
+        <a class="driver-action-btn" href="{{ row.phone|tel_href }}">Call</a>
+        {% else %}
+        <span class="driver-action-btn driver-action-disabled">Call</span>
+        {% endif %}
+        {% if row.phone and row.phone|sms_href %}
+        <a class="driver-action-btn" href="{{ row.phone|sms_href }}">Text</a>
+        {% else %}
+        <span class="driver-action-btn driver-action-disabled">Text</span>
+        {% endif %}
+        {% if row.email and row.email|mailto_href %}
+        <a class="driver-action-btn" href="{{ row.email|mailto_href }}">Email</a>
+        {% else %}
+        <span class="driver-action-btn driver-action-disabled">Email</span>
+        {% endif %}
+        {% if row.xero_url %}
+        <a class="driver-action-btn" href="{{ row.xero_url }}" target="_blank" rel="noopener">Open in Xero</a>
+        {% else %}
+        <span class="driver-action-btn driver-action-disabled">Open in Xero</span>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+
+  <div class="table-scroll desktop-only invoice-desktop-table">
+    <table class="sheet">
+      <thead>
+        <tr>
+          <th>Invoice #</th>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th>Amount</th>
+          <th>Issue</th>
+          <th>Due</th>
+          <th>Overdue</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in inv.invoices %}
+        <tr class="{% if row.days_overdue %} invoice-row-overdue{% endif %}">
+          <td><a href="{{ url_for('edit_booking', booking_id=row.booking_id) }}">{{ row.invoice_number }}</a></td>
+          <td>{{ row.customer_name }}</td>
+          <td class="nowrap">{{ row.phone or '—' }}</td>
+          <td class="nowrap money">{{ row.amount|format_aud }}</td>
+          <td class="nowrap">{{ row.issue_date or '—' }}</td>
+          <td class="nowrap">{{ row.due_date or '—' }}</td>
+          <td class="nowrap{% if row.days_overdue %} profit-negative{% endif %}">{{ row.days_overdue_label }}</td>
+          <td class="nowrap invoice-table-actions">
+            {% if row.phone and row.phone|tel_href %}<a class="btn-secondary btn-sm" href="{{ row.phone|tel_href }}">Call</a>{% endif %}
+            {% if row.phone and row.phone|sms_href %}<a class="btn-secondary btn-sm" href="{{ row.phone|sms_href }}">Text</a>{% endif %}
+            {% if row.email and row.email|mailto_href %}<a class="btn-secondary btn-sm" href="{{ row.email|mailto_href }}">Email</a>{% endif %}
+            {% if row.xero_url %}<a class="btn-secondary btn-sm" href="{{ row.xero_url }}" target="_blank" rel="noopener">Xero</a>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No invoices match this filter.</p>
+  {% endif %}
+</section>
+{% endblock %}

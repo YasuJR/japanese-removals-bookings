@@ -1,0 +1,71 @@
+{
+  "phase": 17,
+  "feature": "daily_job_checklist",
+  "results": [
+    {
+      "name": "Test A \u2014 Today filter includes Confirmed booking",
+      "pass": true,
+      "details": [
+        "Today checklist includes Confirmed job."
+      ],
+      "booking_id": 89
+    },
+    {
+      "name": "Test B \u2014 Tomorrow filter shows tomorrow jobs only",
+      "pass": true,
+      "details": [
+        "Tomorrow filter scoped correctly."
+      ],
+      "booking_id": 90
+    },
+    {
+      "name": "Test C \u2014 Pending booking excluded",
+      "pass": true,
+      "details": [
+        "Pending booking excluded."
+      ],
+      "booking_id": 91
+    },
+    {
+      "name": "Test D \u2014 Checklist items computed from booking data",
+      "pass": true,
+      "details": [
+        "Before-job checklist items reflect booking fields."
+      ],
+      "booking_id": 92
+    },
+    {
+      "name": "Test E \u2014 Warnings for missing phone, crew, payment, calendar, invoice",
+      "pass": true,
+      "details": [
+        "Expected warnings generated."
+      ],
+      "booking_id": 93,
+      "warnings": [
+        "double_booking",
+        "no_calendar",
+        "no_crew",
+        "no_invoice",
+        "no_phone",
+        "not_paid"
+      ]
+    },
+    {
+      "name": "Test F \u2014 Mark completed updates status and checklist",
+      "pass": true,
+      "details": [
+        "Mark completed action works."
+      ],
+      "booking_id": 94
+    },
+    {
+      "name": "Test G \u2014 This week filter includes in-range jobs",
+      "pass": true,
+      "details": [
+        "Week filter includes job in current ISO week."
+      ],
+      "booking_id": 95
+    }
+  ],
+  "all_pass": true
+}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Stripe settings{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <p class="breadcrumb muted"><a href="{{ url_for('settings') }}">Settings</a> → Stripe</p>
+  <h2>Stripe card payments</h2>
+  <p class="hint">Accept credit card payments via Stripe Checkout. A card processing surcharge is added to the customer total — bank transfer stays fee-free.</p>
+
+  {% if status.stripe_ready %}
+  <p class="status-pill ok">Stripe enabled &amp; ready</p>
+  {% elif stripe_form.credentials_ok %}
+  <p class="status-pill pending">Keys saved — enable Stripe below</p>
+  {% else %}
+  <p class="status-pill off">Not configured</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <form method="post" class="settings-form stripe-settings-form">
+    <input type="hidden" name="action" value="save">
+    <div class="form-grid">
+      <label>
+        Publishable key
+        <input type="text" name="publishable_key" autocomplete="off"
+               value="{{ stripe_form.publishable_key }}"
+               placeholder="pk_live_… or pk_test_…">
+      </label>
+      <label>
+        Secret key
+        {% if stripe_form.secret_saved_in_file %}
+        <span class="status-pill ok xero-secret-status">Saved — hidden for security</span>
+        {% elif stripe_form.secret_from_env %}
+        <span class="status-pill pending xero-secret-status">Using secret from .env</span>
+        {% else %}
+        <span class="status-pill off xero-secret-status">Not saved yet</span>
+        {% endif %}
+        <input type="password" name="secret_key" autocomplete="off"
+               placeholder="{% if stripe_form.has_secret %}Enter only to replace{% else %}Required — sk_live_… or sk_test_…{% endif %}">
+      </label>
+      <label>
+        Webhook secret
+        {% if stripe_form.webhook_saved_in_file %}
+        <span class="status-pill ok xero-secret-status">Saved — hidden</span>
+        {% elif stripe_form.webhook_from_env %}
+        <span class="status-pill pending xero-secret-status">Using webhook secret from .env</span>
+        {% else %}
+        <span class="status-pill off xero-secret-status">Not saved yet</span>
+        {% endif %}
+        <input type="password" name="webhook_secret" autocomplete="off"
+               placeholder="whsec_…">
+      </label>
+      <label>
+        Card surcharge (%)
+        <input type="number" name="card_surcharge_percent" min="0" max="10" step="0.1"
+               value="{{ stripe_form.card_surcharge_percent }}">
+      </label>
+    </div>
+
+    <label class="checkbox-row">
+      <input type="checkbox" name="stripe_enabled"
+        {% if stripe_form.stripe_enabled %}checked{% endif %}
+        {% if not stripe_form.credentials_ok %}disabled{% endif %}>
+      STRIPE_ENABLED — allow Pay by Credit Card on invoices
+    </label>
+    <p class="muted form-hint">Stripe stays off until publishable and secret keys are saved. Bank transfer remains available with no surcharge.</p>
+
+    <h3>Webhook</h3>
+    <p class="muted form-hint">In Stripe Dashboard → Developers → Webhooks, add endpoint:</p>
+    <p><code class="path-code">{{ stripe_form.webhook_url }}</code></p>
+    <p class="muted form-hint">Listen for <strong>checkout.session.completed</strong>.</p>
+
+    <h3>Xero (optional)</h3>
+    <label>
+      Xero payment account (code or Account ID)
+      <input type="text" name="xero_payment_account_code"
+             value="{{ stripe_form.xero_payment_account_code }}"
+             placeholder="Auto-detect first bank account if blank">
+    </label>
+    <p class="muted form-hint">When a Stripe payment succeeds, a payment is posted to this Xero bank account. Re-connect Xero if payment posting returns unauthorized (needs accounting.payments scope).</p>
+
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">Save settings</button>
+      <a class="btn-secondary" href="{{ url_for('settings') }}">Back</a>
+    </div>
+  </form>
+
+  <ul class="config-check muted">
+    <li>Settings file: <code class="path-code">{{ stripe_form.settings_path }}</code></li>
+    <li>Credentials saved: {% if stripe_form.credentials_ok %}Yes{% else %}No{% endif %}</li>
+    <li>Webhook secret: {% if stripe_form.has_webhook_secret %}Yes{% else %}No — add for automatic Paid status{% endif %}</li>
+    <li>Default surcharge: {{ stripe_form.card_surcharge_percent }}%</li>
+  </ul>
+</section>
+{% endblock %}

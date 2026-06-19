@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Gmail inbox automation{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <p class="breadcrumb muted"><a href="{{ url_for('settings') }}">Settings</a> → Gmail inbox</p>
+  <h2>Phase 5 — Gmail inbox automation</h2>
+  <p class="hint">Monitor your Gmail inbox and automatically create <strong>Pending</strong> bookings from new enquiry emails. Admin receives an email with a link to review each booking.</p>
+
+  <p class="status-pill {% if status.google_connected and status.gmail_scope_granted %}ok{% elif status.google_connected %}pending{% else %}off{% endif %}">
+    {% if status.google_connected and status.gmail_scope_granted %}Google connected with Gmail scope
+    {% elif status.google_connected %}Google connected — reconnect to grant Gmail scope
+    {% else %}Google not connected{% endif %}
+  </p>
+  {% if status.gmail_automation_enabled %}
+  <p class="status-pill ok">Gmail inbox automation enabled</p>
+  {% else %}
+  <p class="status-pill off">Gmail inbox automation disabled</p>
+  {% endif %}
+  {% if not status.gmail_inbox_enabled %}
+  <p class="muted form-hint">Set <code>GMAIL_INBOX_ENABLED=true</code> in <code>.env</code> to allow automation.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>Settings</h3>
+  <form method="post" class="settings-form">
+    <input type="hidden" name="action" value="save">
+
+    <label class="checkbox-row">
+      <input type="checkbox" name="automation_enabled"
+        {% if gmail_form.automation_enabled %}checked{% endif %}
+        {% if not status.gmail_inbox_enabled or not status.gmail_scope_granted %}disabled{% endif %}>
+      Enable Gmail inbox automation
+    </label>
+
+    <div class="form-grid">
+      <label>
+        Gmail search query
+        <input type="text" name="inbox_query" value="{{ gmail_form.inbox_query }}"
+          placeholder="is:unread">
+        <span class="muted form-hint">Examples: <code>is:unread</code>, <code>label:enquiries is:unread</code></span>
+      </label>
+      <label>
+        Admin notify email
+        <input type="email" name="admin_notify_email" value="{{ gmail_form.admin_notify_email }}"
+          placeholder="admin@example.com">
+        <span class="muted form-hint">Receives a review link when a booking is auto-created. Uses company email if blank.</span>
+      </label>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">Save settings</button>
+      {% if status.google_configured and not status.google_connected %}
+      <a class="btn-secondary" href="{{ url_for('google_connect') }}">Connect Google</a>
+      {% elif status.google_connected and not status.gmail_scope_granted %}
+      <a class="btn-secondary" href="{{ url_for('google_connect') }}">Reconnect Google (Gmail scope)</a>
+      {% endif %}
+    </div>
+  </form>
+
+  <form method="post" class="form-actions" style="margin-top: 1rem;">
+    <input type="hidden" name="action" value="run_inbox_check">
+    <button type="submit" class="btn-secondary"
+      {% if not status.gmail_automation_enabled %}disabled{% endif %}>
+      Check inbox now
+    </button>
+  </form>
+
+  <ul class="config-check muted">
+    <li>Settings file: <code class="path-code">{{ gmail_form.settings_path }}</code></li>
+    <li>Last checked: {{ gmail_form.last_checked_at or '—' }}</li>
+    <li>Gmail scope granted: {% if gmail_form.gmail_scope_granted %}Yes{% else %}No{% endif %}</li>
+    <li>SMTP for admin alerts: {% if status.email_configured %}Configured{% else %}Not configured — add SMTP to .env{% endif %}</li>
+  </ul>
+  <p class="muted form-hint">Pending bookings skip calendar sync, customer SMS, and Xero auto-create until you review and update status.</p>
+</section>
+
+<section class="panel">
+  <h3>Processed emails (recent)</h3>
+  {% if processed_messages %}
+  <div class="table-scroll">
+    <table class="sheet automation-log-sheet">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Booking</th>
+          <th>Subject</th>
+          <th>Customer</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in processed_messages %}
+        <tr>
+          <td class="nowrap">{{ row.processed_at[:16] }}</td>
+          <td class="nowrap">
+            {% if row.booking_id %}
+            <a href="{{ url_for('edit_booking', booking_id=row.booking_id) }}">#{{ row.booking_id }}</a>
+            {% else %}—{% endif %}
+          </td>
+          <td>{{ row.subject or '—' }}</td>
+          <td>{{ row.customer_name or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty muted">No processed Gmail messages yet.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>Automation log</h3>
+  {% if automation_logs %}
+  <div class="table-scroll">
+    <table class="sheet automation-log-sheet">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Booking</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in automation_logs %}
+        <tr class="automation-log-{{ entry.status }}">
+          <td class="nowrap">{{ entry.created_at[:16] }}</td>
+          <td class="nowrap">
+            {% if entry.booking_id %}
+            <a href="{{ url_for('edit_booking', booking_id=entry.booking_id) }}">#{{ entry.booking_id }}</a>
+            {% else %}—{% endif %}
+          </td>
+          <td class="nowrap">{{ entry.automation_type }}</td>
+          <td class="nowrap"><span class="automation-status automation-status-{{ entry.status }}">{{ entry.status }}</span></td>
+          <td>{{ entry.message }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty muted">No Gmail automation runs yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

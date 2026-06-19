@@ -1,0 +1,7 @@
+{% if crew_warnings is defined and crew_warnings %}
+<ul class="crew-warnings" role="alert">
+  {% for msg in crew_warnings %}
+  <li>{{ msg }}</li>
+  {% endfor %}
+</ul>
+{% endif %}

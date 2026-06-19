@@ -1,0 +1,41 @@
+{
+  "steps": [
+    "Parsed sample enquiry email",
+    "Booking #35 created from email."
+  ],
+  "parsed": {
+    "customer_name": "Jane Smith",
+    "phone": "0412 345 678",
+    "email": "jane.smith@example.com",
+    "move_date": "2026-07-20",
+    "pickup_address": "10 Kings Park Rd, West Perth WA",
+    "delivery_address": "5 Swan St, Fremantle WA",
+    "notes": "Move details (from email):\n- Bedrooms: 2 bedrooms\n- Stairs: 1 flight at pickup, lift at delivery\n- Piano: yes (upright)\n- Pool table: No\n- Packing required: Yes\n- Estimated volume: 25 m\u00b3\n\nEmail subject: Moving quote request\n\nPlease call before arriving.",
+    "bedrooms": "2 bedrooms",
+    "stairs": "1 flight at pickup, lift at delivery",
+    "piano": "yes (upright)",
+    "pool_table": "No",
+    "packing_required": "Yes",
+    "estimated_volume": "25 m\u00b3",
+    "subject": "Moving quote request",
+    "source_text": "Moving quote request\nCustomer name: Jane Smith\nPhone: 0412 345 678\nEmail: jane.smith@example.com\nMove date: 20/07/2026\nPickup: 10 Kings Park Rd, West Perth WA\nDelivery: 5 Swan St, Fremantle WA\nBedrooms: 2\nStairs: 1 flight at pickup, lift at delivery\nPiano: yes (upright)\nPool table: no\nPacking required: yes\nEstimated volume: 25 m\u00b3\nNotes: Please call before arriving."
+  },
+  "missing_required": [],
+  "create": {
+    "ok": true,
+    "message": "Booking #35 created from email.",
+    "booking_id": 35
+  },
+  "booking": {
+    "status": "Pending",
+    "customer_name": "Jane Smith",
+    "phone": "0412 345 678",
+    "email": "jane.smith@example.com",
+    "move_date": "2026-07-20",
+    "pickup_address": "10 Kings Park Rd, West Perth WA",
+    "delivery_address": "5 Swan St, Fremantle WA",
+    "gmail_message_id": "msg_phase5_test_1781703751",
+    "notes": "Move details (from email):\n- Bedrooms: 2 bedrooms\n- Stairs: 1 flight at pickup, lift at delivery\n- Piano: yes (upright)\n- Pool table: No\n- Packing required: Yes\n- Estimated volume: 25 m\u00b3\n\nEmail subject: Moving quote request\n\nPlease call before arriving."
+  },
+  "passed": true
+}

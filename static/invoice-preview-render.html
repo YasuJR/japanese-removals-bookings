@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Invoice preview — INV-0011</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/invoice.css">
+</head>
+<body class="invoice-preview-page">
+  <div class="invoice-preview-toolbar">
+    <a class="btn-secondary btn-sm" href="/bookings/21/edit">← Back to booking</a>
+    <a class="btn-primary btn-sm" href="/bookings/21/invoice.pdf" target="_blank">Download PDF</a>
+    <button type="button" class="btn-secondary btn-sm" onclick="window.print()">Print</button>
+  </div>
+
+  <article class="invoice-sheet">
+    <header class="invoice-brand">
+      
+      <img class="invoice-logo" src="/static/branding/japanese-removals-logo.png" alt="Japanese Removals">
+      
+      <div class="invoice-brand-text">
+        <h1 class="invoice-company-name">Japanese Removals</h1>
+        <p class="invoice-contact-line">Phone: 0481 089 573 | Email: info@japaneseremovals.com.au | Website: japaneseremovals.com.au</p>
+      </div>
+    </header>
+
+    <hr class="invoice-accent-line">
+
+    <div class="invoice-title-row">
+      <h2 class="invoice-title">TAX INVOICE</h2>
+      <table class="invoice-meta-right">
+        <tr><td>Invoice Date</td><td>30 June 2026</td></tr>
+        <tr><td>Invoice Number</td><td>INV-0011</td></tr>
+        <tr><td>Reference</td><td>21</td></tr>
+        <tr><td>ABN</td><td>—</td></tr>
+      </table>
+    </div>
+
+    <hr class="invoice-accent-line invoice-accent-line-subtle">
+
+    <section class="invoice-bill-section">
+      <h3 class="invoice-section-title">Bill to</h3>
+      <p class="invoice-bill-to">Layout Test Customer</p>
+    </section>
+
+    <table class="invoice-lines">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th class="num">Qty</th>
+          <th class="num">Unit price</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr>
+          <td class="invoice-line-desc">Moving Labour<br/>5.0 hrs<br/>$180.00/hr<br/>Crew:<br/>Yasu, Tom, Ken</td>
+          <td class="num">5.00</td>
+          <td class="num">$180.00</td>
+          <td class="num">$900.00</td>
+        </tr>
+        
+        <tr>
+          <td class="invoice-line-desc">Callout fee</td>
+          <td class="num">1.00</td>
+          <td class="num">$90.00</td>
+          <td class="num">$90.00</td>
+        </tr>
+        
+      </tbody>
+    </table>
+
+    <table class="invoice-totals">
+      
+      <tr>
+        <td>Subtotal (ex GST)</td>
+        <td>$900.00</td>
+      </tr>
+      <tr>
+        <td>GST (10%)</td>
+        <td>$90.00</td>
+      </tr>
+      
+      <tr class="invoice-total-row">
+        <td>TOTAL AUD (incl. GST)</td>
+        <td>$990.00</td>
+      </tr>
+    </table>
+
+    <section class="invoice-payment-box">
+      <h3>PAYMENT DETAILS</h3>
+      <dl class="invoice-payment-grid">
+        <dt>Bank Name:</dt>
+        <dd>Westpac</dd>
+        <dt>Account Name:</dt>
+        <dd>JR West Pty Ltd</dd>
+        <dt>BSB:</dt>
+        <dd>036308</dd>
+        <dt>Account Number:</dt>
+        <dd>405623</dd>
+      </dl>
+    </section>
+
+    <footer class="invoice-footer">
+      <hr class="invoice-accent-line invoice-accent-line-subtle">
+      <p>Trusted Service | Smart Solutions | Stress-Free Relocations</p>
+    </footer>
+  </article>
+</body>
+</html>

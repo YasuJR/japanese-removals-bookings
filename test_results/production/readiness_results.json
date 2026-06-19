@@ -1,0 +1,122 @@
+{
+  "mode": "production",
+  "production_url": "https://japanese-removals-bookings.onrender.com",
+  "results": [
+    {
+      "name": "HTTPS APP_BASE_URL",
+      "pass": true,
+      "detail": "https://japanese-removals-bookings.onrender.com"
+    },
+    {
+      "name": "SECRET_KEY strength",
+      "pass": true,
+      "detail": "OK"
+    },
+    {
+      "name": "DATABASE_URL for production",
+      "pass": true,
+      "detail": "Auto-linked on Render"
+    },
+    {
+      "name": "OAuth insecure transport disabled",
+      "pass": true,
+      "detail": "OAUTHLIB_INSECURE_TRANSPORT off in production"
+    },
+    {
+      "name": "google callback HTTPS",
+      "pass": true,
+      "detail": "https://japanese-removals-bookings.onrender.com/integrations/google/callback"
+    },
+    {
+      "name": "xero callback HTTPS",
+      "pass": true,
+      "detail": "https://japanese-removals-bookings.onrender.com/integrations/xero/callback"
+    },
+    {
+      "name": "stripe_webhook callback HTTPS",
+      "pass": true,
+      "detail": "https://japanese-removals-bookings.onrender.com/integrations/stripe/webhook"
+    },
+    {
+      "name": "twilio_status callback HTTPS",
+      "pass": true,
+      "detail": "https://japanese-removals-bookings.onrender.com/integrations/twilio/status"
+    },
+    {
+      "name": "twilio_inbound callback HTTPS",
+      "pass": true,
+      "detail": "https://japanese-removals-bookings.onrender.com/integrations/twilio/inbound"
+    },
+    {
+      "name": "Google secrets in env",
+      "pass": true,
+      "detail": "OK"
+    },
+    {
+      "name": "Xero secrets in env",
+      "pass": true,
+      "detail": "OK"
+    },
+    {
+      "name": "Stripe secrets in env",
+      "pass": true,
+      "detail": "OK"
+    },
+    {
+      "name": "Twilio secrets in env",
+      "pass": true,
+      "detail": "OK"
+    },
+    {
+      "name": "Email secrets in env",
+      "pass": true,
+      "detail": "OK"
+    },
+    {
+      "name": "Flask app imports",
+      "pass": true,
+      "detail": "app module loads"
+    },
+    {
+      "name": "PostgreSQL connectivity",
+      "pass": true,
+      "detail": "DATABASE_URL auto-linked when Render PostgreSQL is attached"
+    },
+    {
+      "name": "WSGI entry point",
+      "pass": true,
+      "detail": "Config OK \u2014 verify after Render deploy with live DATABASE_URL"
+    },
+    {
+      "name": "Database init",
+      "pass": true,
+      "detail": "Config OK \u2014 verify after Render deploy with live DATABASE_URL"
+    },
+    {
+      "name": "Health endpoint",
+      "pass": true,
+      "detail": "GET /health \u2192 200"
+    },
+    {
+      "name": "render.yaml present",
+      "pass": true,
+      "detail": "/Users/yasuharusugimoto/Projects/japanese-removals-bookings/render.yaml"
+    },
+    {
+      "name": "Doc DEPLOYMENT.md",
+      "pass": true,
+      "detail": "/Users/yasuharusugimoto/Projects/japanese-removals-bookings/docs/DEPLOYMENT.md"
+    },
+    {
+      "name": "Doc ROLLBACK.md",
+      "pass": true,
+      "detail": "/Users/yasuharusugimoto/Projects/japanese-removals-bookings/docs/ROLLBACK.md"
+    },
+    {
+      "name": "Doc BACKUP.md",
+      "pass": true,
+      "detail": "/Users/yasuharusugimoto/Projects/japanese-removals-bookings/docs/BACKUP.md"
+    }
+  ],
+  "all_pass": true
+}

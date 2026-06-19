@@ -1,0 +1,90 @@
+{
+  "phase": 15,
+  "feature": "profit_calculation",
+  "results": [
+    {
+      "name": "Test A \u2014 Paid bank transfer with staff/fuel/truck costs",
+      "pass": true,
+      "details": [
+        "Profit calculated correctly for bank transfer booking."
+      ],
+      "booking_id": 65,
+      "metrics": {
+        "revenue": 330.0,
+        "gst_amount": 30.0,
+        "net_revenue": 300.0,
+        "stripe_fee": 0.0,
+        "staff_cost": 100.0,
+        "fuel_cost": 50.0,
+        "truck_cost": 80.0,
+        "other_costs": 0.0,
+        "total_costs": 230.0,
+        "estimated_profit": 70.0,
+        "profit_margin_percent": 21.21
+      }
+    },
+    {
+      "name": "Test B \u2014 Paid Stripe card payment includes surcharge",
+      "pass": true,
+      "details": [
+        "Stripe fee included in profit calculation."
+      ],
+      "booking_id": 66,
+      "metrics": {
+        "revenue": 330.0,
+        "gst_amount": 30.0,
+        "net_revenue": 300.0,
+        "stripe_fee": 9.9,
+        "staff_cost": 100.0,
+        "fuel_cost": 50.0,
+        "truck_cost": 80.0,
+        "other_costs": 0.0,
+        "total_costs": 239.9,
+        "estimated_profit": 60.1,
+        "profit_margin_percent": 18.21
+      }
+    },
+    {
+      "name": "Test C \u2014 Pending excluded from monthly profit summary",
+      "pass": true,
+      "details": [
+        "Pending booking excluded by default."
+      ],
+      "pending_id": 67,
+      "completed_id": 68,
+      "summary_booking_count": 32
+    },
+    {
+      "name": "Test D \u2014 Completed booking included in monthly summary",
+      "pass": true,
+      "details": [
+        "Completed booking included with revenue counted."
+      ],
+      "booking_id": 69,
+      "metrics": {
+        "revenue": 330.0,
+        "gst_amount": 30.0,
+        "net_revenue": 300.0,
+        "stripe_fee": 0.0,
+        "staff_cost": 0.0,
+        "fuel_cost": 0.0,
+        "truck_cost": 0.0,
+        "other_costs": 0.0,
+        "total_costs": 0.0,
+        "estimated_profit": 300.0,
+        "profit_margin_percent": 90.91
+      }
+    },
+    {
+      "name": "Test E \u2014 Manual cost update recalculates profit",
+      "pass": true,
+      "details": [
+        "Profit recalculated after manual cost update."
+      ],
+      "booking_id": 70,
+      "before_profit": 70.0,
+      "after_profit": 20.0
+    }
+  ],
+  "all_pass": true
+}

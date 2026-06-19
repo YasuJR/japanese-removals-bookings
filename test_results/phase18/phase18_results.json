@@ -1,0 +1,57 @@
+{
+  "phase": 18,
+  "feature": "ceo_dashboard",
+  "results": [
+    {
+      "name": "Test A \u2014 Phase 18 sections only",
+      "pass": true,
+      "details": [
+        "Seven Phase 18 sections present."
+      ]
+    },
+    {
+      "name": "Test B \u2014 Today job counts",
+      "pass": true,
+      "details": [
+        "Today counts populated."
+      ]
+    },
+    {
+      "name": "Test C \u2014 Tomorrow missing crew/truck/phone/invoice",
+      "pass": true,
+      "details": [
+        "Tomorrow warning counts correct."
+      ]
+    },
+    {
+      "name": "Test D \u2014 Money revenue, profit, margin",
+      "pass": true,
+      "details": [
+        "Money section valid."
+      ]
+    },
+    {
+      "name": "Test E \u2014 Payments including total outstanding",
+      "pass": true,
+      "details": [
+        "Payments section valid."
+      ],
+      "booking_id": 184
+    },
+    {
+      "name": "Test F \u2014 Automation health (5 integrations)",
+      "pass": true,
+      "details": [
+        "Five automation health cards present."
+      ]
+    },
+    {
+      "name": "Test G \u2014 Alerts include missing phone",
+      "pass": true,
+      "details": [
+        "Tomorrow missing phone warning present."
+      ]
+    }
+  ],
+  "all_pass": true
+}

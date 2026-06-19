@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Driver run sheet{% endblock %}
+
+{% block content %}
+<div class="driver-run-sheet">
+  <section class="panel driver-run-header">
+    <h2>Driver run sheet</h2>
+    <p class="hint">{{ sheet.date_heading }}{% if sheet.is_today %} · Today{% endif %}</p>
+
+    <nav class="driver-crew-bar" aria-label="Crew member">
+      {% for name in crew_options %}
+      <a href="{{ url_for('driver', crew=name, date=move_date, truck=active_truck) }}"
+         class="filter-pill{% if active_crew == name %} active{% endif %}">{{ name }}</a>
+      {% endfor %}
+    </nav>
+
+    <nav class="driver-crew-bar" aria-label="Truck">
+      <a href="{{ url_for('driver', crew=active_crew, date=move_date) }}"
+         class="filter-pill{% if not active_truck %} active{% endif %}">All trucks</a>
+      {% for truck in truck_options %}
+      <a href="{{ url_for('driver', crew=active_crew, date=move_date, truck=truck) }}"
+         class="filter-pill{% if active_truck == truck %} active{% endif %}">{{ truck }}</a>
+      {% endfor %}
+    </nav>
+
+    <form method="get" action="{{ url_for('driver') }}" class="driver-date-form">
+      <input type="hidden" name="crew" value="{{ active_crew }}">
+      {% if active_truck %}
+      <input type="hidden" name="truck" value="{{ active_truck }}">
+      {% endif %}
+      <label>
+        <span class="driver-date-label">Date</span>
+        <input type="date" name="date" value="{{ move_date }}" onchange="this.form.submit()">
+      </label>
+    </form>
+
+    <div class="driver-run-summary">
+      <h3 class="driver-run-name">{{ sheet.crew }}</h3>
+      <p class="driver-run-jobs">{{ sheet.jobs_label }}</p>
+      <p class="driver-run-hours">{{ sheet.hours_label }}</p>
+      <a class="btn-primary driver-export-btn"
+         href="{{ url_for('driver_run_sheet_pdf', crew=active_crew, date=move_date, truck=active_truck) }}"
+         target="_blank" rel="noopener">Export PDF</a>
+    </div>
+  </section>
+
+  {% if sheet.jobs %}
+  <div class="driver-job-list">
+    {% for job in sheet.jobs %}
+    <article class="driver-job-card">
+      <a href="{{ url_for('edit_booking', booking_id=job.booking_id) }}" class="driver-job-main">
+        <p class="driver-job-time">{{ job.start_display }}</p>
+        <p class="driver-job-customer">{{ job.customer_name }}</p>
+        <div class="driver-job-badges">
+          {% if job.suburb_badge %}
+          <span class="suburb-badge">{{ job.suburb_badge }}</span>
+          {% endif %}
+          {% with status=job.status %}
+          {% include '_status_badge.html' %}
+          {% endwith %}
+        </div>
+        {% if job.notes %}
+        <p class="driver-job-notes"><span>Notes:</span> {{ job.notes }}</p>
+        {% endif %}
+      </a>
+
+      <div class="driver-actions">
+        {% if job.phone and job.phone|tel_href %}
+        <a class="driver-action-btn" href="{{ job.phone|tel_href }}">Call</a>
+        {% else %}
+        <span class="driver-action-btn driver-action-disabled">Call</span>
+        {% endif %}
+        {% if job.phone and job.phone|sms_href %}
+        <a class="driver-action-btn" href="{{ job.phone|sms_href }}">Text</a>
+        {% else %}
+        <span class="driver-action-btn driver-action-disabled">Text</span>
+        {% endif %}
+        {% if job.pickup_address %}
+        <a class="driver-action-btn" href="{{ job.pickup_address|apple_maps_url }}" target="_blank" rel="noopener noreferrer">Pickup Map</a>
+        {% else %}
+        <span class="driver-action-btn driver-action-disabled">Pickup Map</span>
+        {% endif %}
+        {% if job.delivery_address %}
+        <a class="driver-action-btn" href="{{ job.delivery_address|apple_maps_url }}" target="_blank" rel="noopener noreferrer">Delivery Map</a>
+        {% else %}
+        <span class="driver-action-btn driver-action-disabled">Delivery Map</span>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <section class="panel">
+    <p class="empty">No jobs for {{ sheet.crew }} on this day.</p>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

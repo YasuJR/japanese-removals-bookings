@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Delete booking #{{ booking.id }}{% endblock %}
+
+{% block content %}
+<section class="panel panel-danger">
+  <h2>Delete booking #{{ booking.id }}?</h2>
+  <p class="hint">This cannot be undone. The following booking will be removed:</p>
+
+  <dl class="delete-summary">
+    <div><dt>Customer</dt><dd>{{ booking.customer_name }}</dd></div>
+    <div><dt>Move date</dt><dd>{{ booking.move_date }}</dd></div>
+    <div><dt>Pickup</dt><dd>{{ booking.pickup_address }}</dd></div>
+    <div><dt>Delivery</dt><dd>{{ booking.delivery_address }}</dd></div>
+  </dl>
+
+  <form method="post" class="form-actions">
+    <input type="hidden" name="confirm" value="yes">
+    <button type="submit" class="btn-danger">Yes, delete permanently</button>
+    <p class="hint">Step 2 of 2 — this removes the booking from the database and Google Calendar.</p>
+    <a class="btn-secondary" href="{{ url_for('edit_booking', booking_id=booking.id) }}">Cancel</a>
+  </form>
+</section>
+{% endblock %}

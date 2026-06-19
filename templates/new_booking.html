@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}New booking{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>New booking</h2>
+  <p class="hint">Fill in the customer and move details, then save.</p>
+
+  <form method="post" class="booking-form">
+    {% include '_double_booking_banner.html' %}
+    {% include '_booking_form.html' %}
+    {% include '_extra_charges.html' %}
+    {% include '_invoice_panel.html' %}
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">Save booking</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

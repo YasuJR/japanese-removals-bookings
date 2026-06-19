@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Crew management{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Crew management</h2>
+  <p class="hint">Manage crew members for booking assignment and run sheets.</p>
+  <p><a class="btn-secondary btn-sm" href="{{ url_for('settings') }}">← Settings</a></p>
+</section>
+
+<section class="panel">
+  <h3>Crew table</h3>
+  <div class="table-scroll">
+    <table class="data-table resource-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for member in crew_members %}
+        <tr>
+          <form method="post" action="{{ url_for('crew_management') }}">
+            <input type="hidden" name="action" value="update">
+            <input type="hidden" name="crew_id" value="{{ member.id }}">
+            <td><input type="text" name="name" value="{{ member.name }}" required></td>
+            <td><input type="tel" name="phone" value="{{ member.phone }}"></td>
+            <td><input type="text" name="role" value="{{ member.role }}"></td>
+            <td>
+              <label class="inline-check">
+                <input type="checkbox" name="active" value="on" {% if member.active %}checked{% endif %}>
+                Active
+              </label>
+            </td>
+            <td><button type="submit" class="btn-secondary btn-sm">Save</button></td>
+          </form>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty">No crew members yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>Add crew member</h3>
+  <form method="post" action="{{ url_for('crew_management') }}" class="form-grid resource-form">
+    <input type="hidden" name="action" value="create">
+    <label>
+      Name *
+      <input type="text" name="name" required>
+    </label>
+    <label>
+      Phone
+      <input type="tel" name="phone">
+    </label>
+    <label>
+      Role
+      <input type="text" name="role" placeholder="Driver">
+    </label>
+    <label class="inline-check">
+      <input type="checkbox" name="active" value="on" checked>
+      Active
+    </label>
+    <div class="full-width">
+      <button type="submit" class="btn-primary">Add crew member</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

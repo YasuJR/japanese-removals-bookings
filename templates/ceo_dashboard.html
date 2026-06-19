@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}CEO Dashboard{% endblock %}
+
+{% block content %}
+<div class="ceo-dashboard">
+  <header class="ceo-header">
+    <div>
+      <p class="ceo-kicker">{{ ceo.company_name }}</p>
+      <h2 class="ceo-title">CEO Dashboard</h2>
+      {% set today_parts = ceo.today|format_display_date %}
+      <p class="ceo-subtitle">{{ today_parts.weekday }} {{ today_parts.day_month }}</p>
+    </div>
+  </header>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">1. Today</h3>
+    <div class="ceo-stat-grid ceo-stat-grid-5">
+      <article class="ceo-stat-card ceo-stat-hero">
+        <span class="ceo-stat-label">Jobs today</span>
+        <strong class="ceo-stat-value">{{ ceo.today_section.jobs_today }}</strong>
+      </article>
+      <article class="ceo-stat-card">
+        <span class="ceo-stat-label">Confirmed</span>
+        <strong class="ceo-stat-value">{{ ceo.today_section.confirmed }}</strong>
+      </article>
+      <article class="ceo-stat-card">
+        <span class="ceo-stat-label">On route</span>
+        <strong class="ceo-stat-value">{{ ceo.today_section.on_route }}</strong>
+      </article>
+      <article class="ceo-stat-card">
+        <span class="ceo-stat-label">Completed</span>
+        <strong class="ceo-stat-value">{{ ceo.today_section.completed }}</strong>
+      </article>
+      <article class="ceo-stat-card ceo-stat-warn">
+        <span class="ceo-stat-label">Not started</span>
+        <strong class="ceo-stat-value">{{ ceo.today_section.not_started }}</strong>
+      </article>
+    </div>
+    {% if ceo.today_section.jobs %}
+    <div class="ceo-job-list">
+      {% for job in ceo.today_section.jobs %}
+      <article class="ceo-job-card">
+        <strong>{{ job.customer_name }}</strong>
+        <p class="ceo-job-meta">{{ job.start_display }} · {{ job.status }}</p>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="{{ url_for('edit_booking', booking_id=job.booking_id) }}">Open booking</a>
+          {% if job.has_phone %}
+          <a class="ceo-action-btn ceo-action-sm" href="{{ job.phone|tel_href }}">Call</a>
+          <a class="ceo-action-btn ceo-action-sm" href="{{ job.phone|sms_href }}">Text</a>
+          {% endif %}
+          {% if job.pickup_address %}
+          <a class="ceo-action-btn ceo-action-sm" href="{{ job.pickup_address|apple_maps_url }}" target="_blank" rel="noopener noreferrer">Map</a>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">2. Tomorrow</h3>
+    <div class="ceo-stat-grid">
+      <article class="ceo-stat-card ceo-stat-hero">
+        <span class="ceo-stat-label">Jobs tomorrow</span>
+        <strong class="ceo-stat-value">{{ ceo.tomorrow_section.jobs_tomorrow }}</strong>
+      </article>
+      <article class="ceo-stat-card ceo-stat-warn">
+        <span class="ceo-stat-label">Missing crew</span>
+        <strong class="ceo-stat-value">{{ ceo.tomorrow_section.missing_crew }}</strong>
+      </article>
+      <article class="ceo-stat-card ceo-stat-warn">
+        <span class="ceo-stat-label">Missing truck</span>
+        <strong class="ceo-stat-value">{{ ceo.tomorrow_section.missing_truck }}</strong>
+      </article>
+      <article class="ceo-stat-card ceo-stat-warn">
+        <span class="ceo-stat-label">Missing phone</span>
+        <strong class="ceo-stat-value">{{ ceo.tomorrow_section.missing_phone }}</strong>
+      </article>
+      <article class="ceo-stat-card ceo-stat-warn">
+        <span class="ceo-stat-label">Missing invoice</span>
+        <strong class="ceo-stat-value">{{ ceo.tomorrow_section.missing_invoice }}</strong>
+      </article>
+      <article class="ceo-stat-card ceo-stat-warn">
+        <span class="ceo-stat-label">Crew conflict</span>
+        <strong class="ceo-stat-value">{{ ceo.tomorrow_section.crew_conflict }}</strong>
+      </article>
+      <article class="ceo-stat-card ceo-stat-warn">
+        <span class="ceo-stat-label">Truck conflict</span>
+        <strong class="ceo-stat-value">{{ ceo.tomorrow_section.truck_conflict }}</strong>
+      </article>
+    </div>
+  </section>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">3. Money</h3>
+    <div class="ceo-money-summary">
+      <article class="ceo-money-card">
+        <h4>Revenue</h4>
+        <div class="ceo-money-row"><span>Today</span><strong class="money">{{ ceo.money.revenue.today|format_aud }}</strong></div>
+        <div class="ceo-money-row"><span>This week</span><strong class="money">{{ ceo.money.revenue.week|format_aud }}</strong></div>
+        <div class="ceo-money-row"><span>This month</span><strong class="money">{{ ceo.money.revenue.month|format_aud }}</strong></div>
+      </article>
+      <article class="ceo-money-card">
+        <h4>Profit</h4>
+        <div class="ceo-money-row"><span>Today</span><strong class="money{% if ceo.money.profit.today < 0 %} profit-negative{% endif %}">{{ ceo.money.profit.today|format_aud }}</strong></div>
+        <div class="ceo-money-row"><span>This week</span><strong class="money{% if ceo.money.profit.week < 0 %} profit-negative{% endif %}">{{ ceo.money.profit.week|format_aud }}</strong></div>
+        <div class="ceo-money-row"><span>This month</span><strong class="money{% if ceo.money.profit.month < 0 %} profit-negative{% endif %}">{{ ceo.money.profit.month|format_aud }}</strong></div>
+      </article>
+      <article class="ceo-money-card">
+        <h4>Margin %</h4>
+        <div class="ceo-money-row"><span>Today</span><strong class="ceo-margin {{ ceo.money.margin_pct.today|margin_badge }}">{{ ceo.money.margin_pct.today|format_margin }}</strong></div>
+        <div class="ceo-money-row"><span>This week</span><strong class="ceo-margin {{ ceo.money.margin_pct.week|margin_badge }}">{{ ceo.money.margin_pct.week|format_margin }}</strong></div>
+        <div class="ceo-money-row"><span>This month</span><strong class="ceo-margin {{ ceo.money.margin_pct.month|margin_badge }}">{{ ceo.money.margin_pct.month|format_margin }}</strong></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">4. Payments</h3>
+    <div class="ceo-stat-grid">
+      <article class="ceo-stat-card">
+        <span class="ceo-stat-label">Unpaid invoices</span>
+        <strong class="ceo-stat-value">{{ ceo.payments.unpaid_count }}</strong>
+      </article>
+      <article class="ceo-stat-card ceo-stat-warn">
+        <span class="ceo-stat-label">Overdue invoices</span>
+        <strong class="ceo-stat-value">{{ ceo.payments.overdue_count }}</strong>
+      </article>
+      <article class="ceo-stat-card ceo-stat-ok">
+        <span class="ceo-stat-label">Paid today</span>
+        <strong class="ceo-stat-value">{{ ceo.payments.paid_today_count }}</strong>
+      </article>
+      <article class="ceo-stat-card ceo-stat-hero">
+        <span class="ceo-stat-label">Total outstanding</span>
+        <strong class="ceo-stat-value money">{{ ceo.payments.total_outstanding|format_aud }}</strong>
+      </article>
+    </div>
+    {% if ceo.payments.overdue %}
+    <div class="ceo-table-wrap">
+      <table class="ceo-table">
+        <thead><tr><th>Customer</th><th>Amount</th><th>Days overdue</th><th></th></tr></thead>
+        <tbody>
+          {% for row in ceo.payments.overdue %}
+          <tr>
+            <td><a href="{{ url_for('edit_booking', booking_id=row.booking_id) }}">{{ row.customer_name }}</a></td>
+            <td class="money">{{ row.amount|format_aud }}</td>
+            <td>{{ row.days_overdue_label }}</td>
+            <td>
+              <form method="post" class="inline-form">
+                <input type="hidden" name="action" value="send_reminder">
+                <input type="hidden" name="booking_id" value="{{ row.booking_id }}">
+                <button type="submit" class="ceo-action-btn ceo-action-sm">Send reminder</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">5. Automation health</h3>
+    <div class="ceo-health-grid">
+      {% for service in ceo.automation_health %}
+      <article class="ceo-health-card {{ service.status_class }}">
+        <span class="ceo-health-dot" aria-hidden="true"></span>
+        <div>
+          <strong>{{ service.name }}</strong>
+          <span class="ceo-health-label">{{ service.status_label }}</span>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">6. Alerts</h3>
+    {% if ceo.alerts %}
+    <ul class="ceo-alert-list">
+      {% for alert in ceo.alerts %}
+      <li class="ceo-alert-item">
+        {{ alert.label }}
+        {% if alert.booking_id %}
+        <a href="{{ url_for('edit_booking', booking_id=alert.booking_id) }}">Open</a>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="ceo-empty ceo-empty-ok">No active alerts.</p>
+    {% endif %}
+  </section>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">7. Quick actions</h3>
+    <nav class="ceo-quick-actions ceo-quick-actions-bottom" aria-label="Quick actions">
+      <a class="ceo-action-btn" href="{{ url_for('new_booking') }}">New booking</a>
+      <a class="ceo-action-btn" href="{{ url_for('daily_checklist', filter='today') }}">Today jobs</a>
+      <a class="ceo-action-btn" href="{{ url_for('daily_checklist', filter='tomorrow') }}">Tomorrow jobs</a>
+      <a class="ceo-action-btn" href="{{ url_for('crew_schedule') }}">Crew schedule</a>
+      <a class="ceo-action-btn" href="{{ url_for('outstanding_invoices') }}">Invoices</a>
+      <a class="ceo-action-btn" href="{{ url_for('profit') }}">Profit dashboard</a>
+    </nav>
+  </section>
+</div>
+{% endblock %}

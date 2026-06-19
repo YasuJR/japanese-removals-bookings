@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Truck management{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Truck management</h2>
+  <p class="hint">Manage trucks for booking assignment and driver run sheets.</p>
+  <p><a class="btn-secondary btn-sm" href="{{ url_for('settings') }}">← Settings</a></p>
+</section>
+
+<section class="panel">
+  <h3>Truck table</h3>
+  <div class="table-scroll">
+    <table class="data-table resource-table">
+      <thead>
+        <tr>
+          <th>Truck name</th>
+          <th>Registration</th>
+          <th>Type</th>
+          <th>Capacity</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for truck in trucks %}
+        <tr>
+          <form method="post" action="{{ url_for('truck_management') }}">
+            <input type="hidden" name="action" value="update">
+            <input type="hidden" name="truck_id" value="{{ truck.id }}">
+            <td><input type="text" name="name" value="{{ truck.name }}" required></td>
+            <td><input type="text" name="registration" value="{{ truck.registration }}"></td>
+            <td><input type="text" name="truck_type" value="{{ truck.truck_type }}"></td>
+            <td><input type="text" name="capacity" value="{{ truck.capacity }}"></td>
+            <td>
+              <label class="inline-check">
+                <input type="checkbox" name="active" value="on" {% if truck.active %}checked{% endif %}>
+                Active
+              </label>
+            </td>
+            <td><button type="submit" class="btn-secondary btn-sm">Save</button></td>
+          </form>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="empty">No trucks yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>Add truck</h3>
+  <form method="post" action="{{ url_for('truck_management') }}" class="form-grid resource-form">
+    <input type="hidden" name="action" value="create">
+    <label>
+      Truck name *
+      <input type="text" name="name" required placeholder="Truck 1">
+    </label>
+    <label>
+      Registration
+      <input type="text" name="registration">
+    </label>
+    <label>
+      Type
+      <input type="text" name="truck_type" placeholder="Medium">
+    </label>
+    <label>
+      Capacity
+      <input type="text" name="capacity" placeholder="30 m³">
+    </label>
+    <label class="inline-check">
+      <input type="checkbox" name="active" value="on" checked>
+      Active
+    </label>
+    <div class="full-width">
+      <button type="submit" class="btn-primary">Add truck</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}All bookings{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="panel-head">
+    <h2>All bookings</h2>
+    <a class="btn-secondary btn-sm" href="{{ url_for('export_csv') }}">Export all (CSV)</a>
+  </div>
+  <p class="hint">Every saved job, including past moves.</p>
+
+  {% set show_saved = true %}
+  {% set empty_message = 'No bookings saved yet.' %}
+  {% include '_booking_list.html' %}
+</section>
+{% endblock %}

@@ -1,0 +1,106 @@
+<div class="form-grid">
+  <label>
+    Customer name *
+    <input type="text" name="customer_name" required
+           value="{{ form.get('customer_name', '') }}">
+  </label>
+  <label>
+    Phone number
+    <input type="tel" name="phone"
+           autocomplete="tel"
+           value="{{ form.get('phone', company_settings.default_phone) }}">
+  </label>
+  <label>
+    Email
+    <input type="email" name="email"
+           autocomplete="email"
+           value="{{ form.get('email', company_settings.default_email) }}">
+  </label>
+  <label>
+    Move date *
+    <input type="date" name="move_date" required
+           value="{{ form.get('move_date', '') }}">
+  </label>
+  <label>
+    Job status
+    <select name="status">
+      {% for option in job_status_options %}
+      <option value="{{ option }}"
+        {% if form.get('status', 'Quote') == option %}selected{% endif %}>{{ option }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    Start time
+    <input type="time" name="start_time" id="start_time"
+           value="{{ form.get('start_time', '08:00') }}">
+  </label>
+  <label>
+    Duration (hours)
+    <input type="number" name="duration_hours" id="duration_hours"
+           min="0.5" max="24" step="0.5"
+           placeholder="e.g. 3"
+           value="{{ form.get('duration_hours', '10') }}">
+    <span class="field-hint">Finish time updates automatically below</span>
+  </label>
+  <div class="finish-live-box">
+    <span class="finish-live-label">Finish time</span>
+    <p class="finish-live" id="finish_live_display" aria-live="polite">
+      <strong id="finish_live_text">{{ form.get('finish_time', '18:00')|format_hm_12h }}</strong>
+    </p>
+    <input type="hidden" name="finish_time" id="finish_time"
+           value="{{ form.get('finish_time', '18:00') }}">
+  </div>
+  <label>
+    Number of movers *
+    <input type="number" name="num_movers" min="1" max="20" required
+           value="{{ form.get('num_movers', '2') }}">
+  </label>
+  <fieldset class="full-width crew-fieldset">
+    <legend>Crew</legend>
+    <div class="crew-checkboxes">
+      {% for name in crew_options %}
+      <label class="crew-option">
+        <input type="checkbox" name="crew" value="{{ name }}"
+               {% if name in form.get('crew', []) %}checked{% endif %}>
+        {{ name }}
+      </label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <label>
+    Truck assigned
+    <select name="truck_assigned">
+      <option value="">— Select truck —</option>
+      {% for truck in truck_options %}
+      <option value="{{ truck }}"
+        {% if form.get('truck_assigned', '') == truck %}selected{% endif %}>{{ truck }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% include '_crew_warnings.html' %}
+  <label class="full-width">
+    Pickup address *
+    <input type="text" name="pickup_address" required
+           placeholder="Street, suburb, WA"
+           value="{{ form.get('pickup_address', '') }}">
+  </label>
+  {% if form.get('pickup_address') or form.get('delivery_address') %}
+  <div class="full-width">
+    {% with pickup=form.get('pickup_address', ''), delivery=form.get('delivery_address', '') %}
+    {% include '_map_buttons.html' %}
+    {% endwith %}
+  </div>
+  {% endif %}
+  <label class="full-width">
+    Delivery address *
+    <input type="text" name="delivery_address" required
+           placeholder="Street, suburb, WA"
+           value="{{ form.get('delivery_address', '') }}">
+  </label>
+  <label class="full-width">
+    Notes
+    <textarea name="notes" rows="3"
+              placeholder="Stairs, parking, fragile items, access codes…">{{ form.get('notes', '') }}</textarea>
+  </label>
+</div>

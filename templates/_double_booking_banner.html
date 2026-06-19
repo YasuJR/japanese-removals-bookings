@@ -1,0 +1,21 @@
+{% if show_double_booking_banner and double_booking_conflicts %}
+<div class="double-booking-banner" role="alert">
+  <h3 class="double-booking-heading">Double booking warning</h3>
+  <p>This booking overlaps another job on the same day:</p>
+  <ul class="double-booking-conflicts">
+    {% for conflict in double_booking_conflicts %}
+    <li>
+      <strong>#{{ conflict.id }}</strong>
+      {{ conflict.customer_name }}
+      · {{ conflict.time_label }}
+      · {{ conflict.status }}
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="muted">Saving is allowed, but please confirm you understand the overlap.</p>
+  <label class="checkbox-row double-booking-override">
+    <input type="checkbox" name="double_booking_override_confirm" value="on">
+    I understand this may be double booked
+  </label>
+</div>
+{% endif %}

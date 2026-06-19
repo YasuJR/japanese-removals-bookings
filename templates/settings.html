@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Settings</h2>
+  <p class="hint">Configure company defaults and integrations.</p>
+
+  <div class="integration-grid">
+    <article class="integration-card">
+      <h3>Company defaults</h3>
+      <p class="status-pill ok">Editable</p>
+      <p>Default phone, email, rates, crew, bank details, and GST mode for new bookings and invoices.</p>
+      <a class="btn-primary btn-sm" href="{{ url_for('company_settings') }}">Company defaults</a>
+    </article>
+
+    <article class="integration-card">
+      <h3>Crew &amp; trucks</h3>
+      <p class="status-pill ok">Phase 19</p>
+      <p>Manage crew members and trucks for booking assignment, conflict detection, and run sheets.</p>
+      <a class="btn-primary btn-sm" href="{{ url_for('crew_management') }}">Crew table</a>
+      <a class="btn-secondary btn-sm" href="{{ url_for('truck_management') }}">Truck table</a>
+    </article>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Integrations</h2>
+  <p class="hint">Connect external services once, then bookings use them automatically (where noted).</p>
+
+  <div class="integration-grid">
+    <article class="integration-card">
+      <h3>Google Calendar</h3>
+      <p class="status-pill {% if status.google_connected %}ok{% elif status.google_configured %}ok{% else %}off{% endif %}">
+        {% if status.google_connected %}Connected{% elif status.google_configured %}Ready{% else %}Not configured{% endif %}
+      </p>
+      <p>Creates/updates an all-day event on each booking’s move date. Gmail inbox automation uses the same Google connection (Calendar + Gmail scopes).</p>
+      <ul class="config-check muted">
+        <li>.env: GOOGLE_CALENDAR_ENABLED = {% if status.google_enabled %}true{% else %}false / missing{% endif %}</li>
+        <li>Credentials file: {% if status.google_credentials_exists %}Found{% else %}Missing{% endif %}</li>
+        <li>Path: <code class="path-code">{{ status.google_credentials_path }}</code></li>
+        <li>OAuth redirect URI: <code class="path-code">{{ status.google_redirect_uri }}</code></li>
+      </ul>
+      {% if status.google_configured %}
+      <a class="btn-primary btn-sm" href="{{ url_for('google_connect') }}">Connect Google</a>
+      {% if not status.google_connected %}
+      <p class="muted">Status is <strong>Ready</strong> — click Connect Google once to link your calendar.</p>
+      {% endif %}
+      {% else %}
+      <p class="muted">Add <code>credentials/google_credentials.json</code> and set <code>GOOGLE_CALENDAR_ENABLED=true</code> in <code>.env</code></p>
+      {% endif %}
+    </article>
+
+    <article class="integration-card">
+      <h3>Customer SMS (Twilio)</h3>
+      <p class="status-pill {% if status.sms_configured %}ok{% else %}off{% endif %}">
+        {% if status.sms_configured %}Configured{% else %}Not configured{% endif %}
+      </p>
+      <p>Booking confirmations (create/update) plus automated reminders, thank-you, and payment texts.</p>
+      <a class="btn-primary btn-sm" href="{{ url_for('sms_settings') }}">SMS automation</a>
+      {% if status.sms_automation_enabled %}
+      <p class="muted">Automation enabled — templates and triggers on SMS settings page.</p>
+      {% endif %}
+      <p class="muted">TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER in <code>.env</code></p>
+    </article>
+
+    <article class="integration-card">
+      <h3>Google review requests</h3>
+      <p class="status-pill {% if status.review_automation_enabled %}ok{% elif status.sms_configured or status.email_configured %}pending{% else %}off{% endif %}">
+        {% if status.review_automation_enabled %}Enabled{% elif status.sms_configured or status.email_configured %}Needs setup{% else %}Not configured{% endif %}
+      </p>
+      <p>24 hours after <strong>Completed</strong>, send an SMS or email asking for a Google review.</p>
+      <a class="btn-primary btn-sm" href="{{ url_for('review_settings') }}">Review settings</a>
+    </article>
+
+    <article class="integration-card">
+      <h3>Xero invoices</h3>
+      <p class="status-pill {% if status.xero_ready %}ok{% elif status.xero_connected %}ok{% elif status.xero_has_credentials %}pending{% else %}off{% endif %}">
+        {% if status.xero_ready %}Connected &amp; ready{% elif status.xero_connected %}Connected{% elif status.xero_has_credentials %}Credentials saved{% else %}Not configured{% endif %}
+      </p>
+      <p>Create <strong>draft</strong> invoices from the Edit booking page.</p>
+      <a class="btn-primary btn-sm" href="{{ url_for('xero_settings') }}">Xero settings</a>
+      {% if status.xero_has_credentials and not status.xero_connected %}
+      <p class="muted">Open Xero settings → click <strong>Connect Xero</strong>.</p>
+      {% elif status.xero_ready %}
+      <p class="muted">Ready — draft invoices can be created from bookings.</p>
+      {% elif status.xero_connected %}
+      <p class="muted">Connected — confirm Tenant ID on the Xero settings page.</p>
+      {% endif %}
+    </article>
+
+    <article class="integration-card">
+      <h3>Gmail inbox automation</h3>
+      <p class="status-pill {% if status.gmail_automation_enabled and status.gmail_scope_granted %}ok{% elif status.gmail_inbox_enabled %}pending{% else %}off{% endif %}">
+        {% if status.gmail_automation_enabled and status.gmail_scope_granted %}Enabled
+        {% elif status.gmail_inbox_enabled %}Needs setup
+        {% else %}Not enabled{% endif %}
+      </p>
+      <p>Phase 5 — auto-create <strong>Pending</strong> bookings from new Gmail enquiries and notify admin.</p>
+      <a class="btn-primary btn-sm" href="{{ url_for('gmail_settings') }}">Gmail settings</a>
+    </article>
+
+    <article class="integration-card">
+      <h3>Stripe card payments</h3>
+      <p class="status-pill {% if status.stripe_ready %}ok{% elif status.stripe_configured %}pending{% else %}off{% endif %}">
+        {% if status.stripe_ready %}Enabled{% elif status.stripe_configured %}Keys saved{% else %}Not configured{% endif %}
+      </p>
+      <p>Credit card checkout with customer surcharge. Bank transfer stays fee-free.</p>
+      <a class="btn-primary btn-sm" href="{{ url_for('stripe_settings') }}">Stripe settings</a>
+    </article>
+
+    <article class="integration-card">
+      <h3>Job sheet PDF</h3>
+      <p class="status-pill ok">Ready</p>
+      <p>On any booking → <strong>Edit</strong> → <strong>Download job sheet (PDF)</strong> for your crew.</p>
+    </article>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Logged in as</h2>
+  <p>{{ g.user.display_name }} ({{ g.user.username }})</p>
+  <a class="btn-secondary" href="{{ url_for('logout') }}">Log out</a>
+</section>
+{% endblock %}

@@ -1,0 +1,75 @@
+<section class="extra-charges-panel">
+  <h3>Extra charges</h3>
+  <p class="hint">Add optional fees such as stairs, piano, packing, or after-hours surcharges. Amounts are GST inclusive when GST is enabled.</p>
+
+  <div class="extra-charges-table-wrap">
+    <table class="extra-charges-table" id="extra-charges-table">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th>Qty</th>
+          <th>Unit price ($)</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="extra-charges-body">
+        {% set charges = form.get('extra_charges', []) %}
+        {% if charges %}
+          {% for item in charges %}
+          <tr class="extra-charge-row">
+            <td><input type="text" name="extra_description" value="{{ item.description }}" placeholder="e.g. Stairs Fee"></td>
+            <td><input type="number" name="extra_quantity" min="0.01" step="0.01" value="{{ item.quantity }}"></td>
+            <td><input type="number" name="extra_unit_price" min="0" step="0.01" value="{{ item.unit_price }}"></td>
+            <td><button type="button" class="btn-secondary btn-sm extra-charge-remove">Remove</button></td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="extra-charge-row">
+            <td><input type="text" name="extra_description" placeholder="e.g. Stairs Fee"></td>
+            <td><input type="number" name="extra_quantity" min="0.01" step="0.01" value="1"></td>
+            <td><input type="number" name="extra_unit_price" min="0" step="0.01" value="0"></td>
+            <td><button type="button" class="btn-secondary btn-sm extra-charge-remove">Remove</button></td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+  <button type="button" class="btn-secondary btn-sm" id="extra-charge-add">Add charge</button>
+</section>
+
+<script>
+(function () {
+  var body = document.getElementById("extra-charges-body");
+  var addBtn = document.getElementById("extra-charge-add");
+  if (!body || !addBtn) return;
+
+  function bindRemoveButtons() {
+    body.querySelectorAll(".extra-charge-remove").forEach(function (btn) {
+      btn.onclick = function () {
+        var rows = body.querySelectorAll(".extra-charge-row");
+        if (rows.length <= 1) {
+          rows[0].querySelector('[name="extra_description"]').value = "";
+          rows[0].querySelector('[name="extra_quantity"]').value = "1";
+          rows[0].querySelector('[name="extra_unit_price"]').value = "0";
+          return;
+        }
+        btn.closest("tr").remove();
+      };
+    });
+  }
+
+  addBtn.addEventListener("click", function () {
+    var row = document.createElement("tr");
+    row.className = "extra-charge-row";
+    row.innerHTML =
+      '<td><input type="text" name="extra_description" placeholder="e.g. Piano Fee"></td>' +
+      '<td><input type="number" name="extra_quantity" min="0.01" step="0.01" value="1"></td>' +
+      '<td><input type="number" name="extra_unit_price" min="0" step="0.01" value="0"></td>' +
+      '<td><button type="button" class="btn-secondary btn-sm extra-charge-remove">Remove</button></td>';
+    body.appendChild(row);
+    bindRemoveButtons();
+  });
+
+  bindRemoveButtons();
+})();
+</script>

@@ -1,0 +1,4 @@
+{% set payment_status = payment_status|default('Unpaid') %}
+<span class="status-pill status-payment-{{ payment_status|payment_status_css }}">
+  {{ payment_status }}
+</span>

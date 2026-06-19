@@ -1,0 +1,97 @@
+{% if bookings %}
+<div class="booking-cards" aria-label="Bookings list">
+  {% for b in bookings %}
+  <article class="booking-card{% if today and b.move_date < today %} past{% endif %}">
+    <header class="booking-card-head">
+      <span class="booking-ref">#{{ b.id }}</span>
+      {% with date_str=b.move_date %}
+      {% include '_date_badge.html' %}
+      {% endwith %}
+    </header>
+    <p class="booking-card-times">
+      <span>{{ b|booking_start_time }}</span>
+      <span aria-hidden="true">→</span>
+      <span>{{ b|booking_finish_time }}</span>
+    </p>
+    <h3 class="booking-card-name">{{ b.customer_name }}</h3>
+    <dl class="booking-card-meta">
+      <div><dt>Phone</dt><dd>{% with phone=b.phone %}{% include '_phone_link.html' %}{% endwith %}</dd></div>
+      <div><dt>Email</dt><dd>{% if b.email %}<a href="mailto:{{ b.email }}">{{ b.email }}</a>{% else %}Not provided{% endif %}</dd></div>
+      <div><dt>Start</dt><dd>{{ b|booking_start_time }}</dd></div>
+      <div><dt>Finish</dt><dd>{{ b|booking_finish_time }}</dd></div>
+      <div><dt>Crew</dt><dd>{{ b|booking_crew }}</dd></div>
+      <div><dt>Pickup</dt><dd>{{ b.pickup_address }}</dd></div>
+      <div><dt>Delivery</dt><dd>{{ b.delivery_address }}</dd></div>
+      <div><dt>Movers</dt><dd>{{ b.num_movers }}</dd></div>
+      {% if b.notes %}
+      <div><dt>Notes</dt><dd>{{ b.notes }}</dd></div>
+      {% endif %}
+      {% if show_saved %}
+      <div><dt>Saved</dt><dd>{{ b.created_at[:10] }}</dd></div>
+      {% endif %}
+    </dl>
+    {% with pickup=b.pickup_address, delivery=b.delivery_address %}
+    {% include '_map_buttons.html' %}
+    {% endwith %}
+    <div class="booking-card-actions">
+      <a class="btn-secondary btn-sm" href="{{ url_for('edit_booking', booking_id=b.id) }}">Edit</a>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+
+<div class="table-scroll desktop-only">
+  <table class="sheet">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Date</th>
+        <th>Start</th>
+        <th>Finish</th>
+        <th>Customer</th>
+        <th>Phone</th>
+        <th>Crew</th>
+        <th>Pickup</th>
+        <th>Delivery</th>
+        <th>Movers</th>
+        <th>Maps</th>
+        <th>Notes</th>
+        {% if show_saved %}<th>Saved</th>{% endif %}
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in bookings %}
+      <tr class="{% if today and b.move_date < today %}past{% endif %}">
+        <td>{{ b.id }}</td>
+        <td class="date-cell">
+          {% with date_str=b.move_date %}
+          {% include '_date_badge.html' %}
+          {% endwith %}
+        </td>
+        <td class="nowrap">{{ b|booking_start_time }}</td>
+        <td class="nowrap">{{ b|booking_finish_time }}</td>
+        <td>{{ b.customer_name }}</td>
+        <td class="nowrap">{% with phone=b.phone %}{% include '_phone_link.html' %}{% endwith %}</td>
+        <td class="nowrap">{{ b|booking_crew }}</td>
+        <td>{{ b.pickup_address }}</td>
+        <td>{{ b.delivery_address }}</td>
+        <td class="center">{{ b.num_movers }}</td>
+        <td class="nowrap map-cell">
+          {% with pickup=b.pickup_address, delivery=b.delivery_address %}
+          {% include '_map_buttons.html' %}
+          {% endwith %}
+        </td>
+        <td class="notes-cell">{{ b.notes or '—' }}</td>
+        {% if show_saved %}<td class="nowrap muted">{{ b.created_at[:10] }}</td>{% endif %}
+        <td class="actions-cell nowrap">
+          <a class="btn-secondary btn-sm" href="{{ url_for('edit_booking', booking_id=b.id) }}">Edit</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty">{{ empty_message|safe }}</p>
+{% endif %}

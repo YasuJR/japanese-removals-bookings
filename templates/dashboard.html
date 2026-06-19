@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Dashboard</h2>
+  <p class="hint">Overview for Perth operations · {{ dash.today }}</p>
+
+  <div class="dashboard-stats">
+    <article class="stat-card">
+      <h3>Today</h3>
+      <p class="stat-value">{{ dash.today_jobs|length }}</p>
+      <p class="stat-label">job{% if dash.today_jobs|length != 1 %}s{% endif %}</p>
+    </article>
+    <article class="stat-card">
+      <h3>Tomorrow</h3>
+      <p class="stat-value">{{ dash.tomorrow_jobs|length }}</p>
+      <p class="stat-label">job{% if dash.tomorrow_jobs|length != 1 %}s{% endif %}</p>
+    </article>
+    <article class="stat-card">
+      <h3>This week</h3>
+      <p class="stat-value">{{ dash.week_jobs|length }}</p>
+      <p class="stat-label">{{ dash.week_start }} – {{ dash.week_end }}</p>
+    </article>
+    <article class="stat-card stat-card-accent">
+      <h3>Movers booked</h3>
+      <p class="stat-value">{{ dash.total_movers_week }}</p>
+      <p class="stat-label">total this week</p>
+    </article>
+  </div>
+</section>
+
+<section class="panel profit-summary-panel">
+  <div class="panel-head">
+    <h3>Monthly profit summary</h3>
+    <p class="hint">{{ monthly_profit.booking_count }} booking{% if monthly_profit.booking_count != 1 %}s{% endif %} · {{ monthly_profit.month_start }} – {{ monthly_profit.month_end }} · Pending excluded by default</p>
+  </div>
+
+  <form method="get" class="profit-summary-filters">
+    <input type="hidden" name="filter" value="{{ active_filter }}">
+    <label>
+      Month
+      <input type="month" name="profit_month" value="{{ profit_month }}">
+    </label>
+    <label>
+      Status
+      <select name="profit_status">
+        {% for key, label in profit_status_filters %}
+        <option value="{{ key }}"{% if profit_status == key %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="checkbox-inline">
+      <input type="checkbox" name="profit_paid_only" value="1"{% if profit_paid_only %} checked{% endif %}>
+      Paid only
+    </label>
+    <button type="submit" class="btn-secondary btn-sm">Apply</button>
+  </form>
+
+  <div class="profit-metrics-grid profit-summary-grid">
+    <div class="profit-metric">
+      <span class="profit-metric-label">Total revenue</span>
+      <strong class="profit-metric-value money">{{ monthly_profit.revenue|format_aud }}</strong>
+    </div>
+    <div class="profit-metric">
+      <span class="profit-metric-label">GST</span>
+      <span class="profit-metric-value money">{{ monthly_profit.gst_amount|format_aud }}</span>
+    </div>
+    <div class="profit-metric">
+      <span class="profit-metric-label">Net revenue</span>
+      <span class="profit-metric-value money">{{ monthly_profit.net_revenue|format_aud }}</span>
+    </div>
+    <div class="profit-metric">
+      <span class="profit-metric-label">Total costs</span>
+      <span class="profit-metric-value money">{{ monthly_profit.total_costs|format_aud }}</span>
+    </div>
+    <div class="profit-metric profit-metric-highlight">
+      <span class="profit-metric-label">Estimated profit</span>
+      <strong class="profit-metric-value money{% if monthly_profit.estimated_profit < 0 %} profit-negative{% endif %}">{{ monthly_profit.estimated_profit|format_aud }}</strong>
+    </div>
+    <div class="profit-metric">
+      <span class="profit-metric-label">Average margin</span>
+      <span class="profit-margin-badge {{ monthly_profit.average_margin_percent|margin_badge }}">{{ monthly_profit.average_margin_percent|format_margin }}</span>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h3>Jobs</h3>
+    <nav class="filter-bar" aria-label="Dashboard filters">
+      {% for key, label in dashboard_filters %}
+      <a href="{{ url_for('dashboard', filter=key) }}"
+         class="filter-pill{% if active_filter == key %} active{% endif %}">{{ label }}</a>
+      {% endfor %}
+    </nav>
+  </div>
+
+  {% if jobs %}
+  <div class="table-scroll">
+    <table class="sheet dashboard-sheet">
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Availability</th>
+          <th>Payment</th>
+          <th>Date</th>
+          <th>Start</th>
+          <th>Finish</th>
+          <th>Customer</th>
+          <th>Crew</th>
+          <th>Movers</th>
+          <th>Pickup</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in jobs %}
+        <tr>
+          <td class="nowrap">
+            {% with status=b|booking_job_status %}
+            {% include '_status_badge.html' %}
+            {% endwith %}
+          </td>
+          <td class="nowrap">
+            {% with double_booking_badge=b.double_booking_badge %}
+            {% include '_double_booking_badge.html' %}
+            {% endwith %}
+          </td>
+          <td class="nowrap">
+            {% with payment_status=b.payment_status or 'Unpaid' %}{% include '_payment_badge.html' %}{% endwith %}
+          </td>
+          <td class="date-cell">
+            {% with date_str=b.move_date %}
+            {% include '_date_badge.html' %}
+            {% endwith %}
+          </td>
+          <td class="nowrap">{{ b|booking_start_time }}</td>
+          <td class="nowrap">{{ b|booking_finish_time }}</td>
+          <td>{{ b.customer_name }}</td>
+          <td class="nowrap">{{ b|booking_crew }}</td>
+          <td class="center">{{ b.num_movers }}</td>
+          <td class="pickup-cell">{{ b.pickup_address }}</td>
+          <td class="actions-cell nowrap">
+            <a class="btn-secondary btn-sm" href="{{ url_for('edit_booking', booking_id=b.id) }}">Edit</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No jobs match this filter.</p>
+  {% endif %}
+</section>
+{% endblock %}

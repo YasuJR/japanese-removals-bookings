@@ -1,0 +1,9 @@
+{# pickup / delivery: address strings; hide button when empty #}
+<div class="map-actions">
+  {% if pickup and pickup.strip() %}
+  <a class="btn-secondary btn-sm" href="{{ pickup|apple_maps_url }}" target="_blank" rel="noopener noreferrer">Pickup Map</a>
+  {% endif %}
+  {% if delivery and delivery.strip() %}
+  <a class="btn-secondary btn-sm" href="{{ delivery|apple_maps_url }}" target="_blank" rel="noopener noreferrer">Delivery Map</a>
+  {% endif %}
+</div>

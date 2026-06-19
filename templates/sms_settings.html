@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}SMS automation{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <p class="breadcrumb muted"><a href="{{ url_for('settings') }}">Settings</a> → SMS automation</p>
+  <h2>SMS automation</h2>
+  <p class="hint">Manual SMS buttons are always available on the edit booking page when Twilio is configured. Automatic sends only run when SMS is enabled below.</p>
+
+  <p class="status-pill {% if status.sms_configured %}ok{% else %}off{% endif %}">
+    {% if status.sms_configured %}Twilio configured{% else %}Twilio not configured — set credentials in .env{% endif %}
+  </p>
+  {% if status.sms_automation_enabled %}
+  <p class="status-pill ok">SMS enabled — automatic triggers active</p>
+  {% else %}
+  <p class="status-pill off">SMS disabled — manual sends only</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>Settings &amp; templates</h3>
+  <form method="post" class="settings-form sms-settings-form">
+    <input type="hidden" name="action" value="save">
+
+    <div class="form-grid">
+      <label>
+        From number
+        <input type="text" value="{{ twilio_from_number or 'Not set in .env' }}" disabled>
+      </label>
+    </div>
+
+    <label class="checkbox-row">
+      <input type="checkbox" name="automation_enabled" {% if sms_form.automation_enabled %}checked{% endif %}
+        {% if not status.sms_configured %}disabled{% endif %}>
+      SMS enabled (allow automatic triggers)
+    </label>
+
+    {% for key in sms_form.template_keys %}
+    <article class="sms-template-card">
+      <h4>{{ sms_form.template_labels[key] }}</h4>
+      {% if key == 'booking_confirmation' %}
+      <p class="muted form-hint">Manual send only — use the button on the edit booking page.</p>
+      {% else %}
+      <label class="checkbox-row">
+        <input type="checkbox" name="trigger_{{ key }}"
+          {% if sms_form.triggers[key] %}checked{% endif %}
+          {% if not status.sms_configured %}disabled{% endif %}>
+        Auto-send enabled
+      </label>
+      {% endif %}
+      <label>
+        Message template
+        <textarea name="template_{{ key }}" rows="{% if key == 'booking_confirmed' %}6{% else %}3{% endif %}" class="sms-template-input"
+          {% if not status.sms_configured %}disabled{% endif %}>{{ sms_form.templates[key] }}</textarea>
+      </label>
+    </article>
+    {% endfor %}
+
+    <p class="muted form-hint">Placeholders: {{ sms_form.placeholder_help }}</p>
+
+    <div class="form-actions">
+      <button type="submit" class="btn-primary" {% if not status.sms_configured %}disabled{% endif %}>Save settings</button>
+      <a class="btn-secondary" href="{{ url_for('settings') }}">Back</a>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>Test SMS</h3>
+  <form method="post" class="settings-form sms-test-form">
+    <input type="hidden" name="action" value="test_sms">
+    <div class="form-grid">
+      <label>
+        Template
+        <select name="test_template" {% if not status.sms_configured %}disabled{% endif %}>
+          {% for choice in template_choices %}
+          <option value="{{ choice.key }}">{{ choice.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Phone number
+        <input type="tel" name="test_phone" placeholder="04xx xxx xxx" autocomplete="tel"
+          {% if not status.sms_configured %}disabled{% endif %}>
+      </label>
+    </div>
+    <p class="muted form-hint">Sends a sample message using test booking data (does not mark a real booking as sent).</p>
+    <div class="form-actions">
+      <button type="submit" class="btn-secondary" {% if not status.sms_configured %}disabled{% endif %}>Send test SMS</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>Run scheduled automations</h3>
+  <p class="muted">Processes <strong>1 day before move</strong> reminders and <strong>invoice overdue</strong> payment reminders now. Booking confirmed SMS fires when status changes <strong>Pending → Confirmed</strong>. Thank-you messages fire when status changes to <strong>Completed</strong>.</p>
+  <form method="post" class="inline-form">
+    <input type="hidden" name="action" value="run_scheduled">
+    <button type="submit" class="btn-secondary btn-sm" {% if not status.sms_configured %}disabled{% endif %}>Run now</button>
+  </form>
+  <p class="muted form-hint">For production, schedule daily: <code>python scripts/run_sms_automation.py</code></p>
+</section>
+
+<section class="panel">
+  <h3>Delivery tracking</h3>
+  {% if delivery_logs %}
+  <div class="table-scroll">
+    <table class="sheet automation-log-sheet">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Booking</th>
+          <th>Template</th>
+          <th>To</th>
+          <th>Status</th>
+          <th>Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in delivery_logs %}
+        <tr>
+          <td class="nowrap">{{ entry.created_at[:16] }}</td>
+          <td class="nowrap">
+            {% if entry.booking_id %}
+            <a href="{{ url_for('edit_booking', booking_id=entry.booking_id) }}">#{{ entry.booking_id }}</a>
+            {% else %}—{% endif %}
+          </td>
+          <td class="nowrap">{{ entry.template_key or entry.automation_type }}</td>
+          <td class="nowrap">{{ entry.to_number }}</td>
+          <td class="nowrap"><span class="automation-status automation-status-{{ entry.status }}">{{ entry.status }}</span></td>
+          <td class="nowrap">{{ entry.updated_at[:16] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No SMS delivery records yet.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>Automation log (SMS)</h3>
+  {% if automation_logs %}
+  <div class="table-scroll">
+    <table class="sheet automation-log-sheet">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Booking</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in automation_logs %}
+        <tr class="automation-log-{{ entry.status }}">
+          <td class="nowrap">{{ entry.created_at[:16] }}</td>
+          <td class="nowrap">
+            {% if entry.booking_id %}
+            <a href="{{ url_for('edit_booking', booking_id=entry.booking_id) }}">#{{ entry.booking_id }}</a>
+            {% else %}—{% endif %}
+          </td>
+          <td class="nowrap">{{ entry.automation_type }}</td>
+          <td class="nowrap"><span class="automation-status automation-status-{{ entry.status }}">{{ entry.status }}</span></td>
+          <td>{{ entry.message }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No SMS automation runs yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

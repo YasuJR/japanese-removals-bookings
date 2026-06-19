@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% block title %}Automation Hub{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Automation Hub</h2>
+  <p class="hint">Reduce admin work with one-click automations.</p>
+
+  <article class="automation-card">
+    <h3>Phase 21 — SMS inbound to booking</h3>
+    <p>Twilio inbound webhook parses customer SMS into Pending bookings or draft leads.</p>
+    <ul class="automation-steps">
+      <li>High confidence (≥80%): Pending booking, source SMS</li>
+      <li>Low confidence: draft lead on Leads page</li>
+      <li>Convert lead to booking · reply template SMS link</li>
+    </ul>
+    <a class="btn-secondary btn-sm" href="{{ url_for('leads') }}">Open Leads</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 20 — Website quote form</h3>
+    <p>Public quote page at <code>/quote</code> with honeypot, rate limit, and Pending Website bookings.</p>
+    <ul class="automation-steps">
+      <li>No Xero invoice or calendar sync on submit</li>
+      <li>Admin email notification on new quote</li>
+    </ul>
+    <a class="btn-secondary btn-sm" href="{{ url_for('website_quote') }}" target="_blank" rel="noopener">Open /quote</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 19 — Crew &amp; truck management</h3>
+    <p>Assign multiple crew and one truck per booking with conflict detection and dashboard warnings.</p>
+    <ul class="automation-steps">
+      <li>Crew and truck tables with active/inactive status</li>
+      <li>Crew and truck double-booking warnings (Pending/Cancelled ignored)</li>
+      <li>CEO dashboard and checklist warnings</li>
+      <li>Driver run sheet filtered by crew and truck</li>
+    </ul>
+    <a class="btn-secondary btn-sm" href="{{ url_for('crew_management') }}">Crew table</a>
+    <a class="btn-secondary btn-sm" href="{{ url_for('truck_management') }}">Truck table</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 18 — CEO Dashboard</h3>
+    <p>Default home page for the business owner — today, tomorrow, money, payments, automation health, alerts, and quick actions.</p>
+    <ul class="automation-steps">
+      <li>Today: jobs, confirmed, on route, completed, not started</li>
+      <li>Tomorrow: missing crew, truck, phone, invoice warnings</li>
+      <li>Revenue &amp; profit today / week / month with margin %</li>
+      <li>Payments: unpaid, overdue, paid today, total outstanding</li>
+    </ul>
+    <a class="btn-secondary btn-sm" href="{{ url_for('ceo_dashboard') }}">Open CEO Dashboard</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 17 — Daily job checklist</h3>
+    <p>Pre-job readiness for <strong>Confirmed</strong> and <strong>Paid</strong> bookings today, tomorrow, or this week.</p>
+    <ul class="automation-steps">
+      <li>Before job, on route, and after job checklist items</li>
+      <li>Warnings: no phone, no crew, not paid, no calendar, no invoice, double booking</li>
+      <li>Quick actions: open booking, call, text, map, mark completed</li>
+    </ul>
+    <a class="btn-secondary btn-sm" href="{{ url_for('daily_checklist') }}">Open daily checklist</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 16 — Unpaid invoice reminder automation</h3>
+    <p>When an invoice is created but unpaid, send SMS reminders after <strong>3</strong>, <strong>7</strong>, and <strong>14</strong> days from the invoice issue date.</p>
+    <ul class="automation-steps">
+      <li>Skips Pending, draft invoices, Cancelled, and Paid bookings</li>
+      <li>Stops when payment is received or reminders are cancelled</li>
+      <li>Logs: <code>payment_reminder_1_sent</code>, <code>payment_reminder_2_sent</code>, <code>payment_reminder_3_sent</code>, <code>payment_reminders_cancelled</code></li>
+      <li><strong>Send payment reminder now</strong> and <strong>Cancel payment reminders</strong> on the booking edit page</li>
+    </ul>
+    {% if status.sms_configured and status.sms_automation_enabled %}
+    <p class="status-pill ok">SMS automation enabled</p>
+    {% elif status.sms_configured %}
+    <p class="status-pill pending">Twilio configured — enable SMS automation in Settings</p>
+    {% else %}
+    <p class="status-pill off">SMS not configured</p>
+    {% endif %}
+    <a class="btn-secondary btn-sm" href="{{ url_for('sms_settings') }}">SMS settings</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 14 — Double booking prevention</h3>
+    <p>Warn when blocking bookings overlap on the same move date. <strong>Pending</strong> and <strong>Cancelled</strong> jobs do not block availability.</p>
+    <ul class="automation-steps">
+      <li>Blocking statuses: Confirmed, On Route, Paid, Completed</li>
+      <li>Time overlap uses start time + duration/finish time</li>
+      <li>Warning banner + override checkbox — never auto-blocks save</li>
+      <li>Pending bookings skip calendar sync until confirmed</li>
+      <li>Logs: <code>double_booking_checked</code>, <code>double_booking_conflict</code>, <code>double_booking_override</code></li>
+    </ul>
+    <p class="status-pill ok">Active on save and confirm</p>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 11 — Google review requests</h3>
+    <p>When status changes to <strong>Completed</strong>, schedule a Google review request (default 24h). SMS is sent automatically when due; email is used if no phone number.</p>
+    <ul class="automation-steps">
+      <li>Schedule review request — log <code>review_request_scheduled</code></li>
+      <li>Send SMS/email after wait period — log <code>review_request_sent</code></li>
+      <li>Cancel before send — log <code>review_request_cancelled</code></li>
+      <li><strong>Send review request now</strong> on the booking edit page</li>
+    </ul>
+    {% if status.review_automation_enabled %}
+    <p class="status-pill ok">Review automation enabled</p>
+    {% else %}
+    <p class="status-pill off">Not enabled — <a href="{{ url_for('review_settings') }}">configure review settings</a></p>
+    {% endif %}
+    <a class="btn-secondary btn-sm" href="{{ url_for('review_settings') }}">Review settings</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 10 — Driver on route + ETA SMS</h3>
+    <p>When a driver starts travelling to the customer, press <strong>On Route</strong> on the booking page to update status, save departure time, estimate ETA, and text the customer.</p>
+    <ul class="automation-steps">
+      <li>Set booking status to <strong>On Route</strong> and save <code>on_route_at</code></li>
+      <li>ETA from Google Maps driving route, or manual minutes</li>
+      <li>Send customer ETA SMS once — log <code>eta_sms_sent</code></li>
+      <li>Log <code>on_route_started</code> · resend with <strong>Send ETA SMS Again</strong></li>
+    </ul>
+    {% if status.sms_configured and status.sms_automation_enabled %}
+    <p class="status-pill ok">SMS automation enabled</p>
+    {% elif status.sms_configured %}
+    <p class="status-pill pending">Twilio configured — enable SMS automation in <a href="{{ url_for('sms_settings') }}">SMS settings</a></p>
+    {% else %}
+    <p class="status-pill off">Twilio not configured — add credentials to <code>.env</code></p>
+    {% endif %}
+    <a class="btn-secondary btn-sm" href="{{ url_for('sms_settings') }}">SMS settings</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 9 — Confirmed booking automation</h3>
+    <p>When status changes from <strong>Pending</strong> to <strong>Confirmed</strong>, run three automations once per booking:</p>
+    <ul class="automation-steps">
+      <li>Send customer confirmation SMS (<code>confirmation_sms_sent</code>)</li>
+      <li>Create or update Google Calendar event (<code>calendar_event_synced</code>)</li>
+      <li>Email admin/staff notification (<code>staff_notification_sent</code>)</li>
+      <li>Skip duplicates on repeat confirm triggers</li>
+    </ul>
+    <p class="muted">Status shown on the booking edit page: Confirmation SMS sent · Calendar synced · Staff notified.</p>
+    {% if status.sms_configured and status.google_connected %}
+    <p class="status-pill ok">SMS + Google Calendar ready</p>
+    {% elif status.sms_configured or status.google_connected %}
+    <p class="status-pill pending">Partially configured — check <a href="{{ url_for('sms_settings') }}">SMS</a> and Google settings</p>
+    {% else %}
+    <p class="status-pill off">Configure Twilio and Google Calendar</p>
+    {% endif %}
+    <a class="btn-secondary btn-sm" href="{{ url_for('sms_settings') }}">SMS settings</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 8 — Stripe payment → Paid</h3>
+    <p>When Stripe checkout completes, automatically match the payment to the Xero invoice, mark it paid, and update the booking status to <strong>Paid</strong>.</p>
+    <ul class="automation-steps">
+      <li>Post payment to the linked Xero invoice</li>
+      <li>Update booking payment and job status to <strong>Paid</strong></li>
+      <li>Log <code>stripe_payment_received</code> in the automation hub</li>
+      <li>Ignore duplicate webhook deliveries</li>
+    </ul>
+    {% if status.stripe_ready and status.xero_ready %}
+    <p class="status-pill ok">Stripe + Xero ready</p>
+    {% elif status.stripe_configured and status.xero_ready %}
+    <p class="status-pill pending">Stripe configured — enable in <a href="{{ url_for('stripe_settings') }}">Stripe settings</a></p>
+    {% else %}
+    <p class="status-pill off">Configure <a href="{{ url_for('stripe_settings') }}">Stripe</a> and <a href="{{ url_for('xero_settings') }}">Xero</a></p>
+    {% endif %}
+    <a class="btn-secondary btn-sm" href="{{ url_for('stripe_settings') }}">Stripe settings</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 7 — Xero invoice on confirm</h3>
+    <p>When status changes from <strong>Pending</strong> to <strong>Confirmed</strong>, automatically create and approve a Xero invoice (once per booking).</p>
+    {% if status.xero_ready %}
+    <p class="status-pill ok">Xero ready</p>
+    {% else %}
+    <p class="status-pill off">Xero not ready — <a href="{{ url_for('xero_settings') }}">configure Xero</a></p>
+    {% endif %}
+    <a class="btn-secondary btn-sm" href="{{ url_for('xero_settings') }}">Xero settings</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 6 — Booking confirmed SMS</h3>
+    <p>When status changes from <strong>Pending</strong> to <strong>Confirmed</strong>, send the customer a confirmation text via Twilio.</p>
+    {% if status.sms_configured and status.sms_automation_enabled %}
+    <p class="status-pill ok">SMS automation enabled</p>
+    {% elif status.sms_configured %}
+    <p class="status-pill pending">Twilio configured — enable SMS automation in <a href="{{ url_for('sms_settings') }}">SMS settings</a></p>
+    {% else %}
+    <p class="status-pill off">Twilio not configured — add credentials to <code>.env</code></p>
+    {% endif %}
+    <a class="btn-secondary btn-sm" href="{{ url_for('sms_settings') }}">SMS settings</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 5 — Gmail inbox automation</h3>
+    <p>Monitor Gmail for new enquiry emails and automatically create <strong>Pending</strong> bookings.</p>
+    <ul class="automation-steps">
+      <li>Extract customer name, phone, email, move date, addresses, and notes</li>
+      <li>Create booking with status <strong>Pending</strong></li>
+      <li>Email admin a link to review the booking</li>
+    </ul>
+    {% if status.gmail_automation_enabled and status.gmail_scope_granted %}
+    <p class="status-pill ok">Gmail inbox automation enabled</p>
+    {% elif status.google_connected and not status.gmail_scope_granted %}
+    <p class="status-pill pending">Reconnect Google to grant Gmail scope — <a href="{{ url_for('gmail_settings') }}">Gmail settings</a></p>
+    {% elif status.gmail_inbox_enabled %}
+    <p class="status-pill pending">Configured — enable in <a href="{{ url_for('gmail_settings') }}">Gmail settings</a></p>
+    {% else %}
+    <p class="status-pill off">Not enabled — set <code>GMAIL_INBOX_ENABLED=true</code> in <code>.env</code></p>
+    {% endif %}
+    <a class="btn-secondary btn-sm" href="{{ url_for('gmail_settings') }}">Gmail settings</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 3 — Google review automation</h3>
+    <p>When status changes to <strong>Completed</strong>, schedule a review request after a 24-hour wait.</p>
+    <ul class="automation-steps">
+      <li>Send via SMS or email (your choice)</li>
+      <li>Tracked review link — records <strong>Sent</strong>, <strong>Clicked</strong>, <strong>Reviewed</strong></li>
+    </ul>
+    {% if status.review_automation_enabled %}
+    <p class="status-pill ok">Review automation enabled</p>
+    {% else %}
+    <p class="status-pill off">Not enabled — <a href="{{ url_for('review_settings') }}">configure review settings</a></p>
+    {% endif %}
+    <a class="btn-secondary btn-sm" href="{{ url_for('review_settings') }}">Review settings</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 2 — SMS automation</h3>
+    <p>Automatic customer texts for three triggers:</p>
+    <ul class="automation-steps">
+      <li><strong>Booking Reminder</strong> — 1 day before move</li>
+      <li><strong>Thank You</strong> — when status changes to Completed</li>
+      <li><strong>Payment Reminder</strong> — when invoice is overdue</li>
+    </ul>
+    {% if status.sms_configured and status.sms_automation_enabled %}
+    <p class="status-pill ok">SMS automation enabled</p>
+    {% elif status.sms_configured %}
+    <p class="status-pill pending">SMS configured — enable automation in <a href="{{ url_for('sms_settings') }}">SMS settings</a></p>
+    {% else %}
+    <p class="status-pill off">Twilio not configured — add credentials to <code>.env</code></p>
+    {% endif %}
+    <a class="btn-secondary btn-sm" href="{{ url_for('sms_settings') }}">SMS settings</a>
+  </article>
+
+  <article class="automation-card">
+    <h3>Phase 1 — Xero invoice automation</h3>
+    <p>When a job status is <strong>Completed</strong>, use <strong>Create &amp; Email Invoice</strong> on the edit booking page.</p>
+    <ol class="automation-steps">
+      <li>Create Xero draft invoice</li>
+      <li>Approve invoice</li>
+      <li>Email invoice to customer</li>
+    </ol>
+    <p class="muted">Requires Xero connected, customer email, and no existing invoice. Updates the Outstanding Invoices dashboard automatically.</p>
+    {% if status.xero_ready %}
+    <p class="status-pill ok">Xero ready</p>
+    {% else %}
+    <p class="status-pill off">Xero not ready — <a href="{{ url_for('xero_settings') }}">configure Xero</a></p>
+    {% endif %}
+  </article>
+</section>
+
+<section class="panel">
+  <h3>Google review tracking (recent)</h3>
+  {% if review_requests %}
+  <div class="table-scroll">
+    <table class="sheet automation-log-sheet">
+      <thead>
+        <tr>
+          <th>Booking</th>
+          <th>Customer</th>
+          <th>Status</th>
+          <th>Sent</th>
+          <th>Clicked</th>
+          <th>Reviewed</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in review_requests %}
+        <tr>
+          <td class="nowrap"><a href="{{ url_for('edit_booking', booking_id=row.booking_id) }}">#{{ row.booking_id }}</a></td>
+          <td>{{ row.customer_name or '—' }}</td>
+          <td class="nowrap"><span class="automation-status automation-status-{{ row.status }}">{{ row.status }}</span></td>
+          <td class="nowrap">{{ row.sent_at[:16] if row.sent_at else '—' }}</td>
+          <td class="nowrap">{{ row.clicked_at[:16] if row.clicked_at else '—' }}</td>
+          <td class="nowrap">{{ row.reviewed_at[:16] if row.reviewed_at else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty muted">No review requests yet.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>SMS delivery (recent)</h3>
+  {% if delivery_logs %}
+  <div class="table-scroll">
+    <table class="sheet automation-log-sheet">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Booking</th>
+          <th>Template</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in delivery_logs %}
+        <tr>
+          <td class="nowrap">{{ entry.created_at[:16] }}</td>
+          <td class="nowrap">
+            {% if entry.booking_id %}
+            <a href="{{ url_for('edit_booking', booking_id=entry.booking_id) }}">#{{ entry.booking_id }}</a>
+            {% else %}—{% endif %}
+          </td>
+          <td class="nowrap">{{ entry.template_key }}</td>
+          <td class="nowrap"><span class="automation-status automation-status-{{ entry.status }}">{{ entry.status }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty muted">No SMS deliveries yet.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>Automation log</h3>
+  {% if logs %}
+  <div class="table-scroll">
+    <table class="sheet automation-log-sheet">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Booking</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in logs %}
+        <tr class="automation-log-{{ entry.status }}">
+          <td class="nowrap">{{ entry.created_at[:16] }}</td>
+          <td class="nowrap">
+            {% if entry.booking_id %}
+            <a href="{{ url_for('edit_booking', booking_id=entry.booking_id) }}">#{{ entry.booking_id }}</a>
+            {% else %}—{% endif %}
+          </td>
+          <td class="nowrap">{{ entry.automation_type }}</td>
+          <td class="nowrap"><span class="automation-status automation-status-{{ entry.status }}">{{ entry.status }}</span></td>
+          <td>{{ entry.message }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No automation runs yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

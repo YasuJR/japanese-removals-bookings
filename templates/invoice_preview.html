@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Invoice preview — {{ inv.invoice_number }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='invoice.css') }}">
+</head>
+<body class="invoice-preview-page">
+  <div class="invoice-preview-toolbar">
+    <a class="btn-secondary btn-sm" href="{{ url_for('edit_booking', booking_id=booking_id) }}">← Back to booking</a>
+    <a class="btn-primary btn-sm" href="{{ url_for('invoice_pdf', booking_id=booking_id) }}" target="_blank">Download PDF</a>
+    <button type="button" class="btn-secondary btn-sm" onclick="window.print()">Print</button>
+  </div>
+
+  <article class="invoice-sheet">
+    <header class="invoice-brand">
+      {% if inv.logo_url %}
+      <img class="invoice-logo" src="{{ inv.logo_url }}" alt="Japanese Removals">
+      {% endif %}
+      <div class="invoice-brand-text">
+        <p class="invoice-contact-line">{{ inv.company_contact_line }}</p>
+      </div>
+    </header>
+
+    <hr class="invoice-accent-line">
+
+    <div class="invoice-title-block">
+      <div class="invoice-title-wrap">
+        <h2 class="invoice-title">TAX INVOICE</h2>
+        <hr class="invoice-title-rule">
+      </div>
+      <table class="invoice-meta-right">
+        <tr><td>Invoice Date</td><td>{{ inv.issue_date }}</td></tr>
+        <tr><td>Invoice Number</td><td>{{ inv.invoice_number }}</td></tr>
+        <tr><td>Reference</td><td>{{ inv.reference }}</td></tr>
+        <tr><td>ABN</td><td>{{ inv.company_abn }}</td></tr>
+      </table>
+    </div>
+
+    <section class="invoice-bill-section">
+      <h3 class="invoice-section-title">BILL TO</h3>
+      <p class="invoice-bill-to">{{ inv.customer_name }}</p>
+    </section>
+
+    <table class="invoice-lines">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th class="num">Qty</th>
+          <th class="num">Unit price</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in inv.line_items %}
+        <tr>
+          <td class="invoice-line-desc">{{ item.description_html|safe }}</td>
+          <td class="num">{{ item.quantity }}</td>
+          <td class="num">{{ item.unit_price }}</td>
+          <td class="num">{{ item.amount }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <hr class="invoice-accent-line invoice-accent-line-subtle invoice-table-divider">
+
+    <div class="invoice-bottom">
+      <table class="invoice-totals">
+        {% if inv.totals.gst_enabled %}
+        <tr>
+          <td>Subtotal (ex GST)</td>
+          <td>{{ inv.totals.subtotal|format_aud }}</td>
+        </tr>
+        <tr>
+          <td>GST (10%)</td>
+          <td>{{ inv.totals.gst_amount|format_aud }}</td>
+        </tr>
+        {% endif %}
+      </table>
+
+      <div class="invoice-total-bar">
+        <span class="invoice-total-bar-label">TOTAL AUD{% if inv.gst_inclusive %} (incl. GST){% endif %}</span>
+        <span class="invoice-total-bar-amount">{{ inv.totals.total|format_aud }}</span>
+      </div>
+
+      <div class="invoice-bottom-split">
+        {% if inv.payment_options %}
+        <section class="invoice-payment-options-box">
+          <h3>PAYMENT OPTIONS</h3>
+          <dl class="invoice-payment-options">
+            <dt>Bank Transfer</dt>
+            <dd>
+              Total: {{ inv.payment_options.bank_total_display }}<br>
+              <span class="muted">No processing fee</span>
+            </dd>
+            <dt>Credit Card</dt>
+            <dd>
+              Total: {{ inv.payment_options.card_total_display }}<br>
+              <span class="muted">Includes {{ inv.payment_options.surcharge_percent_display }}% card processing fee</span>
+              {% if inv.payment_options.surcharge_amount %}
+              <br><span class="muted">Card surcharge: {{ inv.payment_options.surcharge_display }}</span>
+              {% endif %}
+            </dd>
+          </dl>
+          <p class="invoice-compliance-note">{{ inv.payment_options.compliance_note }}</p>
+          {% if inv.payment_options.stripe_enabled and inv.payment_options.can_checkout %}
+          <form method="post" action="{{ url_for('stripe_checkout', booking_id=booking_id) }}" class="invoice-stripe-form">
+            <button type="submit" class="btn-primary btn-sm">Pay by Credit Card</button>
+          </form>
+          {% endif %}
+        </section>
+        {% endif %}
+
+        <section class="invoice-payment-box">
+          <h3>PAYMENT DETAILS</h3>
+          <dl class="invoice-payment-grid">
+            <dt>Bank Name:</dt>
+            <dd>{{ inv.bank.bank_name }}</dd>
+            <dt>Account Name:</dt>
+            <dd>{{ inv.bank.account_name }}</dd>
+            <dt>BSB:</dt>
+            <dd>{{ inv.bank.bsb }}</dd>
+            <dt>Account Number:</dt>
+            <dd>{{ inv.bank.account_number }}</dd>
+          </dl>
+        </section>
+      </div>
+    </div>
+
+    <footer class="invoice-footer">
+      <hr class="invoice-accent-line invoice-accent-line-subtle">
+      <p>{{ inv.footer_tagline }}</p>
+    </footer>
+  </article>
+</body>
+</html>

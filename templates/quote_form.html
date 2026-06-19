@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#059669">
+  <title>Get a quote — Japanese Removals Perth</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="quote-page">
+  <header class="quote-header">
+    <div class="wrap">
+      <h1>Japanese Removals</h1>
+      <p>Request a moving quote — Perth &amp; surrounds</p>
+    </div>
+  </header>
+
+  <main class="wrap quote-main">
+    {% if submitted %}
+    <section class="quote-success panel">
+      <h2>Thank you</h2>
+      <p>{{ success_message }}</p>
+      <p class="muted">We will review your request and contact you shortly.</p>
+    </section>
+    {% else %}
+    <section class="quote-form-panel panel">
+      <h2>Get a quote</h2>
+      <p class="hint">Tell us about your move and we will get back to you with a price.</p>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <ul class="flash-list">
+            {% for category, message in messages %}
+              <li class="flash flash-{{ category }}">{{ message }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% endwith %}
+
+      {% if errors %}
+      <ul class="flash-list">
+        {% for message in errors %}
+          <li class="flash flash-error">{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('website_quote') }}" class="form-grid quote-form">
+        <label>
+          Name *
+          <input type="text" name="name" required value="{{ form.get('name', '') }}">
+        </label>
+        <label>
+          Phone *
+          <input type="tel" name="phone" required autocomplete="tel"
+                 value="{{ form.get('phone', '') }}">
+        </label>
+        <label>
+          Email *
+          <input type="email" name="email" required autocomplete="email"
+                 value="{{ form.get('email', '') }}">
+        </label>
+        <label>
+          Move date *
+          <input type="date" name="move_date" required value="{{ form.get('move_date', '') }}">
+        </label>
+        <label>
+          Pickup suburb *
+          <input type="text" name="pickup_suburb" required placeholder="e.g. Subiaco"
+                 value="{{ form.get('pickup_suburb', '') }}">
+        </label>
+        <label>
+          Delivery suburb *
+          <input type="text" name="delivery_suburb" required placeholder="e.g. Fremantle"
+                 value="{{ form.get('delivery_suburb', '') }}">
+        </label>
+        <label>
+          Bedrooms
+          <input type="number" name="bedrooms" min="1" max="20" step="1"
+                 value="{{ form.get('bedrooms', '') }}">
+        </label>
+        <label>
+          Stairs
+          <select name="stairs">
+            <option value="">—</option>
+            <option value="yes" {% if form.get('stairs') == 'yes' %}selected{% endif %}>Yes</option>
+            <option value="no" {% if form.get('stairs') == 'no' %}selected{% endif %}>No</option>
+          </select>
+        </label>
+        <label>
+          Piano
+          <select name="piano">
+            <option value="">—</option>
+            <option value="yes" {% if form.get('piano') == 'yes' %}selected{% endif %}>Yes</option>
+            <option value="no" {% if form.get('piano') == 'no' %}selected{% endif %}>No</option>
+          </select>
+        </label>
+        <label>
+          Pool table
+          <select name="pool_table">
+            <option value="">—</option>
+            <option value="yes" {% if form.get('pool_table') == 'yes' %}selected{% endif %}>Yes</option>
+            <option value="no" {% if form.get('pool_table') == 'no' %}selected{% endif %}>No</option>
+          </select>
+        </label>
+        <label>
+          Packing required
+          <select name="packing_required">
+            <option value="">—</option>
+            <option value="yes" {% if form.get('packing_required') == 'yes' %}selected{% endif %}>Yes</option>
+            <option value="no" {% if form.get('packing_required') == 'no' %}selected{% endif %}>No</option>
+          </select>
+        </label>
+        <label class="full-width">
+          Notes
+          <textarea name="notes" rows="3"
+                    placeholder="Access details, heavy items, preferred time…">{{ form.get('notes', '') }}</textarea>
+        </label>
+        <div class="quote-honeypot" aria-hidden="true">
+          <label>
+            Company website
+            <input type="text" name="company_website" tabindex="-1" autocomplete="off">
+          </label>
+        </div>
+        <div class="full-width">
+          <button type="submit" class="btn-primary quote-submit">Submit quote request</button>
+        </div>
+      </form>
+    </section>
+    {% endif %}
+  </main>
+
+  <footer class="site-footer wrap">
+    <p>Japanese Removals · Perth, Western Australia</p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+{% block title %}Edit booking #{{ booking.id }}{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Edit booking #{{ booking.id }}</h2>
+  <p class="hint">Update details for {{ booking.customer_name }}.
+    {% if booking.phone %}
+    · Phone: {% with phone=booking.phone %}{% include '_phone_link.html' %}{% endwith %}
+    {% endif %}
+    · Payment: {% with payment_status=invoice_summary.payment_status %}{% include '_payment_badge.html' %}{% endwith %}
+    {% if booking.invoice_number %}
+    · Invoice: <strong>{{ booking.invoice_number }}</strong>
+    {% endif %}
+    {% if booking.paid_at and invoice_summary.payment_status == 'Paid' %}
+    <span class="muted"> · paid {{ booking.paid_at[:10] }}</span>
+    {% endif %}
+  </p>
+
+  {% if double_booking_badge %}
+  <div class="double-booking-status-row">
+    {% include '_double_booking_badge.html' %}
+  </div>
+  {% endif %}
+
+  {% if xero_automation_error %}
+  <div class="flash flash-error xero-automation-error">
+    <strong>Xero invoice auto-create failed:</strong> {{ xero_automation_error }}
+  </div>
+  {% endif %}
+
+  {% if booking.invoice_number or xero_invoice_linked %}
+  <div class="xero-invoice-status-bar muted">
+    {% if booking.invoice_number %}
+    <span><strong>Xero invoice:</strong> {{ booking.invoice_number }}</span>
+    {% endif %}
+    {% if xero_invoice_status %}
+    <span class="status-pill status-invoice">{{ xero_invoice_status }}</span>
+    {% endif %}
+    {% if xero_invoice_url %}
+    <a href="{{ xero_invoice_url }}" target="_blank" rel="noopener">Open in Xero</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if booking.invoice_number or booking.stripe_payment_intent_id or invoice_summary.payment_status != 'Unpaid' %}
+  <div class="payment-status-bar muted">
+    <span><strong>Job status:</strong> {{ booking.status }}</span>
+    <span>Payment: {% with payment_status=invoice_summary.payment_status %}{% include '_payment_badge.html' %}{% endwith %}</span>
+    {% if booking.paid_at and invoice_summary.payment_status == 'Paid' %}
+    <span>Paid {{ booking.paid_at[:10] }}</span>
+    {% endif %}
+    {% if booking.stripe_total_charged %}
+    <span>Card total: ${{ '%.2f'|format(booking.stripe_total_charged) }}</span>
+    {% endif %}
+    {% if booking.stripe_payment_intent_id %}
+    <span class="nowrap">Stripe: {{ booking.stripe_payment_intent_id[:24] }}{% if booking.stripe_payment_intent_id|length > 24 %}…{% endif %}</span>
+    {% endif %}
+    {% if booking.xero_payment_id %}
+    <span class="status-pill ok">Xero payment linked</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% set pickup_addr = form.get('pickup_address', booking.pickup_address) %}
+  {% set delivery_addr = form.get('delivery_address', booking.delivery_address) %}
+  {% with pickup=pickup_addr, delivery=delivery_addr %}
+  {% include '_map_buttons.html' %}
+  {% endwith %}
+
+  {% if show_invoice_automation %}
+  <div class="automation-banner">
+    <p class="automation-banner-text">Job completed — ready to invoice.</p>
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="create_email_invoice">
+      <button type="submit" class="btn-primary btn-sm automation-primary-btn"
+        {% if not status.xero_ready %}disabled title="Connect Xero in Settings"
+        {% elif not booking.email %}disabled title="Add customer email first"{% endif %}>
+        Create &amp; Email Invoice
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="tool-bar">
+    <a class="btn-secondary btn-sm" href="{{ url_for('job_sheet_pdf', booking_id=booking.id) }}" target="_blank">Download job sheet (PDF)</a>
+    <a class="btn-secondary btn-sm" href="{{ url_for('invoice_preview', booking_id=booking.id) }}" target="_blank">Invoice preview</a>
+    <a class="btn-secondary btn-sm" href="{{ url_for('invoice_pdf', booking_id=booking.id) }}" target="_blank">Download invoice (PDF)</a>
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="sync_calendar">
+      <button type="submit" class="btn-secondary btn-sm" {% if not status.google_connected %}disabled title="Connect Google in Settings"{% endif %}>Sync calendar</button>
+    </form>
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="xero_draft_invoice">
+      {% if xero_invoice_locked %}
+      <input type="hidden" name="confirm_new" value="1">
+      <button type="submit" class="btn-secondary btn-sm"
+        {% if not status.xero_ready %}disabled title="Configure and connect Xero in Settings → Xero"{% endif %}
+        onclick="return confirm('This invoice is {{ xero_invoice_status|title }} in Xero. Create a new invoice version?');">
+        Create new invoice version
+      </button>
+      {% elif xero_invoice_draft %}
+      <button type="submit" class="btn-secondary btn-sm"
+        {% if not status.xero_ready %}disabled title="Configure and connect Xero in Settings → Xero"{% endif %}>
+        Update Xero Invoice
+      </button>
+      {% else %}
+      <button type="submit" class="btn-secondary btn-sm"
+        {% if not status.xero_ready %}disabled title="Configure and connect Xero in Settings → Xero"{% endif %}>
+        Create Xero Invoice
+      </button>
+      {% endif %}
+    </form>
+    {% if xero_invoice_url %}
+    <a class="btn-secondary btn-sm" href="{{ xero_invoice_url }}" target="_blank" rel="noopener">Open in Xero</a>
+    {% endif %}
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="check_xero_payment">
+      <button type="submit" class="btn-secondary btn-sm"
+        {% if not status.xero_ready %}disabled title="Connect Xero in Settings"
+        {% elif not xero_invoice_linked %}disabled title="Create or link a Xero invoice first"{% endif %}>
+        Check Xero payment status
+      </button>
+    </form>
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="mark_paid">
+      <button type="submit" class="btn-secondary btn-sm"
+        {% if invoice_summary.payment_status == 'Paid' %}disabled{% endif %}>Mark as Paid</button>
+    </form>
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="mark_unpaid">
+      <button type="submit" class="btn-secondary btn-sm"
+        {% if invoice_summary.payment_status == 'Unpaid' %}disabled{% endif %}>Mark as Unpaid</button>
+    </form>
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="send_sms_confirmation">
+      <button type="submit" class="btn-secondary btn-sm" {% if not status.sms_configured %}disabled title="Configure Twilio in .env"{% endif %}>Send booking confirmation SMS</button>
+    </form>
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="send_sms_payment_reminder">
+      <button type="submit" class="btn-secondary btn-sm" {% if not status.sms_configured %}disabled title="Configure Twilio in .env"{% endif %}>Send payment reminder SMS</button>
+    </form>
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="send_sms_thank_you">
+      <button type="submit" class="btn-secondary btn-sm" {% if not status.sms_configured %}disabled title="Configure Twilio in .env"{% endif %}>Send thank you SMS</button>
+    </form>
+    {% if review_request and review_request.status != 'reviewed' %}
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="mark_review_received">
+      <button type="submit" class="btn-secondary btn-sm">Mark review received</button>
+    </form>
+    {% endif %}
+    {% if can_send_review_now %}
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="send_review_now">
+      <button type="submit" class="btn-secondary btn-sm"
+        {% if not status.review_automation_enabled %}disabled title="Enable Google review automation in Settings"{% endif %}>
+        Send review request now
+      </button>
+    </form>
+    {% endif %}
+    {% if can_cancel_review_request %}
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="cancel_review_request">
+      <button type="submit" class="btn-secondary btn-sm"
+        onclick="return confirm('Cancel the scheduled review request?');">
+        Cancel review request
+      </button>
+    </form>
+    {% endif %}
+    {% if can_send_payment_reminder %}
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="send_payment_reminder_now">
+      <button type="submit" class="btn-secondary btn-sm"
+        {% if not status.sms_configured %}disabled title="Configure Twilio in .env"{% endif %}>
+        Send payment reminder now
+      </button>
+    </form>
+    {% endif %}
+    {% if can_cancel_payment_reminders %}
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="cancel_payment_reminders">
+      <button type="submit" class="btn-secondary btn-sm"
+        onclick="return confirm('Cancel all future payment reminders for this booking?');">
+        Cancel payment reminders
+      </button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if booking.status == 'Confirmed' or booking.sms_booking_confirmed_sent_at or booking.calendar_confirmed_synced_at or booking.staff_notification_sent_at %}
+  <ul class="linked-meta phase9-automation-status">
+    <li>
+      Confirmation SMS sent:
+      {% if booking.sms_booking_confirmed_sent_at %}
+      <span class="automation-status automation-status-sent">Yes</span>
+      · {{ booking.sms_booking_confirmed_sent_at[:16] }}
+      {% else %}
+      <span class="automation-status automation-status-partial">Not yet</span>
+      {% endif %}
+    </li>
+    <li>
+      Calendar synced:
+      {% if booking.calendar_confirmed_synced_at or booking.google_calendar_event_id %}
+      <span class="automation-status automation-status-success">Yes</span>
+      {% if booking.calendar_confirmed_synced_at %}
+      · {{ booking.calendar_confirmed_synced_at[:16] }}
+      {% elif booking.google_calendar_event_id %}
+      · event linked
+      {% endif %}
+      {% else %}
+      <span class="automation-status automation-status-partial">Not yet</span>
+      {% endif %}
+    </li>
+    <li>
+      Staff notified:
+      {% if booking.staff_notification_sent_at %}
+      <span class="automation-status automation-status-success">Yes</span>
+      · {{ booking.staff_notification_sent_at[:16] }}
+      {% else %}
+      <span class="automation-status automation-status-partial">Not yet</span>
+      {% endif %}
+    </li>
+  </ul>
+  {% endif %}
+
+  {% if booking.on_route_at or booking.status == 'On Route' or booking.eta_sms_sent_at or booking.eta_minutes %}
+  <ul class="linked-meta phase10-automation-status">
+    <li>
+      On Route:
+      {% if booking.on_route_at or booking.status == 'On Route' %}
+      <span class="automation-status automation-status-success">Yes</span>
+      {% if booking.on_route_at %} · departed {{ booking.on_route_at[:16] }}{% endif %}
+      {% else %}
+      <span class="automation-status automation-status-partial">Not yet</span>
+      {% endif %}
+    </li>
+    <li>
+      ETA SMS sent:
+      {% if booking.eta_sms_sent_at %}
+      <span class="automation-status automation-status-sent">Yes</span>
+      · {{ booking.eta_sms_sent_at[:16] }}
+      {% else %}
+      <span class="automation-status automation-status-partial">Not yet</span>
+      {% endif %}
+    </li>
+    <li>
+      ETA minutes:
+      {% if booking.eta_minutes %}
+      <strong>{{ booking.eta_minutes }}</strong>
+      {% if booking.driver_name %} · {{ booking.driver_name }}{% endif %}
+      {% else %}
+      <span class="muted">—</span>
+      {% endif %}
+    </li>
+  </ul>
+  {% endif %}
+
+  {% if payment_reminder_badges or booking.payment_reminder_1_sent_at or booking.payment_reminder_2_sent_at or booking.payment_reminder_3_sent_at or booking.payment_reminders_cancelled_at %}
+  <ul class="linked-meta phase16-automation-status">
+    {% for badge in payment_reminder_badges %}
+    <li>
+      <span class="status-pill {{ badge.css_class }}">{{ badge.label }}</span>
+      {% if badge.sent_at %} · {{ badge.sent_at }}{% endif %}
+    </li>
+    {% endfor %}
+    {% if not payment_reminder_badges and not booking.payment_reminders_cancelled_at %}
+    <li class="muted">No payment reminders sent yet.</li>
+    {% endif %}
+  </ul>
+  {% endif %}
+
+  {% if can_start_on_route and booking.status != 'Cancelled' and booking.status != 'Paid' %}
+  <div class="on-route-panel">
+    <h3 class="on-route-heading">Driver on route</h3>
+    <p class="muted form-hint">Sets status to <strong>On Route</strong>, saves departure time, estimates ETA via Google Maps when configured, and sends the customer an ETA SMS once.</p>
+    <form method="post" class="on-route-form">
+      <input type="hidden" name="action" value="start_on_route">
+      <div class="form-grid on-route-fields">
+        <label>
+          Driver name
+          <input type="text" name="driver_name" value="{{ booking.driver_name or default_driver_name }}" maxlength="80">
+        </label>
+        <label>
+          Manual ETA (minutes)
+          <input type="number" name="manual_eta_minutes" min="1" max="600" step="1"
+            value="{{ booking.eta_minutes or '' }}" placeholder="Auto from Google Maps">
+        </label>
+        <label>
+          Driver origin (optional)
+          <input type="text" name="driver_origin" value="" placeholder="Leave blank for default depot">
+        </label>
+      </div>
+      <div class="form-actions on-route-actions">
+        <button type="submit" class="btn-primary btn-sm"
+          {% if not status.sms_configured %}disabled title="Configure Twilio in .env"{% endif %}>
+          On Route
+        </button>
+      </div>
+    </form>
+    {% if booking.on_route_at or booking.eta_sms_sent_at %}
+    <form method="post" class="on-route-form on-route-resend-form">
+      <input type="hidden" name="action" value="resend_eta_sms">
+      <div class="form-grid on-route-fields">
+        <label>
+          Driver name
+          <input type="text" name="driver_name" value="{{ booking.driver_name or default_driver_name }}" maxlength="80">
+        </label>
+        <label>
+          ETA (minutes)
+          <input type="number" name="manual_eta_minutes" min="1" max="600" step="1"
+            value="{{ booking.eta_minutes or '' }}" required>
+        </label>
+      </div>
+      <div class="form-actions on-route-actions">
+        <button type="submit" class="btn-secondary btn-sm"
+          {% if not status.sms_configured %}disabled title="Configure Twilio in .env"{% endif %}>
+          Send ETA SMS Again
+        </button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if booking.status == 'Completed' or booking.completed_at or booking.review_request_scheduled_at or booking.review_request_sent_at or booking.review_request_cancelled_at %}
+  <ul class="linked-meta phase11-automation-status">
+    <li>
+      Completed:
+      {% if booking.completed_at or booking.status == 'Completed' %}
+      <span class="automation-status automation-status-success">Yes</span>
+      {% if booking.completed_at %} · {{ booking.completed_at[:16] }}{% endif %}
+      {% else %}
+      <span class="automation-status automation-status-partial">Not yet</span>
+      {% endif %}
+    </li>
+    <li>
+      Review request scheduled:
+      {% if booking.review_request_scheduled_at and not booking.review_request_cancelled_at %}
+      <span class="automation-status automation-status-scheduled">Yes</span>
+      · {{ booking.review_request_scheduled_at[:16] }}
+      {% elif booking.review_request_cancelled_at %}
+      <span class="automation-status automation-status-partial">Cancelled</span>
+      · {{ booking.review_request_cancelled_at[:16] }}
+      {% else %}
+      <span class="automation-status automation-status-partial">Not yet</span>
+      {% endif %}
+    </li>
+    <li>
+      Review request sent:
+      {% if booking.review_request_sent_at %}
+      <span class="automation-status automation-status-sent">Yes</span>
+      · {{ booking.review_request_sent_at[:16] }}
+      {% else %}
+      <span class="automation-status automation-status-partial">Not yet</span>
+      {% endif %}
+    </li>
+  </ul>
+  {% endif %}
+
+  {% if booking.google_calendar_event_id or booking.xero_invoice_id or booking.sms_last_sent_at or review_request %}
+  <ul class="linked-meta muted">
+    {% if booking.google_calendar_event_id %}<li>Calendar event linked</li>{% endif %}
+    {% if xero_invoice_draft %}
+    <li>Draft invoice linked — saving this booking updates the Xero draft automatically.</li>
+    {% elif booking.invoice_number %}<li>Xero invoice: {{ booking.invoice_number }}</li>
+    {% elif booking.xero_invoice_id %}<li>Xero invoice linked</li>{% endif %}
+    {% if xero_invoice_locked %}
+    <li>This invoice is authorised/paid in Xero. Create a new invoice version instead.</li>
+    {% endif %}
+    {% if booking.sms_last_sent_at %}<li>Last SMS: {{ booking.sms_last_sent_at }}</li>{% endif %}
+    {% if review_request %}
+    <li>Google review:
+      <span class="automation-status automation-status-{{ review_request.status }}">{{ review_request.status }}</span>
+      {% if review_request.sent_at %} · sent {{ review_request.sent_at[:16] }}{% elif review_request.scheduled_at %} · scheduled {{ review_request.scheduled_at[:16] }}{% endif %}
+      {% if review_request.clicked_at %} · clicked {{ review_request.clicked_at[:16] }}{% endif %}
+      {% if review_request.reviewed_at %} · reviewed {{ review_request.reviewed_at[:16] }}{% endif %}
+    </li>
+    {% endif %}
+  </ul>
+  {% endif %}
+
+  <form method="post" class="booking-form">
+    <input type="hidden" name="action" value="save">
+    {% include '_double_booking_banner.html' %}
+    {% include '_booking_form.html' %}
+    {% include '_extra_charges.html' %}
+    {% include '_invoice_panel.html' %}
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">Save changes</button>
+      <a class="btn-secondary" href="{{ url_for('dashboard') }}">Cancel</a>
+      <a class="btn-secondary" href="{{ url_for('delete_booking', booking_id=booking.id) }}">Delete booking…</a>
+    </div>
+  </form>
+
+  {% include '_profit_panel.html' %}
+</section>
+{% endblock %}

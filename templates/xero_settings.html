@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Xero settings{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <p class="breadcrumb muted"><a href="{{ url_for('settings') }}">Settings</a> → Xero</p>
+  <h2>Xero</h2>
+  <p class="hint">Connect your Xero organisation to create draft invoices from bookings.</p>
+
+  {% if status.xero_ready %}
+  <p class="status-pill ok">Connected &amp; ready</p>
+  <p class="muted">Tenant ID is set. You can create draft invoices from the Edit booking page.</p>
+  {% elif status.xero_connected %}
+  <p class="status-pill ok">Connected</p>
+  <p class="muted">OAuth linked — confirm Tenant ID below if draft invoices fail.</p>
+  {% elif xero_form.credentials_ok %}
+  <p class="status-pill pending">Credentials saved — connect to Xero</p>
+  <p class="muted">Client ID and secret are stored. Click <strong>Connect Xero</strong> to authorise.</p>
+  {% else %}
+  <p class="status-pill off">Not configured</p>
+  <p class="muted">Enter Client ID and Client Secret below, save, then connect.</p>
+  {% endif %}
+
+  {% if xero_form.credentials_ok and not status.xero_connected %}
+  <div class="xero-connect-banner">
+    <p>Step 2 — Authorise this app with Xero.</p>
+    <a class="btn-primary" href="{{ url_for('xero_connect') }}">Connect Xero</a>
+  </div>
+  {% elif status.xero_connected and not status.xero_ready %}
+  <div class="xero-connect-banner xero-connect-banner-muted">
+    <p>Connected — select your organisation (Tenant ID) below and save.</p>
+  </div>
+  {% endif %}
+
+  <form method="post" class="settings-form xero-settings-form">
+    <input type="hidden" name="action" value="save">
+    <div class="form-grid">
+      <label>
+        Client ID
+        <input type="text" name="client_id" required autocomplete="off"
+               value="{{ xero_form.client_id }}">
+      </label>
+      <label>
+        Client Secret
+        {% if xero_form.secret_saved_in_file %}
+        <span class="status-pill ok xero-secret-status">Saved — hidden for security</span>
+        {% elif xero_form.secret_from_env %}
+        <span class="status-pill pending xero-secret-status">Using secret from .env</span>
+        {% else %}
+        <span class="status-pill off xero-secret-status">Not saved yet</span>
+        {% endif %}
+        <input type="password" name="client_secret" autocomplete="off"
+               placeholder="{% if xero_form.has_secret %}Enter only to replace current secret{% else %}Required — paste your client secret{% endif %}">
+      </label>
+      <label>
+        Tenant ID
+        {% if tenants %}
+        <select name="tenant_id">
+          <option value="">— Select organisation —</option>
+          {% for t in tenants %}
+          <option value="{{ t.tenant_id }}" {% if xero_form.tenant_id == t.tenant_id %}selected{% endif %}>
+            {{ t.tenant_name }} ({{ t.tenant_id[:8] }}…)
+          </option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <input type="text" name="tenant_id" autocomplete="off"
+               placeholder="{% if status.xero_connected %}Connect again or paste tenant ID{% else %}Filled automatically after Connect Xero{% endif %}"
+               value="{{ xero_form.tenant_id }}">
+        {% endif %}
+      </label>
+    </div>
+    <h3>Invoice workflow</h3>
+    <label class="checkbox-row">
+      <input type="checkbox" name="auto_create_on_booking_create"
+        {% if xero_form.auto_create_on_booking_create %}checked{% endif %}
+        {% if not status.xero_ready %}disabled{% endif %}>
+      Auto-create and approve Xero invoice when a booking is created
+    </label>
+    <label class="checkbox-row">
+      <input type="checkbox" name="auto_create_draft_on_confirmed"
+        {% if xero_form.auto_create_draft_on_confirmed %}checked{% endif %}
+        {% if not status.xero_ready %}disabled{% endif %}>
+      Also auto-create draft invoice when booking status becomes Confirmed
+    </label>
+    <p class="muted form-hint">Approved invoices are required for Stripe payments to post to Xero. When off, use Create Xero Invoice on the edit booking page.</p>
+    <p class="muted form-hint">OAuth scopes include <code>accounting.payments</code> for Stripe payment posting. If payments fail with unauthorized, click Connect Xero again.</p>
+    <p class="muted form-hint">
+      Create an app at <a href="https://developer.xero.com/" target="_blank" rel="noopener">developer.xero.com</a>
+      (type: <strong>Web app</strong>).
+      Redirect URI must match exactly: <code>{{ config_redirect_uri }}</code>
+      — use <code>localhost</code>, not <code>127.0.0.1</code> (Xero blocks IP-based redirect URIs with 403).
+    </p>
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">Save settings</button>
+      {% if xero_form.credentials_ok %}
+      <a class="btn-secondary" href="{{ url_for('xero_connect') }}">Connect Xero</a>
+      {% endif %}
+      <a class="btn-secondary" href="{{ url_for('settings') }}">Back</a>
+    </div>
+  </form>
+
+  <ul class="config-check muted">
+    <li>Settings file: <code class="path-code">{{ xero_form.credentials_debug.settings_path }}</code></li>
+    <li>Redirect URI (must match Xero Web App exactly): <code>{{ xero_form.credentials_debug.redirect_uri }}</code></li>
+    <li>OAuth scopes: <code>{{ xero_form.credentials_debug.scopes | join(' ') }}</code></li>
+    <li>Authorize URL (preview — state is replaced when you click Connect):
+      <code class="path-code xero-auth-url">{{ xero_form.credentials_debug.authorize_url }}</code>
+    </li>
+    <li>Saved JSON (masked): client_id=<code>{{ xero_form.credentials_debug.masked_json.client_id }}</code>, client_secret=<code>{{ xero_form.credentials_debug.masked_json.client_secret }}</code>, tenant_id=<code>{{ xero_form.credentials_debug.masked_json.tenant_id }}</code></li>
+    <li>Credentials (Client ID + secret):
+      {% if xero_form.credentials_ok %}
+      <strong>Yes</strong> — <code>bool(get_client_id()) and bool(get_client_secret())</code>
+      {% else %}
+      <strong>No</strong> — client_id={{ 'yes' if xero_form.credentials_debug.client_id_resolved else 'no' }}, secret={{ 'yes' if xero_form.credentials_debug.secret_resolved else 'no' }}
+      (file: id={{ 'yes' if xero_form.credentials_debug.client_id_in_file else 'no' }}, secret={{ 'yes' if xero_form.credentials_debug.secret_in_file else 'no' }})
+      {% endif %}
+    </li>
+    <li>Client secret in settings file: {% if xero_form.secret_saved_in_file %}Yes{% elif xero_form.secret_from_env %}No — using .env{% else %}No — paste secret and Save{% endif %}</li>
+    <li>OAuth token: {% if status.xero_connected %}Yes{% else %}No — click Connect Xero{% endif %}</li>
+    <li>Tenant ID: {% if xero_form.tenant_id %}{{ xero_form.tenant_id[:12] }}…{% else %}Not set{% endif %}</li>
+    <li>Ready for draft invoices: {% if status.xero_ready %}Yes{% else %}No{% endif %}</li>
+  </ul>
+</section>
+{% endblock %}

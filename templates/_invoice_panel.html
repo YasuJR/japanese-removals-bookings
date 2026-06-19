@@ -1,0 +1,146 @@
+<section class="invoice-panel">
+  <h3>Invoice</h3>
+
+  <dl class="invoice-summary">
+    <div class="invoice-summary-row">
+      <dt>Rate</dt>
+      <dd>{{ invoice_summary.hourly_rate|format_aud }}/hr × {{ invoice_summary.hours }}h{% if invoice_summary.gst_enabled %} <span class="muted">(incl. GST)</span>{% endif %}</dd>
+    </div>
+    <div class="invoice-summary-row">
+      <dt>Callout</dt>
+      <dd>{{ invoice_summary.callout_fee|format_aud }}{% if invoice_summary.gst_enabled %} <span class="muted">(incl. GST)</span>{% endif %}</dd>
+    </div>
+    {% for item in invoice_summary.extra_charges %}
+    <div class="invoice-summary-row">
+      <dt>{{ item.description }}</dt>
+      <dd>{{ item.quantity }} × {{ item.unit_price|format_aud }}</dd>
+    </div>
+    {% endfor %}
+    {% if invoice_summary.gst_enabled %}
+    <div class="invoice-summary-row">
+      <dt>Net sales (ex GST)</dt>
+      <dd>{{ invoice_summary.net_sales|format_aud }}</dd>
+    </div>
+    <div class="invoice-summary-row">
+      <dt>GST</dt>
+      <dd>{{ invoice_summary.gst_amount|format_aud }} (10%)</dd>
+    </div>
+    {% endif %}
+    <div class="invoice-summary-row invoice-summary-total">
+      <dt>Total{% if invoice_summary.gst_enabled %} (incl. GST){% endif %}</dt>
+      <dd>{{ invoice_summary.total|format_aud }}</dd>
+    </div>
+
+    {% if payment_options is defined and payment_options %}
+    <div class="invoice-summary-row">
+      <dt>Bank transfer total</dt>
+      <dd>{{ payment_options.bank_total_display }} <span class="muted">· No fee</span></dd>
+    </div>
+    <div class="invoice-summary-row">
+      <dt>Credit card total</dt>
+      <dd>
+        {{ payment_options.card_total_display }}
+        <span class="muted">· +{{ payment_options.surcharge_percent_display }}% surcharge ({{ payment_options.surcharge_display }})</span>
+      </dd>
+    </div>
+    {% endif %}
+
+    {% if invoice_summary.invoice_number %}
+    <div class="invoice-summary-row">
+      <dt>Invoice #</dt>
+      <dd>{{ invoice_summary.invoice_number }}</dd>
+    </div>
+    {% endif %}
+    <div class="invoice-summary-row">
+      <dt>Invoice status</dt>
+      <dd>
+        <span class="status-pill status-invoice">{{ invoice_summary.invoice_status }}</span>
+        {% if xero_invoice_draft is defined and xero_invoice_draft %}
+        <span class="muted"> — saving this booking updates the Xero draft</span>
+        {% elif xero_invoice_locked is defined and xero_invoice_locked %}
+        <span class="muted"> — this invoice is authorised/paid in Xero. Create a new invoice version instead.</span>
+        {% endif %}
+      </dd>
+    </div>
+    <div class="invoice-summary-row">
+      <dt>Payment status</dt>
+      <dd>
+        <span class="status-pill status-payment-{{ invoice_summary.payment_status|payment_status_css }}">
+          {{ invoice_summary.payment_status }}
+        </span>
+        {% if booking.paid_at and invoice_summary.payment_status == 'Paid' %}
+        <span class="muted"> · {{ booking.paid_at[:10] }}</span>
+        {% endif %}
+      </dd>
+    </div>
+  </dl>
+
+  <div class="invoice-fields form-grid">
+    <label>
+      Hourly rate ($)
+      <input type="number" name="hourly_rate" min="0" step="0.01"
+             value="{{ form.get('hourly_rate', company_settings.default_hourly_rate) }}">
+    </label>
+    <label>
+      Callout fee ($)
+      <input type="number" name="callout_fee" min="0" step="0.01"
+             value="{{ form.get('callout_fee', company_settings.default_callout_fee) }}">
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" name="gst_enabled"
+             {% if form.get('gst_enabled', company_settings.default_gst_enabled) %}checked{% endif %}>
+      GST inclusive pricing (10%)
+    </label>
+  </div>
+
+  <h4>Invoice overrides</h4>
+  <p class="hint muted">Leave blank to use company defaults from Settings → Company defaults. Changes sync to Xero when you update the invoice.</p>
+  <div class="invoice-fields form-grid">
+    <label>
+      Bank account name
+      <input type="text" name="invoice_bank_account_name"
+             placeholder="{{ company_settings.bank_account_name }}"
+             value="{{ form.get('invoice_bank_account_name', '') }}">
+    </label>
+    <label>
+      Bank BSB
+      <input type="text" name="invoice_bank_bsb"
+             placeholder="{{ company_settings.bank_bsb }}"
+             value="{{ form.get('invoice_bank_bsb', '') }}">
+    </label>
+    <label>
+      Bank account number
+      <input type="text" name="invoice_bank_account"
+             placeholder="{{ company_settings.bank_account_number }}"
+             value="{{ form.get('invoice_bank_account', '') }}">
+    </label>
+    <label class="full-width">
+      Invoice text
+      <textarea name="invoice_custom_text" rows="3"
+                placeholder="Optional extra invoice text">{{ form.get('invoice_custom_text', '') }}</textarea>
+    </label>
+  </div>
+
+  <input type="hidden" name="payment_status" value="{{ form.get('payment_status', 'Unpaid') }}">
+  <input type="hidden" name="invoice_status" value="{{ form.get('invoice_status', '') }}">
+
+  {% if payment_options is defined and payment_options %}
+  <h4>Payment methods</h4>
+  <ul class="payment-method-list">
+    <li><strong>Bank Transfer</strong> — {{ payment_options.bank_total_display }} · No fee</li>
+    <li><strong>Credit Card</strong> — {{ payment_options.card_total_display }} · +{{ payment_options.surcharge_percent_display }}% surcharge</li>
+  </ul>
+  <p class="hint muted">{{ payment_options.compliance_note }}</p>
+  {% if payment_options.stripe_enabled and payment_options.can_checkout %}
+  <form method="post" class="inline-form">
+    <input type="hidden" name="action" value="stripe_checkout">
+    <button type="submit" class="btn-primary btn-sm"
+      {% if not booking.email %}disabled title="Add customer email first"{% endif %}>
+      Pay by Credit Card
+    </button>
+  </form>
+  {% elif payment_options.stripe_enabled and not payment_options.can_checkout %}
+  <p class="muted">Card payment unavailable — invoice already paid.</p>
+  {% endif %}
+  {% endif %}
+</section>

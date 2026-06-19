@@ -1,0 +1,56 @@
+{
+  "phase": 19,
+  "feature": "crew_truck_management",
+  "results": [
+    {
+      "name": "Test A \u2014 Crew and truck tables",
+      "pass": true,
+      "details": [
+        "Tables seeded with required columns."
+      ]
+    },
+    {
+      "name": "Test B \u2014 Crew conflict; Pending ignored",
+      "pass": true,
+      "details": [
+        "Crew conflict rules correct."
+      ]
+    },
+    {
+      "name": "Test C \u2014 Truck double booking",
+      "pass": true,
+      "details": [
+        "Truck conflict detected."
+      ]
+    },
+    {
+      "name": "Test D \u2014 Cancelled bookings ignored",
+      "pass": true,
+      "details": [
+        "Cancelled jobs ignored for conflicts."
+      ]
+    },
+    {
+      "name": "Test E \u2014 Driver run sheet truck filter",
+      "pass": true,
+      "details": [
+        "Truck filter works on run sheet."
+      ]
+    },
+    {
+      "name": "Test F \u2014 Dashboard missing crew/truck warnings",
+      "pass": true,
+      "details": [
+        "CEO dashboard warnings present."
+      ]
+    },
+    {
+      "name": "Test G \u2014 Checklist crew conflict warning",
+      "pass": true,
+      "details": [
+        "Checklist conflict warning present."
+      ]
+    }
+  ],
+  "all_pass": true
+}

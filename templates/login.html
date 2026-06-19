@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1a2744">
+  <title>Staff login — Japanese Removals</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="login-page">
+  <main class="login-panel">
+    <div class="brand brand-login">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <h1>Japanese Removals</h1>
+        <p class="tagline">Staff login · Perth, WA</p>
+      </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flash-list">
+          {% for category, message in messages %}
+            <li class="flash flash-{{ category }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <form method="post" class="booking-form login-form">
+      <label>
+        Username
+        <input type="text" name="username" required autocomplete="username" autofocus>
+      </label>
+      <label>
+        Password
+        <input type="password" name="password" required autocomplete="current-password">
+      </label>
+      <button type="submit" class="btn-primary btn-block">Log in</button>
+    </form>
+
+    <p class="login-help">
+      First time? In Terminal run:<br>
+      <code>python create_staff.py admin YourPassword123</code>
+    </p>
+  </main>
+</body>
+</html>

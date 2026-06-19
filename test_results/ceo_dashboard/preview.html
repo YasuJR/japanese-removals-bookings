@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1a2744">
+  <title>CEO Dashboard — Perth</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <h1>Japanese Removals</h1>
+          <p class="tagline">Perth, Western Australia</p>
+        </div>
+      </div>
+      <button type="button" class="nav-toggle" aria-expanded="false" aria-controls="main-nav">
+        Menu
+      </button>
+      <nav id="main-nav" class="main-nav">
+        <a href="/" class="active">Home</a>
+        <a href="/dashboard" class="">Dashboard</a>
+        <a href="/executive" class="">Executive</a>
+        <a href="/profit" class="">Profit</a>
+        <a href="/invoices" class="">Invoices</a>
+        <a href="/automation" class="">Automation</a>
+        <a href="/crew-schedule" class="">Crew</a>
+        <a href="/daily-checklist" class="">Checklist</a>
+        <a href="/driver" class="">Driver</a>
+        <a href="/bookings/upcoming" class="">Upcoming</a>
+        <a href="/bookings/new" class="">New</a>
+        <a href="/bookings/search" class="">Search</a>
+        <a href="/bookings/all" class="">All</a>
+        <a class="nav-export" href="/bookings/export.csv">Export CSV</a>
+        <a href="/settings" class="">Settings</a>
+        <a href="/logout" class="nav-logout">Log out (admin)</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    
+      
+    
+
+    
+<div class="ceo-dashboard">
+  <header class="ceo-header">
+    <div>
+      <p class="ceo-kicker">Japanese Removals</p>
+      <h2 class="ceo-title">CEO Dashboard</h2>
+      
+      <p class="ceo-subtitle">Thu 18 Jun</p>
+    </div>
+  </header>
+
+  <nav class="ceo-quick-actions" aria-label="Quick actions">
+    <a class="ceo-action-btn" href="/bookings/new">New Booking</a>
+    <a class="ceo-action-btn" href="/daily-checklist?filter=today">Today's Jobs</a>
+    <a class="ceo-action-btn" href="/daily-checklist?filter=tomorrow">Tomorrow's Jobs</a>
+    <a class="ceo-action-btn" href="/invoices">Create Invoice</a>
+    <a class="ceo-action-btn" href="https://calendar.google.com/calendar/r/day/2026/06/18" target="_blank" rel="noopener noreferrer">View Calendar</a>
+  </nav>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">Today</h3>
+    <div class="ceo-stat-grid ceo-stat-grid-5">
+      <article class="ceo-stat-card">
+        <span class="ceo-stat-label">Jobs today</span>
+        <strong class="ceo-stat-value">26</strong>
+      </article>
+      <article class="ceo-stat-card">
+        <span class="ceo-stat-label">Confirmed</span>
+        <strong class="ceo-stat-value">9</strong>
+      </article>
+      <article class="ceo-stat-card">
+        <span class="ceo-stat-label">On route</span>
+        <strong class="ceo-stat-value">0</strong>
+      </article>
+      <article class="ceo-stat-card">
+        <span class="ceo-stat-label">Completed</span>
+        <strong class="ceo-stat-value">13</strong>
+      </article>
+      <article class="ceo-stat-card ceo-stat-warn">
+        <span class="ceo-stat-label">Not started</span>
+        <strong class="ceo-stat-value">13</strong>
+      </article>
+    </div>
+
+    
+    <div class="ceo-job-list">
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>Debug Customer</strong>
+            <p class="ceo-job-meta">8:00 AM – 6:00 PM · Completed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/76/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000444">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000444">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20St" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>BankTransferA Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Paid</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/65/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000333">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000333">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Profit%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>StripeCardB Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Paid</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/66/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000333">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000333">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Profit%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>CompletedMarkerC Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Completed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/68/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000333">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000333">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Profit%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>CompletedD Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Completed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/69/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000333">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000333">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Profit%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>ManualUpdateE Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Paid</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/70/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000333">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000333">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Profit%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>UnpaidA Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Completed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/71/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000444">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000444">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Reminder%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>PaidB Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Completed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/72/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000444">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000444">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Reminder%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>DuplicateD Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Completed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/74/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000444">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000444">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Reminder%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>ManualE Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Completed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/75/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000444">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000444">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Reminder%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>UnpaidA Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Completed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/77/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000444">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000444">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Reminder%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>PaidB Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Completed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/78/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000444">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000444">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Reminder%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>DuplicateD Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Completed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/80/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000444">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000444">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Reminder%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>ManualE Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Completed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/81/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000444">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000444">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Reminder%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>TodayA Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Confirmed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/82/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000555">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000555">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Checklist%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>ChecklistD Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Confirmed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/85/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000555">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000555">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Checklist%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>WarningsE Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Confirmed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/86/edit">Open booking</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Checklist%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>CompleteF Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Completed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/87/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000555">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000555">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Checklist%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>TodayA Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Confirmed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/89/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000555">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000555">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Checklist%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>ChecklistD Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Confirmed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/92/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000555">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000555">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Checklist%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>WarningsE Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Confirmed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/93/edit">Open booking</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Checklist%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>CompleteF Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Completed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/94/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000555">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000555">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20Checklist%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>TodayJob Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Confirmed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/96/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000666">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000666">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20CEO%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>MoneyJob Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Paid</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/98/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000666">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000666">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20CEO%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>PipeConfirmed Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Confirmed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/100/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000666">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000666">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20CEO%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+      <article class="ceo-job-card">
+        <div class="ceo-job-head">
+          <div>
+            <strong>ActionsJob Customer</strong>
+            <p class="ceo-job-meta">9:00 AM – 12:00 PM · Confirmed</p>
+          </div>
+        </div>
+        <div class="ceo-job-actions">
+          <a class="ceo-action-btn ceo-action-sm" href="/bookings/101/edit">Open booking</a>
+          
+          <a class="ceo-action-btn ceo-action-sm" href="tel:+61412000666">Call customer</a>
+          <a class="ceo-action-btn ceo-action-sm" href="sms:0412000666">Text customer</a>
+          
+          
+          <a class="ceo-action-btn ceo-action-sm" href="https://maps.apple.com/?q=10%20CEO%20St%2C%20Perth%20WA" target="_blank" rel="noopener noreferrer">Open map</a>
+          
+        </div>
+      </article>
+      
+    </div>
+    
+  </section>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">Tomorrow</h3>
+    <div class="ceo-stat-grid">
+      <article class="ceo-stat-card">
+        <span class="ceo-stat-label">Jobs</span>
+        <strong class="ceo-stat-value">4</strong>
+      </article>
+      <article class="ceo-stat-card">
+        <span class="ceo-stat-label">Confirmed</span>
+        <strong class="ceo-stat-value">1</strong>
+      </article>
+      <article class="ceo-stat-card">
+        <span class="ceo-stat-label">Crew assigned</span>
+        <strong class="ceo-stat-value">2</strong>
+      </article>
+      <article class="ceo-stat-card">
+        <span class="ceo-stat-label">Truck assigned</span>
+        <strong class="ceo-stat-value">2</strong>
+      </article>
+    </div>
+    
+    <ul class="ceo-warning-list">
+      
+      <li>
+        <span class="ceo-warning-pill">Missing crew</span>
+        <a href="/bookings/23/edit">Webhook Test Customer</a>
+      </li>
+      
+      <li>
+        <span class="ceo-warning-pill">Missing truck</span>
+        <a href="/bookings/23/edit">Webhook Test Customer</a>
+      </li>
+      
+      <li>
+        <span class="ceo-warning-pill">Missing crew</span>
+        <a href="/bookings/97/edit">TomorrowWarn Customer</a>
+      </li>
+      
+      <li>
+        <span class="ceo-warning-pill">Missing truck</span>
+        <a href="/bookings/97/edit">TomorrowWarn Customer</a>
+      </li>
+      
+      <li>
+        <span class="ceo-warning-pill">Missing invoice</span>
+        <a href="/bookings/97/edit">TomorrowWarn Customer</a>
+      </li>
+      
+    </ul>
+    
+  </section>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">Money</h3>
+    
+    
+    <article class="ceo-money-card">
+      <h4 class="ceo-money-period">Today</h4>
+      <div class="ceo-money-grid">
+        <div><span>Revenue</span><strong class="money">$9,350.00</strong></div>
+        <div><span>GST</span><strong class="money">$850.00</strong></div>
+        <div><span>Costs</span><strong class="money">$749.90</strong></div>
+        <div><span>Profit</span><strong class="money">$7,750.10</strong></div>
+        <div><span>Margin</span><strong class="ceo-margin profit-margin-high">82.9%</strong></div>
+      </div>
+    </article>
+    
+    
+    <article class="ceo-money-card">
+      <h4 class="ceo-money-period">This week</h4>
+      <div class="ceo-money-grid">
+        <div><span>Revenue</span><strong class="money">$11,010.00</strong></div>
+        <div><span>GST</span><strong class="money">$1,000.90</strong></div>
+        <div><span>Costs</span><strong class="money">$750.06</strong></div>
+        <div><span>Profit</span><strong class="money">$9,259.04</strong></div>
+        <div><span>Margin</span><strong class="ceo-margin profit-margin-high">84.1%</strong></div>
+      </div>
+    </article>
+    
+    
+    <article class="ceo-money-card">
+      <h4 class="ceo-money-period">This month</h4>
+      <div class="ceo-money-grid">
+        <div><span>Revenue</span><strong class="money">$32,946.00</strong></div>
+        <div><span>GST</span><strong class="money">$2,995.10</strong></div>
+        <div><span>Costs</span><strong class="money">$782.19</strong></div>
+        <div><span>Profit</span><strong class="money">$29,168.71</strong></div>
+        <div><span>Margin</span><strong class="ceo-margin profit-margin-high">88.5%</strong></div>
+      </div>
+    </article>
+    
+  </section>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">Payments</h3>
+    <div class="ceo-stat-grid">
+      <article class="ceo-stat-card">
+        <span class="ceo-stat-label">Unpaid</span>
+        <strong class="ceo-stat-value">39</strong>
+      </article>
+      <article class="ceo-stat-card ceo-stat-warn">
+        <span class="ceo-stat-label">Overdue</span>
+        <strong class="ceo-stat-value">6</strong>
+      </article>
+      <article class="ceo-stat-card ceo-stat-ok">
+        <span class="ceo-stat-label">Paid today</span>
+        <strong class="ceo-stat-value">10</strong>
+      </article>
+    </div>
+
+    
+    <h4 class="ceo-subheading">Overdue invoices</h4>
+    <div class="ceo-table-wrap">
+      <table class="ceo-table">
+        <thead><tr><th>Customer</th><th>Amount</th><th>Days overdue</th><th></th></tr></thead>
+        <tbody>
+          
+          <tr>
+            <td><a href="/bookings/5/edit">tester2</a></td>
+            <td class="money">$1,890.00</td>
+            <td>2</td>
+            <td>
+              <form method="post" class="inline-form">
+                <input type="hidden" name="action" value="send_reminder">
+                <input type="hidden" name="booking_id" value="5">
+                <button type="submit" class="ceo-action-btn ceo-action-sm">Send reminder</button>
+              </form>
+            </td>
+          </tr>
+          
+          <tr>
+            <td><a href="/bookings/12/edit">test9</a></td>
+            <td class="money">$630.00</td>
+            <td>4</td>
+            <td>
+              <form method="post" class="inline-form">
+                <input type="hidden" name="action" value="send_reminder">
+                <input type="hidden" name="booking_id" value="12">
+                <button type="submit" class="ceo-action-btn ceo-action-sm">Send reminder</button>
+              </form>
+            </td>
+          </tr>
+          
+          <tr>
+            <td><a href="/bookings/1/edit">tester</a></td>
+            <td class="money">$1,890.00</td>
+            <td>4</td>
+            <td>
+              <form method="post" class="inline-form">
+                <input type="hidden" name="action" value="send_reminder">
+                <input type="hidden" name="booking_id" value="1">
+                <button type="submit" class="ceo-action-btn ceo-action-sm">Send reminder</button>
+              </form>
+            </td>
+          </tr>
+          
+          <tr>
+            <td><a href="/bookings/11/edit">test8</a></td>
+            <td class="money">$1,890.00</td>
+            <td>5</td>
+            <td>
+              <form method="post" class="inline-form">
+                <input type="hidden" name="action" value="send_reminder">
+                <input type="hidden" name="booking_id" value="11">
+                <button type="submit" class="ceo-action-btn ceo-action-sm">Send reminder</button>
+              </form>
+            </td>
+          </tr>
+          
+          <tr>
+            <td><a href="/bookings/10/edit">test7</a></td>
+            <td class="money">$906.00</td>
+            <td>6</td>
+            <td>
+              <form method="post" class="inline-form">
+                <input type="hidden" name="action" value="send_reminder">
+                <input type="hidden" name="booking_id" value="10">
+                <button type="submit" class="ceo-action-btn ceo-action-sm">Send reminder</button>
+              </form>
+            </td>
+          </tr>
+          
+          <tr>
+            <td><a href="/bookings/9/edit">test6</a></td>
+            <td class="money">$990.00</td>
+            <td>6</td>
+            <td>
+              <form method="post" class="inline-form">
+                <input type="hidden" name="action" value="send_reminder">
+                <input type="hidden" name="booking_id" value="9">
+                <button type="submit" class="ceo-action-btn ceo-action-sm">Send reminder</button>
+              </form>
+            </td>
+          </tr>
+          
+        </tbody>
+      </table>
+    </div>
+    
+
+    
+  </section>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">Bookings pipeline</h3>
+    <div class="ceo-pipeline-grid">
+      
+      <article class="ceo-pipeline-card">
+        <span class="ceo-stat-label">Pending</span>
+        <strong class="ceo-stat-value">9</strong>
+        <span class="ceo-pipeline-value money">$6,990.00</span>
+      </article>
+      
+      <article class="ceo-pipeline-card">
+        <span class="ceo-stat-label">Confirmed</span>
+        <strong class="ceo-stat-value">31</strong>
+        <span class="ceo-pipeline-value money">$5,850.00</span>
+      </article>
+      
+      <article class="ceo-pipeline-card">
+        <span class="ceo-stat-label">On Route</span>
+        <strong class="ceo-stat-value">0</strong>
+        <span class="ceo-pipeline-value money">$0.00</span>
+      </article>
+      
+      <article class="ceo-pipeline-card">
+        <span class="ceo-stat-label">Paid</span>
+        <strong class="ceo-stat-value">9</strong>
+        <span class="ceo-pipeline-value money">$1,983.00</span>
+      </article>
+      
+      <article class="ceo-pipeline-card">
+        <span class="ceo-stat-label">Completed</span>
+        <strong class="ceo-stat-value">22</strong>
+        <span class="ceo-pipeline-value money">$8,036.00</span>
+      </article>
+      
+    </div>
+  </section>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">Automation health</h3>
+    <div class="ceo-health-grid">
+      
+      <article class="ceo-health-card ceo-health-ok">
+        <span class="ceo-health-dot" aria-hidden="true"></span>
+        <div>
+          <strong>Gmail Automation</strong>
+          <span class="ceo-health-label">Working</span>
+        </div>
+      </article>
+      
+      <article class="ceo-health-card ceo-health-ok">
+        <span class="ceo-health-dot" aria-hidden="true"></span>
+        <div>
+          <strong>Google Calendar</strong>
+          <span class="ceo-health-label">Working</span>
+        </div>
+      </article>
+      
+      <article class="ceo-health-card ceo-health-ok">
+        <span class="ceo-health-dot" aria-hidden="true"></span>
+        <div>
+          <strong>Xero</strong>
+          <span class="ceo-health-label">Working</span>
+        </div>
+      </article>
+      
+      <article class="ceo-health-card ceo-health-ok">
+        <span class="ceo-health-dot" aria-hidden="true"></span>
+        <div>
+          <strong>Stripe</strong>
+          <span class="ceo-health-label">Working</span>
+        </div>
+      </article>
+      
+      <article class="ceo-health-card ceo-health-ok">
+        <span class="ceo-health-dot" aria-hidden="true"></span>
+        <div>
+          <strong>SMS</strong>
+          <span class="ceo-health-label">Working</span>
+        </div>
+      </article>
+      
+    </div>
+  </section>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">Alerts</h3>
+    
+    <ul class="ceo-alert-list">
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/76/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/65/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/66/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/68/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/69/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/70/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/71/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/72/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/74/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/75/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/77/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/78/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/80/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/81/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/82/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/85/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/86/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Missing phone number
+        
+        <a href="/bookings/86/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/87/edit">Open</a>
+        
+      </li>
+      
+      <li class="ceo-alert-item">
+        Double booking conflict
+        
+        <a href="/bookings/89/edit">Open</a>
+        
+      </li>
+      
+    </ul>
+    
+  </section>
+
+  <section class="ceo-section">
+    <h3 class="ceo-section-title">Quick stats</h3>
+    <div class="ceo-stat-grid ceo-stat-grid-3">
+      <article class="ceo-stat-card"><span class="ceo-stat-label">Bookings this month</span><strong class="ceo-stat-value">66</strong></article>
+      <article class="ceo-stat-card"><span class="ceo-stat-label">Completed this month</span><strong class="ceo-stat-value">25</strong></article>
+      <article class="ceo-stat-card"><span class="ceo-stat-label">Reviews requested</span><strong class="ceo-stat-value">4</strong></article>
+      <article class="ceo-stat-card"><span class="ceo-stat-label">Avg invoice value</span><strong class="ceo-stat-value money">$549.10</strong></article>
+      <article class="ceo-stat-card"><span class="ceo-stat-label">Avg profit / job</span><strong class="ceo-stat-value money">$486.15</strong></article>
+    </div>
+  </section>
+</div>
+
+  </main>
+
+  <footer class="site-footer wrap">
+    <p>Bookings saved locally in <code>bookings.db</code></p>
+  </footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>

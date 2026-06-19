@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Upcoming jobs{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="panel-head">
+    <h2>Upcoming jobs</h2>
+    <a class="btn-primary" href="{{ url_for('new_booking') }}">+ New booking</a>
+  </div>
+  <p class="hint">Moves from today onwards, sorted by date.</p>
+
+  {% set show_saved = false %}
+  {% set empty_message = 'No upcoming jobs yet. <a href="' ~ url_for('new_booking') ~ '">Add your first booking</a>.' %}
+  {% include '_booking_list.html' %}
+</section>
+{% endblock %}

@@ -1,0 +1,7 @@
+{% if double_booking_badge == 'conflict' %}
+<span class="double-booking-badge double-booking-badge-conflict">Conflict warning</span>
+{% elif double_booking_badge == 'clear' %}
+<span class="double-booking-badge double-booking-badge-clear">No conflict</span>
+{% elif double_booking_badge == 'override' %}
+<span class="double-booking-badge double-booking-badge-override">Override confirmed</span>
+{% endif %}

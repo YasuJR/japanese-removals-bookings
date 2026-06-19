@@ -1,0 +1,149 @@
+"""Automation Hub — logging and constants."""
+
+from typing import List, Optional
+
+import database as db
+
+AUTOMATION_XERO_INVOICE_EMAIL = "xero_create_approve_email"
+AUTOMATION_XERO_INVOICE_AUTO_CREATE = "xero_invoice_auto_create"
+
+XERO_AUTOMATION_TYPES = (
+    AUTOMATION_XERO_INVOICE_EMAIL,
+    AUTOMATION_XERO_INVOICE_AUTO_CREATE,
+)
+
+AUTOMATION_SMS_BOOKING_CONFIRMATION = "sms_booking_confirmation"
+AUTOMATION_SMS_BOOKING_CONFIRMED = "sms_booking_confirmed"
+AUTOMATION_SMS_BOOKING_REMINDER = "sms_booking_reminder"
+AUTOMATION_SMS_THANK_YOU = "sms_thank_you"
+AUTOMATION_SMS_PAYMENT_REMINDER = "sms_payment_reminder"
+AUTOMATION_SMS_PAYMENT_CONFIRMATION = "sms_payment_confirmation"
+
+SMS_AUTOMATION_TYPES = (
+    AUTOMATION_SMS_BOOKING_CONFIRMATION,
+    AUTOMATION_SMS_BOOKING_CONFIRMED,
+    AUTOMATION_SMS_BOOKING_REMINDER,
+    AUTOMATION_SMS_THANK_YOU,
+    AUTOMATION_SMS_PAYMENT_REMINDER,
+    AUTOMATION_SMS_PAYMENT_CONFIRMATION,
+)
+
+AUTOMATION_XERO_STRIPE_PAYMENT = "xero_stripe_payment"
+
+AUTOMATION_GMAIL_INBOX = "gmail_inbox_booking"
+AUTOMATION_GMAIL_ADMIN_NOTIFY = "gmail_admin_notify"
+AUTOMATION_WEBSITE_QUOTE = "website_quote_submitted"
+AUTOMATION_WEBSITE_QUOTE_NOTIFY = "website_quote_admin_notify"
+
+GMAIL_AUTOMATION_TYPES = (
+    AUTOMATION_GMAIL_INBOX,
+    AUTOMATION_GMAIL_ADMIN_NOTIFY,
+)
+
+WEBSITE_QUOTE_AUTOMATION_TYPES = (
+    AUTOMATION_WEBSITE_QUOTE,
+    AUTOMATION_WEBSITE_QUOTE_NOTIFY,
+)
+
+AUTOMATION_SMS_INBOUND_BOOKING = "sms_inbound_booking"
+AUTOMATION_SMS_INBOUND_LEAD = "sms_inbound_lead"
+AUTOMATION_SMS_INBOUND_NOTIFY = "sms_inbound_admin_notify"
+AUTOMATION_SMS_LEAD_CONVERTED = "sms_lead_converted"
+
+SMS_INBOUND_AUTOMATION_TYPES = (
+    AUTOMATION_SMS_INBOUND_BOOKING,
+    AUTOMATION_SMS_INBOUND_LEAD,
+    AUTOMATION_SMS_INBOUND_NOTIFY,
+    AUTOMATION_SMS_LEAD_CONVERTED,
+)
+
+AUTOMATION_CONFIRMATION_SMS_SENT = "confirmation_sms_sent"
+AUTOMATION_CALENDAR_EVENT_SYNCED = "calendar_event_synced"
+AUTOMATION_STAFF_NOTIFICATION_SENT = "staff_notification_sent"
+
+CONFIRMED_AUTOMATION_TYPES = (
+    AUTOMATION_CONFIRMATION_SMS_SENT,
+    AUTOMATION_CALENDAR_EVENT_SYNCED,
+    AUTOMATION_STAFF_NOTIFICATION_SENT,
+)
+
+AUTOMATION_ON_ROUTE_STARTED = "on_route_started"
+AUTOMATION_ETA_SMS_SENT = "eta_sms_sent"
+
+ON_ROUTE_AUTOMATION_TYPES = (
+    AUTOMATION_ON_ROUTE_STARTED,
+    AUTOMATION_ETA_SMS_SENT,
+)
+
+AUTOMATION_REVIEW_REQUEST_SCHEDULED = "review_request_scheduled"
+AUTOMATION_REVIEW_REQUEST_SENT = "review_request_sent"
+AUTOMATION_REVIEW_REQUEST_CANCELLED = "review_request_cancelled"
+
+AUTOMATION_GOOGLE_REVIEW = "google_review_request"
+
+REVIEW_AUTOMATION_TYPES = (
+    AUTOMATION_GOOGLE_REVIEW,
+    AUTOMATION_REVIEW_REQUEST_SCHEDULED,
+    AUTOMATION_REVIEW_REQUEST_SENT,
+    AUTOMATION_REVIEW_REQUEST_CANCELLED,
+)
+
+AUTOMATION_STRIPE_CHECKOUT = "stripe_checkout"
+AUTOMATION_STRIPE_WEBHOOK = "stripe_webhook_paid"
+AUTOMATION_STRIPE_PAYMENT_RECEIVED = "stripe_payment_received"
+
+STRIPE_AUTOMATION_TYPES = (
+    AUTOMATION_STRIPE_CHECKOUT,
+    AUTOMATION_STRIPE_PAYMENT_RECEIVED,
+    AUTOMATION_STRIPE_WEBHOOK,
+)
+
+AUTOMATION_DOUBLE_BOOKING_CHECKED = "double_booking_checked"
+AUTOMATION_DOUBLE_BOOKING_CONFLICT = "double_booking_conflict"
+AUTOMATION_DOUBLE_BOOKING_OVERRIDE = "double_booking_override"
+
+DOUBLE_BOOKING_AUTOMATION_TYPES = (
+    AUTOMATION_DOUBLE_BOOKING_CHECKED,
+    AUTOMATION_DOUBLE_BOOKING_CONFLICT,
+    AUTOMATION_DOUBLE_BOOKING_OVERRIDE,
+)
+
+AUTOMATION_PAYMENT_REMINDER_1_SENT = "payment_reminder_1_sent"
+AUTOMATION_PAYMENT_REMINDER_2_SENT = "payment_reminder_2_sent"
+AUTOMATION_PAYMENT_REMINDER_3_SENT = "payment_reminder_3_sent"
+AUTOMATION_PAYMENT_REMINDERS_CANCELLED = "payment_reminders_cancelled"
+
+PAYMENT_REMINDER_AUTOMATION_TYPES = (
+    AUTOMATION_PAYMENT_REMINDER_1_SENT,
+    AUTOMATION_PAYMENT_REMINDER_2_SENT,
+    AUTOMATION_PAYMENT_REMINDER_3_SENT,
+    AUTOMATION_PAYMENT_REMINDERS_CANCELLED,
+)
+
+STATUS_SUCCESS = "success"
+STATUS_SCHEDULED = "scheduled"
+STATUS_CLICKED = "clicked"
+STATUS_REVIEWED = "reviewed"
+STATUS_ERROR = "error"
+STATUS_PARTIAL = "partial"
+STATUS_SENT = "sent"
+STATUS_DELIVERED = "delivered"
+STATUS_FAILED = "failed"
+
+
+def log_event(
+    automation_type: str,
+    status: str,
+    message: str,
+    booking_id: Optional[int] = None,
+) -> int:
+    return db.add_automation_log(
+        automation_type=automation_type,
+        status=status,
+        message=message,
+        booking_id=booking_id,
+    )
+
+
+def recent_logs(limit: int = 50, automation_types: Optional[tuple] = None) -> List[dict]:
+    return db.list_automation_logs(limit=limit, automation_types=automation_types)

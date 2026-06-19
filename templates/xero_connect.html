@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Connect Xero{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <p class="breadcrumb muted">
+    <a href="{{ url_for('settings') }}">Settings</a> →
+    <a href="{{ url_for('xero_settings') }}">Xero</a> → Connect
+  </p>
+  <h2>Connect to Xero</h2>
+  <p class="hint">
+    Review the OAuth request below, then continue to Xero to sign in and approve access.
+  </p>
+
+  <p class="status-pill pending">Step 2 — Authorise with Xero</p>
+
+  <div class="xero-oauth-review">
+    <h3>OAuth parameters</h3>
+    <ul class="config-check muted">
+      <li>client_id: <code>{{ oauth.client_id }}</code></li>
+      <li>redirect_uri: <code>{{ oauth.redirect_uri }}</code></li>
+      <li>scope: <code>{{ oauth.scope }}</code></li>
+      <li>state: <code>{{ oauth.state[:12] }}…</code> (stored in your session)</li>
+      <li>response_type: <code>{{ oauth.response_type }}</code></li>
+    </ul>
+
+    <h3>Exact authorize URL</h3>
+    <p class="muted">This is the URL sent to <code>login.xero.com</code> when you continue.</p>
+    <pre class="xero-auth-url-block"><code>{{ oauth.authorize_url }}</code></pre>
+
+    <p class="muted form-hint">
+      In your Xero Web App, the redirect URI must match <strong>exactly</strong>:
+      <code>{{ oauth.redirect_uri }}</code>.
+      Use <code>localhost</code>, not <code>127.0.0.1</code> — Xero returns 403 Forbidden for IP-based redirect URIs.
+    </p>
+  </div>
+
+  <div class="form-actions">
+    <a class="btn-primary" href="{{ oauth.authorize_url }}">Continue to Xero</a>
+    <a class="btn-secondary" href="{{ url_for('xero_settings') }}">Back to Xero settings</a>
+  </div>
+</section>
+{% endblock %}

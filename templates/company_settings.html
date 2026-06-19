@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Company defaults{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <p class="breadcrumb muted"><a href="{{ url_for('settings') }}">Settings</a> → Company defaults</p>
+  <h2>Company defaults</h2>
+  <p class="hint">These values pre-fill new bookings and sync to Xero invoice branding (header, logo theme, bank details).</p>
+
+  <form method="post" class="settings-form">
+    <input type="hidden" name="action" value="save">
+
+    <h3>New booking defaults</h3>
+    <div class="form-grid">
+      <label>
+        Default phone number
+        <input type="tel" name="default_phone" value="{{ company_form.default_phone }}">
+      </label>
+      <label>
+        Default email
+        <input type="email" name="default_email" value="{{ company_form.default_email }}">
+      </label>
+      <label>
+        Default hourly rate ($)
+        <input type="number" name="default_hourly_rate" min="0" step="0.01"
+               value="{{ company_form.default_hourly_rate }}">
+      </label>
+      <label>
+        Default call out fee ($)
+        <input type="number" name="default_callout_fee" min="0" step="0.01"
+               value="{{ company_form.default_callout_fee }}">
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="default_gst_enabled"
+               {% if company_form.default_gst_enabled %}checked{% endif %}>
+        GST enabled by default
+      </label>
+      <label>
+        GST pricing mode
+        <select name="gst_pricing_mode">
+          <option value="inclusive" {% if company_form.gst_pricing_mode == 'inclusive' %}selected{% endif %}>
+            Inclusive (quote amount is final)
+          </option>
+          <option value="exclusive" {% if company_form.gst_pricing_mode == 'exclusive' %}selected{% endif %}>
+            Exclusive (GST added on top)
+          </option>
+        </select>
+      </label>
+      <label class="full-width">
+        Default crew names (comma-separated)
+        <input type="text" name="default_crew_csv" value="{{ company_form.default_crew_csv }}">
+      </label>
+    </div>
+
+    <h3>Invoice header (above line items in Xero)</h3>
+    <p class="hint muted">Company name, phone, email, and bank details sync to Xero organisation/branding — not inside line item descriptions. Upload the logo once in Xero branding themes.</p>
+    <div class="form-grid">
+      <label>
+        Business name
+        <input type="text" name="company_name" value="{{ company_form.company_name }}">
+      </label>
+      <label>
+        Location
+        <input type="text" name="company_location" value="{{ company_form.company_location }}">
+      </label>
+      <label>
+        Legal entity name
+        <input type="text" name="company_legal_name" value="{{ company_form.company_legal_name }}">
+      </label>
+      <label>
+        Business phone
+        <input type="tel" name="company_phone" value="{{ company_form.company_phone }}">
+      </label>
+      <label>
+        Business email
+        <input type="email" name="company_email" value="{{ company_form.company_email }}">
+      </label>
+      <label>
+        Website
+        <input type="text" name="company_website" value="{{ company_form.company_website }}">
+      </label>
+    </div>
+
+    <h3>Bank details (invoice footer)</h3>
+    <div class="form-grid">
+      <label>
+        Account name
+        <input type="text" name="bank_account_name" value="{{ company_form.bank_account_name }}">
+      </label>
+      <label>
+        BSB
+        <input type="text" name="bank_bsb" value="{{ company_form.bank_bsb }}">
+      </label>
+      <label>
+        Account number
+        <input type="text" name="bank_account_number" value="{{ company_form.bank_account_number }}">
+      </label>
+    </div>
+
+    <h3>Xero invoice branding</h3>
+    <div class="branding-preview">
+      <img src="{{ url_for('static', filename='branding/japanese-removals-invoice-logo.png') }}"
+           alt="Japanese Removals logo" class="branding-logo-preview">
+      <div>
+        <p class="hint">Official invoice logo (wide format with company name). Upload to Xero: <strong>Settings → Invoice settings → Branding themes → Upload logo</strong>.</p>
+        <p class="hint muted">Xero-ready file: <code>static/branding/japanese-removals-logo-xero.png</code> (auto-resized from invoice logo).</p>
+        {% if branding_status and branding_status.logo_ready %}
+        <p class="status-pill ok">Logo detected on Xero branding theme{% if branding_status.theme_name %}: {{ branding_status.theme_name }}{% endif %}</p>
+        {% elif status.xero_connected %}
+        <p class="status-pill off">Logo not uploaded in Xero yet</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="form-grid">
+      <label>
+        Xero branding theme
+        <select name="xero_branding_theme_id">
+          <option value="">Default theme (SortOrder 0)</option>
+          {% for theme in (branding_status.themes if branding_status else []) or [] %}
+          <option value="{{ theme.id }}"
+                  {% if company_form.xero_branding_theme_id == theme.id %}selected{% endif %}>
+            {{ theme.name }}{% if theme.logo_url %} · logo uploaded{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="xero_sync_org_header"
+               {% if company_form.xero_sync_org_header %}checked{% endif %}>
+        Sync organisation header to Xero (company name, phone, email, bank details above line items)
+      </label>
+    </div>
+
+    <p class="muted form-hint">
+      Settings file: <code>{{ company_form.settings_path }}</code>.
+      Remove any street address (e.g. 20B …) from Xero organisation settings.
+      Reconnect Xero once after this update (new Settings scope).
+      Refresh existing drafts via <strong>Update Invoice</strong> on each booking, or run
+      <code>python3 scripts/resync_xero_invoices.py</code>.
+    </p>
+
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">Save company defaults</button>
+      <a class="btn-secondary" href="{{ url_for('settings') }}">Back</a>
+    </div>
+  </form>
+
+  {% if status.xero_connected %}
+  <form method="post" class="inline-form" style="margin-top: 1rem;">
+    <input type="hidden" name="action" value="sync_xero_branding">
+    <button type="submit" class="btn-secondary"
+            {% if not status.xero_ready %}disabled title="Set Xero tenant ID first"{% endif %}>
+      Sync invoice branding to Xero
+    </button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

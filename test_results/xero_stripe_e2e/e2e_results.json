@@ -1,0 +1,33 @@
+{
+  "steps": [],
+  "xero_payments_scope": true,
+  "bank_account_code": "c73de22b-9503-4a6b-8a1c-b4d080ffea93",
+  "booking_id": 32,
+  "after_booking_created": [
+    "Xero invoice INV-0016 created automatically."
+  ],
+  "after_create": {
+    "xero_invoice_id": "d17162ce-53ad-4650-9406-32165f0eea31",
+    "invoice_number": "INV-0016",
+    "invoice_status": "AUTHORISED"
+  },
+  "checkout": {
+    "ok": true,
+    "message": "Redirecting to Stripe\u2026",
+    "url": "https://checkout.stripe.com/c/pay/cs_live_a1HQZ4OJvbjHRP8dh9coZcwrPpUKu41VSiTuhs"
+  },
+  "after_webhook": {
+    "webhook_ok": true,
+    "webhook_message": "Payment recorded for booking #32.",
+    "payment_status": "Paid",
+    "invoice_status": "PAID",
+    "invoice_number": "INV-0016",
+    "paid_at": "2026-06-15 08:00:00",
+    "xero_payment_id": "d461c86c-f4f1-48ce-a9cd-217a9d14d1ff",
+    "xero_amount_due": -1.0,
+    "xero_amount_paid": 1.0,
+    "xero_status": "PAID",
+    "xero_fully_paid_on": "/Date(1781481600000+0000)/"
+  },
+  "passed": true
+}

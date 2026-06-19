@@ -1,0 +1,6 @@
+{# date_str: ISO move_date YYYY-MM-DD #}
+{% set date_parts = date_str|format_display_date %}
+<time class="date-badge {{ date_str|weekday_class }}" datetime="{{ date_str }}">
+  <span class="weekday">{{ date_parts.weekday }}</span>
+  <span class="day-month">{{ date_parts.day_month }}</span>
+</time>

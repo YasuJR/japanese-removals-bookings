@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}Executive{% endblock %}
+
+{% block content %}
+<section class="panel executive-panel">
+  <div class="executive-header">
+    {% set today_parts = exec.today|format_display_date %}
+    <h2>Executive</h2>
+    <p class="hint">{{ exec.company_name }} · {{ today_parts.weekday }} {{ today_parts.day_month }}</p>
+  </div>
+
+  <nav class="exec-quick-actions" aria-label="Quick actions">
+    <a class="exec-action-btn" href="{{ url_for('new_booking') }}">New booking</a>
+    <a class="exec-action-btn" href="{{ url_for('crew_schedule') }}">Crew schedule</a>
+    <a class="exec-action-btn" href="{{ url_for('outstanding_invoices') }}">Invoices</a>
+    <a class="exec-action-btn" href="{{ url_for('profit') }}">Profit</a>
+  </nav>
+
+  <div class="executive-stack">
+    <article class="exec-card exec-card-hero exec-card-target">
+      <h3 class="exec-card-title">Monthly revenue target</h3>
+      <div class="exec-target-row">
+        <span class="exec-hero-value money">{{ exec.revenue_target.current|format_aud }}</span>
+        <span class="exec-target-of">of {{ exec.revenue_target.target|format_aud }}</span>
+      </div>
+      <div class="exec-progress" role="progressbar"
+           aria-valuenow="{{ exec.revenue_target.pct_raw }}"
+           aria-valuemin="0" aria-valuemax="100">
+        <div class="exec-progress-fill" style="width: {% if exec.revenue_target.pct_raw > 100 %}100{% else %}{{ exec.revenue_target.pct_raw }}{% endif %}%;"></div>
+      </div>
+      <p class="exec-hero-sub">
+        <strong>{{ exec.revenue_target.pct_raw }}%</strong> completed
+        {% if exec.revenue_target.remaining > 0 %} · {{ exec.revenue_target.remaining|format_aud }} to go{% endif %}
+      </p>
+      <form method="post" class="exec-target-form">
+        <input type="hidden" name="action" value="save_target">
+        <label class="exec-target-edit">
+          <span class="sr-only">Monthly target</span>
+          <input type="number" name="monthly_revenue_target" min="0" step="1000"
+                 value="{{ exec.settings.monthly_revenue_target|int }}">
+          <button type="submit" class="btn-secondary btn-sm">Update target</button>
+        </label>
+      </form>
+    </article>
+
+    {% if exec.outstanding.has_overdue_warning %}
+    <a class="exec-card exec-card-hero exec-card-warning exec-card-link" href="{{ url_for('outstanding_invoices', filter='overdue') }}">
+      <h3 class="exec-card-title">Overdue invoices</h3>
+      <span class="exec-hero-value">{{ exec.outstanding.overdue_count }}</span>
+      <span class="exec-hero-sub">Action required — {{ exec.outstanding.total|format_aud }} outstanding</span>
+    </a>
+    {% else %}
+    <a class="exec-card exec-card-link exec-card-invoices" href="{{ url_for('outstanding_invoices') }}">
+      <h3 class="exec-card-title">Outstanding invoices</h3>
+      <span class="exec-hero-value money">{{ exec.outstanding.total|format_aud }}</span>
+      <span class="exec-hero-sub">{{ exec.outstanding.count }} unpaid · no overdue</span>
+    </a>
+    {% endif %}
+
+    <div class="exec-row-2">
+      <article class="exec-card">
+        <h3 class="exec-card-title">Revenue</h3>
+        <div class="exec-metrics">
+          <div class="exec-metric"><span class="exec-label">Today</span><span class="exec-value money">{{ exec.revenue.today|format_aud }}</span></div>
+          <div class="exec-metric"><span class="exec-label">Week</span><span class="exec-value money">{{ exec.revenue.week|format_aud }}</span></div>
+          <div class="exec-metric"><span class="exec-label">Month</span><span class="exec-value money">{{ exec.revenue.month|format_aud }}</span></div>
+        </div>
+      </article>
+      <article class="exec-card exec-card-profit">
+        <h3 class="exec-card-title">Profit</h3>
+        <div class="exec-metrics">
+          <div class="exec-metric"><span class="exec-label">Today</span><span class="exec-value money{% if exec.profit.today < 0 %} profit-negative{% endif %}">{{ exec.profit.today|format_aud }}</span></div>
+          <div class="exec-metric"><span class="exec-label">Week</span><span class="exec-value money{% if exec.profit.week < 0 %} profit-negative{% endif %}">{{ exec.profit.week|format_aud }}</span></div>
+          <div class="exec-metric"><span class="exec-label">Month</span><span class="exec-value money{% if exec.profit.month < 0 %} profit-negative{% endif %}">{{ exec.profit.month|format_aud }}</span></div>
+        </div>
+      </article>
+    </div>
+
+    <article class="exec-card exec-card-chart">
+      <h3 class="exec-card-title">Revenue · last 30 days</h3>
+      <div class="exec-chart" aria-hidden="true">
+        {% for point in exec.charts.revenue_30d %}
+        <div class="exec-chart-bar-wrap" title="{{ point.label }}: {{ point.revenue|format_aud }}">
+          <div class="exec-chart-bar exec-chart-bar-revenue" style="height: {% if point.revenue_pct < 4 and point.revenue > 0 %}4{% elif point.revenue_pct < 4 %}2{% else %}{{ point.revenue_pct }}{% endif %}%;"></div>
+          {% if loop.index % 6 == 0 %}<span class="exec-chart-label">{{ point.label }}</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </article>
+
+    <article class="exec-card exec-card-chart">
+      <h3 class="exec-card-title">Profit · last 30 days</h3>
+      <div class="exec-chart" aria-hidden="true">
+        {% for point in exec.charts.profit_30d %}
+        <div class="exec-chart-bar-wrap" title="{{ point.label }}: {{ point.profit|format_aud }}">
+          <div class="exec-chart-bar exec-chart-bar-profit{% if point.profit_negative %} exec-chart-bar-negative{% endif %}" style="height: {% if point.profit_pct < 4 and point.profit != 0 %}4{% elif point.profit_pct < 4 %}2{% else %}{{ point.profit_pct }}{% endif %}%;"></div>
+          {% if loop.index % 6 == 0 %}<span class="exec-chart-label">{{ point.label }}</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </article>
+
+    <div class="exec-row-2">
+      <article class="exec-card">
+        <h3 class="exec-card-title">Jobs</h3>
+        <div class="exec-split">
+          <div class="exec-split-item"><span class="exec-label">Today</span><span class="exec-hero-value">{{ exec.jobs.today }}</span></div>
+          <div class="exec-split-item"><span class="exec-label">Week</span><span class="exec-hero-value">{{ exec.jobs.week }}</span></div>
+        </div>
+      </article>
+      <a class="exec-card exec-card-link exec-card-crew" href="{{ url_for('crew_schedule') }}">
+        <h3 class="exec-card-title">Crew utilization</h3>
+        <span class="exec-hero-value">{{ exec.crew.utilization_week_pct }}%</span>
+        <span class="exec-hero-sub">This week</span>
+      </a>
+    </div>
+
+    <article class="exec-card">
+      <h3 class="exec-card-title">Top customers this month</h3>
+      {% if exec.top_customers %}
+      <div class="exec-table-wrap">
+        <table class="exec-table">
+          <thead><tr><th>Customer</th><th>Revenue</th><th>Jobs</th></tr></thead>
+          <tbody>
+            {% for row in exec.top_customers %}
+            <tr>
+              <td>{{ row.customer_name }}</td>
+              <td class="money">{{ row.revenue|format_aud }}</td>
+              <td>{{ row.jobs }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty muted">No jobs this month yet.</p>
+      {% endif %}
+    </article>
+
+    <article class="exec-card">
+      <h3 class="exec-card-title">Google review conversion</h3>
+      <div class="exec-stat-grid">
+        <div><span class="exec-label">Sent</span><span class="exec-stat-num">{{ exec.review_conversion.sent }}</span></div>
+        <div><span class="exec-label">Clicked</span><span class="exec-stat-num">{{ exec.review_conversion.clicked }}</span></div>
+        <div><span class="exec-label">Received</span><span class="exec-stat-num">{{ exec.review_conversion.received }}</span></div>
+        <div><span class="exec-label">Conversion</span><span class="exec-stat-num">{% if exec.review_conversion.conversion_pct is not none %}{{ exec.review_conversion.conversion_pct }}%{% else %}—{% endif %}</span></div>
+      </div>
+      <div class="exec-split exec-split-reviews">
+        <div class="exec-split-item">
+          <span class="exec-label">Total reviews</span>
+          <span class="exec-hero-value">{{ exec.reviews.received }}</span>
+        </div>
+        <div class="exec-split-item">
+          <span class="exec-label">Avg rating</span>
+          <span class="exec-hero-value exec-rating">{% if exec.reviews.average_rating is not none %}{{ "%.1f"|format(exec.reviews.average_rating) }}★{% else %}—{% endif %}</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="exec-card">
+      <h3 class="exec-card-title">Quote conversion this month</h3>
+      <div class="exec-stat-grid">
+        <div><span class="exec-label">Quotes sent</span><span class="exec-stat-num">{{ exec.quote_conversion.quotes_sent }}</span></div>
+        <div><span class="exec-label">Won</span><span class="exec-stat-num">{{ exec.quote_conversion.bookings_won }}</span></div>
+        <div><span class="exec-label">Lost</span><span class="exec-stat-num">{{ exec.quote_conversion.bookings_lost }}</span></div>
+        <div><span class="exec-label">Conversion</span><span class="exec-stat-num">{% if exec.quote_conversion.conversion_pct is not none %}{{ exec.quote_conversion.conversion_pct }}%{% else %}—{% endif %}</span></div>
+      </div>
+      <p class="exec-footnote muted">Based on bookings created this month</p>
+    </article>
+
+    {% if exec.largest_unpaid %}
+    <a class="exec-card exec-card-link{% if exec.largest_unpaid.is_overdue %} exec-card-warning-soft{% endif %}"
+       href="{{ url_for('edit_booking', booking_id=exec.largest_unpaid.booking_id) }}">
+      <h3 class="exec-card-title">Largest unpaid invoice</h3>
+      <span class="exec-hero-value money">{{ exec.largest_unpaid.amount|format_aud }}</span>
+      <span class="exec-hero-sub">{{ exec.largest_unpaid.customer_name }}{% if exec.largest_unpaid.is_overdue %} · {{ exec.largest_unpaid.days_overdue }} days overdue{% endif %}</span>
+    </a>
+    {% endif %}
+
+    <article class="exec-card">
+      <h3 class="exec-card-title">Crew leaderboard · this month</h3>
+      {% if exec.crew_leaderboard %}
+      <div class="exec-table-wrap">
+        <table class="exec-table">
+          <thead><tr><th>Crew</th><th>Jobs</th><th>Hours</th><th>Revenue</th></tr></thead>
+          <tbody>
+            {% for row in exec.crew_leaderboard %}
+            <tr>
+              <td><strong>{{ row.name }}</strong></td>
+              <td>{{ row.jobs_completed }}</td>
+              <td>{{ row.hours_worked }}</td>
+              <td class="money">{{ row.revenue_generated|format_aud }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty muted">No completed jobs this month.</p>
+      {% endif %}
+    </article>
+  </div>
+</section>
+{% endblock %}

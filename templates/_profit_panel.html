@@ -1,0 +1,101 @@
+<section class="panel profit-panel">
+  <div class="panel-head">
+    <h3>Profit calculation</h3>
+    <span class="profit-margin-badge {{ profit_summary.margin_badge_class }}">
+      Margin {{ profit_summary.profit_margin_percent|format_margin }}
+    </span>
+  </div>
+  <p class="muted form-hint">
+    Estimated profit = Revenue − GST − Stripe fee − Staff − Fuel − Truck − Other costs.
+    GST is calculated as invoice total ÷ 11 when GST-inclusive.
+  </p>
+
+  <div class="profit-metrics-grid">
+    <div class="profit-metric">
+      <span class="profit-metric-label">Total revenue</span>
+      <strong class="profit-metric-value money">{{ profit_summary.revenue|format_aud }}</strong>
+    </div>
+    <div class="profit-metric">
+      <span class="profit-metric-label">GST</span>
+      <span class="profit-metric-value money">{{ profit_summary.gst_amount|format_aud }}</span>
+    </div>
+    <div class="profit-metric">
+      <span class="profit-metric-label">Net revenue</span>
+      <span class="profit-metric-value money">{{ profit_summary.net_revenue|format_aud }}</span>
+    </div>
+    <div class="profit-metric">
+      <span class="profit-metric-label">Staff cost</span>
+      <span class="profit-metric-value money">{{ profit_summary.staff_cost|format_aud }}</span>
+    </div>
+    <div class="profit-metric">
+      <span class="profit-metric-label">Fuel cost</span>
+      <span class="profit-metric-value money">{{ profit_summary.fuel_cost|format_aud }}</span>
+    </div>
+    <div class="profit-metric">
+      <span class="profit-metric-label">Truck cost</span>
+      <span class="profit-metric-value money">{{ profit_summary.truck_cost|format_aud }}</span>
+    </div>
+    <div class="profit-metric">
+      <span class="profit-metric-label">Stripe fee</span>
+      <span class="profit-metric-value money">{{ profit_summary.stripe_fee|format_aud }}</span>
+    </div>
+    <div class="profit-metric">
+      <span class="profit-metric-label">Other costs</span>
+      <span class="profit-metric-value money">{{ profit_summary.other_costs|format_aud }}</span>
+    </div>
+    <div class="profit-metric profit-metric-highlight">
+      <span class="profit-metric-label">Estimated profit</span>
+      <strong class="profit-metric-value money{% if profit_summary.estimated_profit < 0 %} profit-negative{% endif %}">{{ profit_summary.estimated_profit|format_aud }}</strong>
+    </div>
+    <div class="profit-metric">
+      <span class="profit-metric-label">Profit margin</span>
+      <span class="profit-margin-badge {{ profit_summary.margin_badge_class }}">{{ profit_summary.profit_margin_percent|format_margin }}</span>
+    </div>
+  </div>
+
+  <form method="post" class="profit-costs-form">
+    <input type="hidden" name="action" value="save_profit_costs">
+    <h4>Cost inputs</h4>
+    <div class="form-grid profit-costs-grid">
+      <label>
+        Staff cost ($)
+        <input type="number" name="staff_cost" step="0.01" min="0"
+               value="{{ booking.staff_cost if booking.staff_cost is not none else '' }}">
+      </label>
+      <label>
+        Crew hours (optional)
+        <input type="number" name="profit_crew_hours" step="0.25" min="0"
+               value="{{ booking.profit_crew_hours if booking.profit_crew_hours is not none else '' }}">
+      </label>
+      <label>
+        Hourly wage (optional)
+        <input type="number" name="profit_hourly_wage" step="0.01" min="0"
+               value="{{ booking.profit_hourly_wage if booking.profit_hourly_wage is not none else '' }}">
+      </label>
+      <label>
+        Fuel cost ($)
+        <input type="number" name="fuel_cost" step="0.01" min="0"
+               value="{{ booking.fuel_cost if booking.fuel_cost is not none else '' }}">
+      </label>
+      <label>
+        Truck cost ($)
+        <input type="number" name="truck_cost" step="0.01" min="0"
+               value="{{ booking.truck_cost if booking.truck_cost is not none else '' }}">
+      </label>
+      <label>
+        Other costs ($)
+        <input type="number" name="other_costs" step="0.01" min="0"
+               value="{{ booking.other_costs if booking.other_costs is not none else '' }}">
+      </label>
+    </div>
+    <p class="muted form-hint">When crew hours and hourly wage are both set, staff cost uses hours × wage instead of the manual staff cost field.</p>
+    <div class="form-actions profit-form-actions">
+      <button type="submit" class="btn-primary">Save Profit Costs</button>
+    </div>
+  </form>
+
+  <form method="post" class="profit-recalc-form">
+    <input type="hidden" name="action" value="recalculate_profit">
+    <button type="submit" class="btn-secondary">Recalculate Profit</button>
+  </form>
+</section>

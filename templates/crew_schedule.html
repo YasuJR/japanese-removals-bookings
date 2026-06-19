@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Crew schedule{% endblock %}
+
+{% block content %}
+<section class="panel crew-schedule-header">
+  <h2>Crew schedule</h2>
+  <p class="hint">{{ schedule.range_label }}</p>
+
+  <nav class="filter-bar crew-range-bar" aria-label="Date range">
+    {% for key, label in crew_schedule_ranges %}
+      {% if key != 'custom' %}
+      <a href="{{ url_for('crew_schedule', range=key) }}"
+         class="filter-pill{% if active_range == key %} active{% endif %}">{{ label }}</a>
+      {% endif %}
+    {% endfor %}
+  </nav>
+
+  <form method="get" action="{{ url_for('crew_schedule') }}" class="crew-custom-date">
+    <input type="hidden" name="range" value="custom">
+    <label class="crew-custom-date-label">
+      <span>Custom Date</span>
+      <input type="date" name="date" value="{{ schedule.custom_date or '' }}" required>
+    </label>
+    <button type="submit" class="btn-secondary btn-sm{% if active_range == 'custom' %} active-custom{% endif %}">Go</button>
+  </form>
+
+  <div class="crew-workload-grid">
+    {% for item in schedule.workload %}
+    <article class="crew-workload-card">
+      <h3 class="crew-workload-name">{{ item.name }}</h3>
+      <p class="crew-workload-stat">{{ item.jobs_label }}</p>
+      <p class="crew-workload-hours">{{ item.hours_label }}</p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+{% for section in schedule.crew_sections %}
+<section class="panel crew-schedule-section">
+  <header class="crew-section-head">
+    <h3>{{ section.name }}</h3>
+    <p class="crew-section-meta muted">{{ section.job_count }} Job{% if section.job_count != 1 %}s{% endif %} · {{ section.hours_label }}</p>
+  </header>
+
+  {% if section.jobs %}
+  <ul class="crew-schedule-list">
+    {% for job in section.jobs %}
+    <li class="crew-schedule-item{% if job.is_conflict %} crew-schedule-conflict{% endif %}">
+      <a href="{{ url_for('edit_booking', booking_id=job.booking_id) }}" class="crew-schedule-link">
+        <div class="crew-schedule-time">{{ job.start_display }}</div>
+        <div class="crew-schedule-body">
+          <p class="crew-schedule-title">
+            <span class="crew-schedule-date">{{ job.date_label }}</span>
+            <span class="crew-schedule-customer">{{ job.customer_name }}</span>
+          </p>
+          <div class="crew-schedule-badges">
+            {% if job.suburb_badge != '—' %}
+            <span class="suburb-badge">{{ job.suburb_badge }}</span>
+            {% endif %}
+            {% with status=job.status %}
+            {% include '_status_badge.html' %}
+            {% endwith %}
+            {% if job.is_conflict %}
+            <span class="conflict-badge">Double booking</span>
+            {% endif %}
+          </div>
+        </div>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">No jobs assigned in this period.</p>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

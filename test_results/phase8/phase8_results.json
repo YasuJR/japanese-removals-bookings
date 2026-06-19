@@ -1,0 +1,62 @@
+{
+  "steps": [
+    "Booking #38 created from email."
+  ],
+  "gmail_create": {
+    "ok": true,
+    "message": "Booking #38 created from email.",
+    "booking_id": 38
+  },
+  "after_gmail": {
+    "status": "Pending",
+    "hourly_rate": 1.0
+  },
+  "after_confirmed": {
+    "status": "Confirmed",
+    "invoice_number": "INV-0018",
+    "xero_invoice_id": "a808a12f-df02-4237-9197-3a08ac36ae25",
+    "invoice_status": "AUTHORISED",
+    "xero_status": "AUTHORISED",
+    "integration_messages": [
+      "Added to Google Calendar.",
+      "SMS not configured \u2014 add Twilio settings to .env",
+      "Xero invoice INV-0018 created and approved."
+    ]
+  },
+  "after_stripe": {
+    "checkout_ok": true,
+    "checkout_message": "Redirecting to Stripe\u2026",
+    "webhook_ok": true,
+    "webhook_message": "Payment recorded for booking #38.",
+    "status": "Paid",
+    "payment_status": "Paid",
+    "invoice_status": "PAID",
+    "paid_at": "2026-06-18 08:00:00",
+    "xero_payment_id": "9b898102-e87e-4bd6-9a82-6c7c6a55e504",
+    "xero_status": "PAID",
+    "xero_amount_due": -1.0,
+    "stripe_payment_received_log": {
+      "id": 56,
+      "booking_id": 38,
+      "automation_type": "stripe_payment_received",
+      "status": "success",
+      "message": "Stripe payment received for INV-0018 \u2014 booking marked Paid.",
+      "created_at": "2026-06-18 10:41:39"
+    }
+  },
+  "duplicate_webhook": {
+    "webhook_ok": true,
+    "webhook_message": "Payment already recorded.",
+    "xero_payment_id_unchanged": true,
+    "duplicate_log": {
+      "id": 60,
+      "booking_id": 38,
+      "automation_type": "stripe_payment_received",
+      "status": "partial",
+      "message": "Duplicate Stripe payment ignored \u2014 booking already marked Paid.",
+      "created_at": "2026-06-18 10:41:44"
+    },
+    "payment_log_count": 2
+  },
+  "passed": true
+}

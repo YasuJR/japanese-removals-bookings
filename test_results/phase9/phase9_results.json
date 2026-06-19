@@ -1,0 +1,93 @@
+{
+  "steps": [
+    "Booking #39 created from email.",
+    "Pending \u2192 Confirmed automation ran",
+    "Stripe webhook processed"
+  ],
+  "gmail_create": {
+    "ok": true,
+    "message": "Booking #39 created from email.",
+    "booking_id": 39
+  },
+  "after_gmail": {
+    "status": "Pending",
+    "hourly_rate": 1.0
+  },
+  "after_confirmed": {
+    "status": "Confirmed",
+    "sms_booking_confirmed_sent_at": "2026-06-18T11:17:51",
+    "calendar_confirmed_synced_at": "2026-06-18T11:17:51",
+    "staff_notification_sent_at": "2026-06-18T11:17:51",
+    "google_calendar_event_id": "evt_phase9_mock_39",
+    "integration_messages": [
+      "SMS sent (Phase 9 mock)",
+      "Added to Google Calendar.",
+      "Staff notification sent (Phase 9 mock)",
+      "Xero invoice INV-0019 created and approved."
+    ],
+    "phase9_logs": {
+      "confirmation_sms_sent": {
+        "id": 63,
+        "booking_id": 39,
+        "automation_type": "confirmation_sms_sent",
+        "status": "sent",
+        "message": "SMS sent (Phase 9 mock)",
+        "created_at": "2026-06-18 11:17:51"
+      },
+      "calendar_event_synced": {
+        "id": 64,
+        "booking_id": 39,
+        "automation_type": "calendar_event_synced",
+        "status": "success",
+        "message": "Added to Google Calendar.",
+        "created_at": "2026-06-18 11:17:51"
+      },
+      "staff_notification_sent": {
+        "id": 65,
+        "booking_id": 39,
+        "automation_type": "staff_notification_sent",
+        "status": "success",
+        "message": "Staff notification sent (Phase 9 mock)",
+        "created_at": "2026-06-18 11:17:51"
+      }
+    },
+    "invoice_number": "INV-0019",
+    "xero_invoice_id": "81b51c3d-8282-46da-873a-31a658c5678a",
+    "xero_status": "AUTHORISED"
+  },
+  "dedupe": {
+    "messages": [
+      "Confirmation SMS already sent.",
+      "Calendar already synced on confirm.",
+      "Staff notification already sent."
+    ],
+    "partial_logs": {
+      "confirmation_sms_sent": 1,
+      "calendar_event_synced": 1,
+      "staff_notification_sent": 1
+    }
+  },
+  "after_stripe": {
+    "checkout_ok": true,
+    "checkout_message": "Redirecting to Stripe\u2026",
+    "webhook_ok": true,
+    "webhook_message": "Payment recorded for booking #39.",
+    "status": "Paid",
+    "payment_status": "Paid",
+    "invoice_status": "PAID",
+    "paid_at": "2026-06-18 08:00:00",
+    "xero_payment_id": "dc870717-4bbb-4661-9ef8-89bd3d30167b",
+    "xero_status": "PAID",
+    "xero_amount_due": -1.0,
+    "stripe_payment_received_log": {
+      "id": 71,
+      "booking_id": 39,
+      "automation_type": "stripe_payment_received",
+      "status": "success",
+      "message": "Stripe payment received for INV-0019 \u2014 booking marked Paid.",
+      "created_at": "2026-06-18 11:17:57"
+    }
+  },
+  "phase9_automation_ok": true,
+  "passed": true
+}

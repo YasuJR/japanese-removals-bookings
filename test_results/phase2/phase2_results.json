@@ -1,0 +1,102 @@
+{
+  "booking_id": 26,
+  "checkout": {
+    "ok": true,
+    "message": "Redirecting to Stripe\u2026",
+    "url": "https://checkout.stripe.com/c/pay/cs_live_a1gQLVq3OLx3PyfZArl3jVh4AdgL9XHYtVOdvoGB06FuRbBY3yCKZFwxu6#fidnandhYHdWcXxpYCc%2FJ2FgY2RwaXEnKSdicGRmZGhqaWBTZHdsZGtxJz8nZmprcXdqaScpJ2R1bE5gfCc%2FJ3VuWmlsc2BaMDRUQm1zYjZKdDJnXF9OSEh0Q1dSd3NWdFV8bEFiUVNjbE5sdGA0bFVRVzxQfzVgVnFDQUNpbURBdUBINV1Hal91TVFBT3Ncd2ZhX3ZAQzdHfGx9Z0pBUmM1NW1nd0A1b3M3JyknY3dqaFZgd3Ngdyc%2FcXdwYCknZ2RmbmJ3anBrYUZqaWp3Jz8nJmNjY2NjYycpJ2lkfGpwcVF8dWAnPyd2bGtiaWBabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl"
+  },
+  "webhook_first": {
+    "ok": true,
+    "message": "Payment recorded for booking #26.",
+    "payment_status": "Paid",
+    "invoice_status": "PAID",
+    "xero_payment_id": "",
+    "sms_payment_confirmation_sent_at": "2026-06-12T12:56:42"
+  },
+  "automation_after_webhook": [
+    {
+      "type": "sms_payment_confirmation",
+      "status": "sent",
+      "message": "SMS sent (test mock) to 0481089573"
+    },
+    {
+      "type": "xero_stripe_payment",
+      "status": "partial",
+      "message": "Stripe payment recorded locally. No Xero payment account code configured \u2014 add one in Settings \u2192 Stripe to post payments to Xero automatically."
+    },
+    {
+      "type": "stripe_webhook_paid",
+      "status": "success",
+      "message": "Stripe payment received"
+    },
+    {
+      "type": "stripe_checkout",
+      "status": "success",
+      "message": "Checkout session cs_live_a1gQLVq3 for $1.02"
+    }
+  ],
+  "webhook_duplicate": {
+    "ok": true,
+    "message": "Payment already recorded.",
+    "sms_sent_count": 1,
+    "sms_sent_at_unchanged": true
+  },
+  "payment_reminder_manual": {
+    "first": {
+      "ok": true,
+      "message": "SMS sent (test mock) to 0481089573"
+    },
+    "duplicate_blocked": {
+      "ok": false,
+      "message": "SMS already sent for this booking."
+    }
+  },
+  "google_review": {
+    "first_send": [
+      "#26: SMS sent (test mock) to 0481089573"
+    ],
+    "duplicate_send": []
+  },
+  "final_automation_log": [
+    {
+      "type": "google_review_request",
+      "status": "sent",
+      "message": "SMS sent (test mock) to 0481089573 via sms"
+    },
+    {
+      "type": "google_review_request",
+      "status": "scheduled",
+      "message": "Review request scheduled for 2026-06-13 12:56 UTC (24h wait, sms)."
+    },
+    {
+      "type": "sms_payment_reminder",
+      "status": "sent",
+      "message": "SMS sent (test mock) to 0481089573"
+    },
+    {
+      "type": "xero_stripe_payment",
+      "status": "partial",
+      "message": "Stripe payment recorded locally. No Xero payment account code configured \u2014 add one in Settings \u2192 Stripe to post payments to Xero automatically."
+    },
+    {
+      "type": "sms_payment_confirmation",
+      "status": "sent",
+      "message": "SMS sent (test mock) to 0481089573"
+    },
+    {
+      "type": "xero_stripe_payment",
+      "status": "partial",
+      "message": "Stripe payment recorded locally. No Xero payment account code configured \u2014 add one in Settings \u2192 Stripe to post payments to Xero automatically."
+    },
+    {
+      "type": "stripe_webhook_paid",
+      "status": "success",
+      "message": "Stripe payment received"
+    },
+    {
+      "type": "stripe_checkout",
+      "status": "success",
+      "message": "Checkout session cs_live_a1gQLVq3 for $1.02"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Job profit{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>Job profit dashboard</h2>
+      <p class="hint">Estimated net profit · {{ profit.job_count }} active jobs · {{ profit.today }}</p>
+    </div>
+    <a class="btn-primary btn-sm" href="{{ url_for('profit_export_csv') }}">Export CSV</a>
+  </div>
+
+  <div class="table-scroll">
+    <table class="sheet profit-summary-sheet">
+      <thead>
+        <tr>
+          <th>Period</th>
+          <th>Revenue</th>
+          <th>Gross profit</th>
+          <th>Net profit</th>
+          <th>Margin</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for period in profit.periods %}
+        <tr>
+          <td>
+            <strong>{{ period.label }}</strong>
+            <span class="muted profit-period-range">{{ period.range }}</span>
+          </td>
+          <td class="nowrap money">{{ period.revenue|format_aud }}</td>
+          <td class="nowrap money{% if period.gross_profit < 0 %} profit-negative{% endif %}">{{ period.gross_profit|format_aud }}</td>
+          <td class="nowrap money{% if period.net_profit < 0 %} profit-negative{% endif %}"><strong>{{ period.net_profit|format_aud }}</strong></td>
+          <td class="nowrap{% if period.margin_pct < 0 %} profit-negative{% endif %}">{{ period.margin_pct|format_margin }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="muted profit-formula-hint">
+    {{ profit.formula_hint }}
+  </p>
+</section>
+
+<section class="panel">
+  <h3>Top 10 most profitable jobs</h3>
+  {% with jobs=profit.top_profitable %}
+  {% include '_profit_job_table.html' %}
+  {% endwith %}
+</section>
+
+<section class="panel">
+  <h3>Top 10 lowest net profit jobs</h3>
+  {% with jobs=profit.lowest_profit %}
+  {% include '_profit_job_table.html' %}
+  {% endwith %}
+</section>
+
+<section class="panel">
+  <h3>All jobs ({{ profit.job_count }})</h3>
+  {% with jobs=profit.all_jobs %}
+  {% include '_profit_job_table.html' %}
+  {% endwith %}
+</section>
+{% endblock %}

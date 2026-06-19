@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thank you — {{ company_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="public-page">
+  <main class="panel public-panel">
+    {% if confirmed %}
+    <h2>Thank you!</h2>
+    <p>We appreciate you taking the time to leave a review.</p>
+    {% else %}
+    <h2>Left a Google review?</h2>
+    <p>If you have already left us a review, please confirm below so we can thank you properly.</p>
+    <form method="post">
+      <button type="submit" class="btn-primary">I've left a review</button>
+    </form>
+    {% endif %}
+  </main>
+</body>
+</html>

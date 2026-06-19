@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Leads{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Leads</h2>
+  <p class="hint">Draft leads from inbound SMS when parsing confidence is under 80%.</p>
+</section>
+
+{% if leads %}
+<section class="panel">
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Received</th>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th>Move date</th>
+          <th>Confidence</th>
+          <th>Message</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for lead in leads %}
+        <tr>
+          <td>{{ lead.created_at[:16] }}</td>
+          <td>{{ lead.customer_name or '—' }}</td>
+          <td>{{ lead.phone or '—' }}</td>
+          <td>{{ lead.move_date or '—' }}</td>
+          <td>{{ '%.0f'|format(lead.confidence) }}%</td>
+          <td class="lead-message">{{ lead.raw_message[:120] }}{% if lead.raw_message|length > 120 %}…{% endif %}</td>
+          <td class="lead-actions">
+            <form method="post" action="{{ url_for('leads') }}" class="inline-form">
+              <input type="hidden" name="action" value="convert">
+              <input type="hidden" name="lead_id" value="{{ lead.id }}">
+              <button type="submit" class="btn-primary btn-sm">Convert to booking</button>
+            </form>
+            {% if lead.phone|sms_href %}
+            <a class="btn-secondary btn-sm"
+               href="{{ lead.phone|sms_href }}&body={{ lead.reply_template|urlencode }}">Reply template</a>
+            {% else %}
+            <button type="button" class="btn-secondary btn-sm" disabled>Reply template</button>
+            {% endif %}
+          </td>
+        </tr>
+        <tr class="lead-detail-row">
+          <td colspan="7">
+            <p><strong>Pickup:</strong> {{ lead.pickup_address or '—' }}</p>
+            <p><strong>Delivery:</strong> {{ lead.delivery_address or '—' }}</p>
+            <p><strong>Reply template:</strong> {{ lead.reply_template }}</p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% else %}
+<section class="panel">
+  <p class="empty">No draft leads — inbound SMS with high confidence creates Pending bookings automatically.</p>
+</section>
+{% endif %}
+{% endblock %}

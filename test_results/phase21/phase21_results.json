@@ -1,0 +1,42 @@
+{
+  "phase": 21,
+  "feature": "sms_inbound",
+  "results": [
+    {
+      "name": "Test A \u2014 High confidence creates Pending SMS booking",
+      "pass": true,
+      "details": [
+        "Pending booking created from SMS."
+      ]
+    },
+    {
+      "name": "Test B \u2014 Low confidence creates draft lead",
+      "pass": true,
+      "details": [
+        "Draft lead saved for low-confidence SMS."
+      ]
+    },
+    {
+      "name": "Test C \u2014 Convert lead to booking",
+      "pass": true,
+      "details": [
+        "Lead converted to Pending booking."
+      ]
+    },
+    {
+      "name": "Test D \u2014 Reply template",
+      "pass": true,
+      "details": [
+        "Reply template generated."
+      ]
+    },
+    {
+      "name": "Test E \u2014 Twilio inbound webhook",
+      "pass": true,
+      "details": [
+        "Inbound webhook accepts POST."
+      ]
+    }
+  ],
+  "all_pass": true
+}

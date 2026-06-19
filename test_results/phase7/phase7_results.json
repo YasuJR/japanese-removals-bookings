@@ -1,0 +1,37 @@
+{
+  "steps": [
+    "Booking #37 created from email."
+  ],
+  "gmail_create": {
+    "ok": true,
+    "message": "Booking #37 created from email.",
+    "booking_id": 37
+  },
+  "after_gmail": {
+    "status": "Pending",
+    "customer_name": "Phase7 E2E Customer"
+  },
+  "after_confirmed": {
+    "status": "Confirmed",
+    "invoice_number": "INV-0017",
+    "xero_invoice_id": "efa8e8ee-4b40-4dac-8eba-b936877b5377",
+    "invoice_status": "AUTHORISED",
+    "xero_automation_error": "",
+    "xero_status": "AUTHORISED",
+    "xero_amount_due": 1890.0,
+    "integration_messages": [
+      "Added to Google Calendar.",
+      "SMS not configured \u2014 add Twilio settings to .env",
+      "Xero invoice INV-0017 created and approved."
+    ],
+    "automation_log": {
+      "id": 52,
+      "booking_id": 37,
+      "automation_type": "xero_invoice_auto_create",
+      "status": "success",
+      "message": "Xero invoice INV-0017 created and approved.",
+      "created_at": "2026-06-18 10:37:18"
+    }
+  },
+  "passed": true
+}

@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+bookings.db
+credentials/*.json
+!credentials/.gitkeep

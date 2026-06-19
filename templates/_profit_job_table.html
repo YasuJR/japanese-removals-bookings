@@ -1,0 +1,40 @@
+{% if jobs %}
+<div class="table-scroll">
+  <table class="sheet profit-sheet">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Date</th>
+        <th>Customer</th>
+        <th>Status</th>
+        <th>Revenue</th>
+        <th>Gross profit</th>
+        <th>Net profit</th>
+        <th>Margin</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in jobs %}
+      <tr>
+        <td>{{ row.id }}</td>
+        <td class="nowrap">{{ row.move_date }}</td>
+        <td>{{ row.customer_name }}</td>
+        <td>
+          {% with status=row.status %}
+          {% include '_status_badge.html' %}
+          {% endwith %}
+        </td>
+        <td class="nowrap money">{{ row.revenue|format_aud }}</td>
+        <td class="nowrap money{% if row.gross_profit < 0 %} profit-negative{% endif %}">{{ row.gross_profit|format_aud }}</td>
+        <td class="nowrap money{% if row.net_profit < 0 %} profit-negative{% endif %}"><strong>{{ row.net_profit|format_aud }}</strong></td>
+        <td class="nowrap{% if row.margin_pct < 0 %} profit-negative{% endif %}">{{ row.margin_pct|format_margin }}</td>
+        <td class="nowrap"><a class="btn-secondary btn-sm" href="{{ url_for('edit_booking', booking_id=row.id) }}">Edit</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty">No jobs to show.</p>
+{% endif %}

@@ -1,0 +1,87 @@
+{
+  "tests": [
+    {
+      "name": "Test A \u2014 Pending overlaps Confirmed",
+      "passed": true,
+      "details": {
+        "confirmed_id": 55,
+        "pending_id": 56,
+        "badge": null,
+        "conflict_count": 8,
+        "save_errors": [],
+        "calendar_event_id": null,
+        "calendar_messages": []
+      }
+    },
+    {
+      "name": "Test B \u2014 Confirmed overlaps Confirmed",
+      "passed": true,
+      "details": {
+        "first_id": 57,
+        "second_id": 58,
+        "errors": [
+          "Time overlap with another booking \u2014 tick \"I understand this may be double booked\" to save."
+        ],
+        "conflict_count": 1,
+        "show_banner": true,
+        "checked_logs": 1,
+        "conflict_logs": 1
+      }
+    },
+    {
+      "name": "Test C \u2014 Pending \u2192 Confirmed with overlap",
+      "passed": true,
+      "details": {
+        "pending_id": 60,
+        "block_errors": [
+          "Time overlap with another booking \u2014 tick \"I understand this may be double booked\" to save."
+        ],
+        "override_applied": true,
+        "override_at": "2026-06-18T13:22:29"
+      }
+    },
+    {
+      "name": "Test D \u2014 Confirmed not overlapping",
+      "passed": true,
+      "details": {
+        "booking_id": 62,
+        "errors": [],
+        "conflict_count": 0,
+        "badge": "clear"
+      }
+    },
+    {
+      "name": "Test E \u2014 Cancelled overlap ignored",
+      "passed": true,
+      "details": {
+        "confirmed_id": 63,
+        "cancelled_id": 64,
+        "conflict_count": 0,
+        "cancelled_listed": false
+      }
+    }
+  ],
+  "summary_table": [
+    {
+      "test": "Test A \u2014 Pending overlaps Confirmed",
+      "result": "PASS"
+    },
+    {
+      "test": "Test B \u2014 Confirmed overlaps Confirmed",
+      "result": "PASS"
+    },
+    {
+      "test": "Test C \u2014 Pending \u2192 Confirmed with overlap",
+      "result": "PASS"
+    },
+    {
+      "test": "Test D \u2014 Confirmed not overlapping",
+      "result": "PASS"
+    },
+    {
+      "test": "Test E \u2014 Cancelled overlap ignored",
+      "result": "PASS"
+    }
+  ],
+  "passed": true
+}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Search bookings{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Search bookings</h2>
+  <p class="hint">Search by name, phone, email, address, date, notes, or booking number.</p>
+
+  <form method="get" action="{{ url_for('search_bookings') }}" class="search-bar">
+    <input type="search" name="q" value="{{ query }}" placeholder="e.g. Smith, 0412, Perth, 15"
+           autocomplete="off" class="search-input">
+    <button type="submit" class="btn-primary">Search</button>
+    {% if query %}
+    <a class="btn-secondary" href="{{ url_for('search_bookings') }}">Clear</a>
+    {% endif %}
+  </form>
+
+  {% if query %}
+  <div class="panel-toolbar">
+    <p class="result-count">{{ bookings|length }} result{% if bookings|length != 1 %}s{% endif %} for “{{ query }}”</p>
+    <a class="btn-secondary btn-sm" href="{{ url_for('export_csv', q=query) }}">Export results (CSV)</a>
+  </div>
+
+  {% set empty_message = 'No bookings match your search.' %}
+  {% include '_booking_list.html' %}
+  {% else %}
+  <p class="empty">Enter a term above to search your bookings.</p>
+  {% endif %}
+</section>
+{% endblock %}

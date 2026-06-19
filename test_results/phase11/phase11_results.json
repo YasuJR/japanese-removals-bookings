@@ -1,0 +1,67 @@
+{
+  "steps": [
+    "Booking #44 created from email.",
+    "Pending \u2192 Confirmed automation",
+    "On Route + ETA SMS",
+    "Stripe payment \u2192 Paid",
+    "Completed \u2192 review request scheduled",
+    "Review SMS sent after wait period"
+  ],
+  "gmail_create": {
+    "ok": true,
+    "message": "Booking #44 created from email.",
+    "booking_id": 44
+  },
+  "after_gmail": {
+    "status": "Pending"
+  },
+  "after_stripe": {
+    "webhook_ok": true,
+    "status": "Paid",
+    "payment_status": "Paid"
+  },
+  "after_completed": {
+    "status": "Completed",
+    "completed_at": "2026-06-18T12:59:24",
+    "review_request_scheduled_at": "2026-06-19T12:59:24",
+    "integration_messages": [
+      "Added to Google Calendar.",
+      "SMS not configured \u2014 add Twilio settings to .env",
+      "Google review request scheduled (24h after completion)."
+    ],
+    "scheduled_log": {
+      "id": 135,
+      "booking_id": 44,
+      "automation_type": "review_request_scheduled",
+      "status": "scheduled",
+      "message": "Review request scheduled for 2026-06-19 12:59 UTC (24h wait, sms).",
+      "created_at": "2026-06-18 12:59:24"
+    }
+  },
+  "after_review_send": {
+    "process_messages": [
+      "#44: SMS sent (Phase 11 mock)"
+    ],
+    "duplicate_send_ok": false,
+    "duplicate_send_message": "Review request is not scheduled.",
+    "review_request_sent_at": "2026-06-18T12:59:25",
+    "sent_log": {
+      "id": 138,
+      "booking_id": 44,
+      "automation_type": "review_request_sent",
+      "status": "partial",
+      "message": "Review request is not scheduled.",
+      "created_at": "2026-06-18 12:59:25"
+    },
+    "sent_log_count": 2,
+    "partial_sent_logs": 1
+  },
+  "dedupe": {
+    "schedule_partial_logs": 1,
+    "sent_log_count": 2
+  },
+  "phase9_automation_ok": true,
+  "phase10_automation_ok": true,
+  "phase11_automation_ok": true,
+  "passed": true
+}

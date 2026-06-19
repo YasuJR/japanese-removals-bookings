@@ -1,0 +1,58 @@
+{
+  "feature": "ceo_dashboard",
+  "results": [
+    {
+      "name": "Test A \u2014 Dashboard exposes all nine sections",
+      "pass": true,
+      "details": [
+        "All required sections present."
+      ]
+    },
+    {
+      "name": "Test B \u2014 Today section lists today's jobs with counts",
+      "pass": true,
+      "details": [
+        "Today section populated."
+      ],
+      "booking_id": 96
+    },
+    {
+      "name": "Test C \u2014 Tomorrow warnings for crew, truck, invoice",
+      "pass": true,
+      "details": [
+        "Tomorrow warnings generated."
+      ],
+      "booking_id": 97
+    },
+    {
+      "name": "Test D \u2014 Money section includes revenue, GST, costs, profit, margin",
+      "pass": true,
+      "details": [
+        "Money metrics present."
+      ]
+    },
+    {
+      "name": "Test E \u2014 Bookings pipeline shows counts and values",
+      "pass": true,
+      "details": [
+        "Pipeline stages populated."
+      ]
+    },
+    {
+      "name": "Test F \u2014 Automation health lists five integrations",
+      "pass": true,
+      "details": [
+        "Automation health section valid."
+      ]
+    },
+    {
+      "name": "Test G \u2014 Today job cards support quick actions",
+      "pass": true,
+      "details": [
+        "Job card includes phone action flags."
+      ],
+      "booking_id": 101
+    }
+  ],
+  "all_pass": true
+}

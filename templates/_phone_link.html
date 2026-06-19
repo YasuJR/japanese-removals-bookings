@@ -1,0 +1,7 @@
+{% if phone and phone.strip() and phone|tel_href %}
+<a href="{{ phone|tel_href }}" class="phone-link">{{ phone }}</a>
+{% elif phone and phone.strip() %}
+{{ phone }}
+{% else %}
+Not provided
+{% endif %}

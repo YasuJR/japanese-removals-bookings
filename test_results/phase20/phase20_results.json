@@ -1,0 +1,43 @@
+{
+  "phase": 20,
+  "feature": "website_quote_form",
+  "results": [
+    {
+      "name": "Test A \u2014 Basic validation",
+      "pass": true,
+      "details": [
+        "Validation rejects empty/invalid input."
+      ]
+    },
+    {
+      "name": "Test B \u2014 Honeypot anti-spam",
+      "pass": true,
+      "details": [
+        "Honeypot silently blocks bots."
+      ]
+    },
+    {
+      "name": "Test C \u2014 Pending booking with source Website",
+      "pass": true,
+      "details": [
+        "Pending Website booking created without calendar."
+      ],
+      "booking_id": 133
+    },
+    {
+      "name": "Test D \u2014 Rate limit",
+      "pass": true,
+      "details": [
+        "Rate limit enforced."
+      ]
+    },
+    {
+      "name": "Test E \u2014 Public /quote page",
+      "pass": true,
+      "details": [
+        "Public quote page loads."
+      ]
+    }
+  ],
+  "all_pass": true
+}

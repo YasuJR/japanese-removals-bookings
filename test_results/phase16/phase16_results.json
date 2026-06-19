@@ -1,0 +1,48 @@
+{
+  "phase": 16,
+  "feature": "unpaid_invoice_reminder_automation",
+  "results": [
+    {
+      "name": "Test A \u2014 Unpaid invoice sends reminder after 3 days",
+      "pass": true,
+      "details": [
+        "Reminder 1 sent for unpaid authorised invoice."
+      ],
+      "booking_id": 77
+    },
+    {
+      "name": "Test B \u2014 Paid invoice skips reminder",
+      "pass": true,
+      "details": [
+        "Paid booking skipped by reminder automation."
+      ],
+      "booking_id": 78
+    },
+    {
+      "name": "Test C \u2014 Cancelled booking skips reminder",
+      "pass": true,
+      "details": [
+        "Cancelled booking skipped."
+      ],
+      "booking_id": 79
+    },
+    {
+      "name": "Test D \u2014 Duplicate reminders blocked",
+      "pass": true,
+      "details": [
+        "Second run did not send duplicate reminder 1."
+      ],
+      "booking_id": 80
+    },
+    {
+      "name": "Test E \u2014 Manual reminder button works",
+      "pass": true,
+      "details": [
+        "Send payment reminder now sent reminder 1."
+      ],
+      "booking_id": 81,
+      "message": "Payment reminder 1 sent."
+    }
+  ],
+  "all_pass": true
+}
