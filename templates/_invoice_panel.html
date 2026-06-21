@@ -68,7 +68,7 @@
         <span class="status-pill status-payment-{{ invoice_summary.payment_status|payment_status_css }}">
           {{ invoice_summary.payment_status }}
         </span>
-        {% if booking.paid_at and invoice_summary.payment_status == 'Paid' %}
+        {% if booking is defined and booking and booking.paid_at and invoice_summary.payment_status == 'Paid' %}
         <span class="muted"> · {{ booking.paid_at[:10] }}</span>
         {% endif %}
       </dd>
@@ -124,7 +124,7 @@
   <input type="hidden" name="payment_status" value="{{ form.get('payment_status', 'Unpaid') }}">
   <input type="hidden" name="invoice_status" value="{{ form.get('invoice_status', '') }}">
 
-  {% if payment_options is defined and payment_options %}
+  {% if payment_options is defined and payment_options and booking is defined and booking %}
   <h4>Payment methods</h4>
   <ul class="payment-method-list">
     <li><strong>Bank Transfer</strong> — {{ payment_options.bank_total_display }} · No fee</li>
