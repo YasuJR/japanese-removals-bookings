@@ -55,6 +55,9 @@ def payment_options_for_booking(
     base = base_total if base_total is not None else totals["total"]
     calc = calculate_card_payment(base)
     pct = calc["surcharge_percent"]
+    pay_now_url = customer_payment_url(booking)
+    stripe_ready = stripe_config.is_ready()
+    unpaid = (booking.get("payment_status") or "").strip() != invoice.PAYMENT_STATUS_PAID
     return {
         "bank_total": calc["base_total"],
         "bank_total_display": invoice.format_aud(calc["base_total"]),
@@ -64,12 +67,26 @@ def payment_options_for_booking(
         "surcharge_display": invoice.format_aud(calc["surcharge_amount"]),
         "surcharge_percent": pct,
         "surcharge_percent_display": "{0:.1f}".format(pct).rstrip("0").rstrip("."),
-        "stripe_enabled": stripe_config.is_ready(),
+        "stripe_enabled": stripe_ready,
         "compliance_note": COMPLIANCE_NOTE,
-        "can_checkout": stripe_config.is_ready()
-        and (booking.get("payment_status") or "").strip()
-        != invoice.PAYMENT_STATUS_PAID,
+        "can_checkout": stripe_ready and unpaid,
+        "pay_now_url": pay_now_url,
+        "can_pay_now": bool(pay_now_url) and stripe_ready and unpaid,
     }
+
+
+def customer_payment_url(booking: Dict[str, Any]) -> str:
+    token = (booking.get("payment_token") or "").strip()
+    if not token:
+        return ""
+    return config.oauth_url("/pay/{0}".format(token))
+
+
+def ensure_customer_payment_link(booking_id: int) -> str:
+    token = db.ensure_payment_token(booking_id)
+    if not token:
+        return ""
+    return config.oauth_url("/pay/{0}".format(token))
 
 
 def is_configured() -> bool:
@@ -92,12 +109,13 @@ def create_checkout_session(
     *,
     success_url: str,
     cancel_url: str,
+    require_email: bool = False,
 ) -> Tuple[bool, str, Optional[str]]:
     if not is_ready():
         return False, "Stripe is not enabled — configure keys in Settings → Stripe.", None
 
     email = (booking.get("email") or "").strip()
-    if not email:
+    if require_email and not email:
         return False, "Add customer email before card payment.", None
 
     if (booking.get("payment_status") or "").strip() == invoice.PAYMENT_STATUS_PAID:
@@ -119,10 +137,9 @@ def create_checkout_session(
 
     try:
         stripe = _stripe_client()
-        session = stripe.checkout.Session.create(
-            mode="payment",
-            customer_email=email,
-            line_items=[
+        session_kwargs = {
+            "mode": "payment",
+            "line_items": [
                 {
                     "price_data": {
                         "currency": "aud",
@@ -137,16 +154,19 @@ def create_checkout_session(
                     "quantity": 1,
                 }
             ],
-            metadata={
+            "metadata": {
                 "booking_id": str(booking_id),
                 "invoice_number": invoice_number,
                 "base_total": str(calc["base_total"]),
                 "surcharge_amount": str(calc["surcharge_amount"]),
                 "card_total": str(calc["card_total"]),
             },
-            success_url=success_url,
-            cancel_url=cancel_url,
-        )
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+        }
+        if email:
+            session_kwargs["customer_email"] = email
+        session = stripe.checkout.Session.create(**session_kwargs)
     except Exception as exc:
         automation.log_event(
             automation.AUTOMATION_STRIPE_CHECKOUT,
@@ -179,6 +199,21 @@ def create_checkout_session(
         booking_id,
     )
     return True, "Redirecting to Stripe…", checkout_url
+
+
+def start_customer_checkout(
+    booking: Dict[str, Any],
+    *,
+    success_url: str,
+    cancel_url: str,
+) -> Tuple[bool, str, Optional[str]]:
+    """Public customer checkout from invoice Pay Now link."""
+    return create_checkout_session(
+        booking,
+        success_url=success_url,
+        cancel_url=cancel_url,
+        require_email=False,
+    )
 
 
 def handle_webhook_event(payload: bytes, signature: str) -> Tuple[bool, str]:

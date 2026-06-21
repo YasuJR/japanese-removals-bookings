@@ -228,6 +228,34 @@ def create_stripe_checkout(
         booking_to_dict(row),
         success_url=success_url,
         cancel_url=cancel_url,
+        require_email=True,
+    )
+
+
+def prepare_booking_payment_link(booking_id: int) -> str:
+    db.ensure_payment_token(booking_id)
+    row = db.get_booking(booking_id)
+    if not row:
+        return ""
+    return stripe_service.customer_payment_url(booking_to_dict(row))
+
+
+def start_public_stripe_checkout(
+    token: str,
+    *,
+    success_url: str,
+    cancel_url: str,
+) -> Tuple[bool, str, str]:
+    row = db.get_booking_by_payment_token(token)
+    if not row:
+        return False, "Payment link not found.", ""
+    booking = booking_to_dict(row)
+    if (booking.get("payment_status") or "").strip() == invoice.PAYMENT_STATUS_PAID:
+        return False, "This invoice is already paid.", ""
+    return stripe_service.start_customer_checkout(
+        booking,
+        success_url=success_url,
+        cancel_url=cancel_url,
     )
 
 

@@ -175,6 +175,7 @@ def build_invoice_document(booking: Dict[str, Any]) -> Dict[str, Any]:
     if not logo_file.is_file():
         logo_file = xero_branding.invoice_logo_path()
     company_abn = str(settings.get("company_abn") or "").strip()
+    payment_options = stripe_service.payment_options_for_booking(booking, totals["total"])
 
     return {
         "settings": settings,
@@ -200,9 +201,7 @@ def build_invoice_document(booking: Dict[str, Any]) -> Dict[str, Any]:
         "show_company_name": False,
         "footer_tagline": FOOTER_TAGLINE,
         "gst_inclusive": bool(totals.get("gst_enabled")),
-        "payment_options": stripe_service.payment_options_for_booking(
-            booking, totals["total"]
-        ),
+        "payment_options": payment_options,
     }
 
 
@@ -516,6 +515,45 @@ def _payment_options_table(
     return table
 
 
+def _pay_now_button_table(
+    options: Dict[str, Any],
+    styles: Dict[str, ParagraphStyle],
+    box_width: float,
+) -> Optional[Table]:
+    pay_url = (options.get("pay_now_url") or "").strip()
+    if not options.get("can_pay_now") or not pay_url:
+        return None
+    pct = options.get("surcharge_percent_display") or "0"
+    card_total = options.get("card_total_display") or ""
+    link_html = (
+        '<a href="{0}" color="#083d28"><b>Pay Now by Credit Card — {1}</b></a>'
+    ).format(pay_url, card_total)
+    note_html = (
+        "Secure online payment. Includes {0}% card processing surcharge."
+    ).format(pct)
+    table = Table(
+        [
+            [Paragraph(link_html, styles["payment_value"])],
+            [Paragraph(note_html, styles["payment_value"])],
+        ],
+        colWidths=[box_width],
+    )
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), JR_GREEN_LIGHT),
+                ("BOX", (0, 0), (-1, -1), 1.5, JR_GREEN_TABLE),
+                ("LEFTPADDING", (0, 0), (-1, -1), 18),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 18),
+                ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
+    return table
+
+
 def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
     """Build a branded customer invoice PDF (A4 portrait)."""
     doc_data = build_invoice_document(booking)
@@ -741,6 +779,14 @@ def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
         )
     )
     story.append(payment_row)
+    pay_now_table = _pay_now_button_table(
+        doc_data.get("payment_options") or {},
+        styles,
+        CONTENT_WIDTH,
+    )
+    if pay_now_table:
+        story.append(Spacer(1, SECTION_GAP))
+        story.append(pay_now_table)
     story.append(Spacer(1, SECTION_GAP * 3))
     story.append(HRFlowable(width="100%", thickness=0.4, color=JR_BORDER_SUBTLE, spaceAfter=SECTION_GAP))
     story.append(Paragraph(doc_data["footer_tagline"], styles["footer"]))

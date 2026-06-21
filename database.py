@@ -1,5 +1,6 @@
 """SQLite or PostgreSQL storage for bookings and staff."""
 
+import secrets
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -37,6 +38,7 @@ BOOKING_EXTRA_COLUMNS = [
     ("invoice_bank_bsb", "TEXT"),
     ("invoice_bank_account", "TEXT"),
     ("stripe_checkout_session_id", "TEXT"),
+    ("payment_token", "TEXT"),
     ("stripe_payment_intent_id", "TEXT"),
     ("stripe_payment_status", "TEXT"),
     ("stripe_surcharge_amount", "REAL"),
@@ -1048,6 +1050,34 @@ def get_booking_by_stripe_session(session_id: str) -> Optional[sqlite3.Row]:
             "SELECT * FROM bookings WHERE stripe_checkout_session_id = ? LIMIT 1",
             (sid,),
         ).fetchone()
+
+
+def get_booking_by_payment_token(token: str) -> Optional[sqlite3.Row]:
+    raw = (token or "").strip()
+    if not raw:
+        return None
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM bookings WHERE payment_token = ? LIMIT 1",
+            (raw,),
+        ).fetchone()
+
+
+def ensure_payment_token(booking_id: int) -> str:
+    row = get_booking(booking_id)
+    if not row:
+        return ""
+    existing = (row["payment_token"] or "").strip()
+    if existing:
+        return existing
+    token = secrets.token_urlsafe(16)
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE bookings SET payment_token = ? WHERE id = ?",
+            (token, booking_id),
+        )
+        conn.commit()
+    return token
 
 
 def search_bookings(query: str) -> List[sqlite3.Row]:

@@ -106,9 +106,15 @@
             </dd>
           </dl>
           <p class="invoice-compliance-note">{{ inv.payment_options.compliance_note }}</p>
-          {% if inv.payment_options.stripe_enabled and inv.payment_options.can_checkout %}
+          {% if inv.payment_options.can_pay_now and inv.payment_options.pay_now_url %}
+          <p class="invoice-stripe-form">
+            <a class="btn-primary btn-sm" href="{{ inv.payment_options.pay_now_url }}" target="_blank" rel="noopener">
+              Pay Now by Credit Card — {{ inv.payment_options.card_total_display }}
+            </a>
+          </p>
+          {% elif inv.payment_options.stripe_enabled and inv.payment_options.can_checkout %}
           <form method="post" action="{{ url_for('stripe_checkout', booking_id=booking_id) }}" class="invoice-stripe-form">
-            <button type="submit" class="btn-primary btn-sm">Pay by Credit Card</button>
+            <button type="submit" class="btn-primary btn-sm">Pay by Credit Card (staff)</button>
           </form>
           {% endif %}
         </section>

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} — {{ company_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="public-page">
+  <main class="panel public-panel">
+    <h2>{{ title }}</h2>
+    <p>{{ message }}</p>
+    {% if success and booking and booking.payment_status == 'Paid' and booking.stripe_payment_intent_id %}
+    <p class="muted">Payment reference: {{ booking.stripe_payment_intent_id }}</p>
+    {% endif %}
+    {% if pay_url %}
+    <p><a class="btn-primary btn-sm" href="{{ pay_url }}">Try payment again</a></p>
+    {% endif %}
+  </main>
+</body>
+</html>

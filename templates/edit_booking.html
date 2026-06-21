@@ -43,21 +43,29 @@
   </div>
   {% endif %}
 
-  {% if booking.invoice_number or booking.stripe_payment_intent_id or invoice_summary.payment_status != 'Unpaid' %}
+  {% if customer_pay_url or booking.stripe_payment_intent_id or booking.stripe_payment_status or invoice_summary.payment_status != 'Unpaid' %}
   <div class="payment-status-bar muted">
     <span><strong>Job status:</strong> {{ booking.status }}</span>
     <span>Payment: {% with payment_status=invoice_summary.payment_status %}{% include '_payment_badge.html' %}{% endwith %}</span>
+    {% if booking.stripe_payment_status and invoice_summary.payment_status != 'Paid' %}
+    <span class="status-pill status-invoice">{{ booking.stripe_payment_status|capitalize }}</span>
+    {% endif %}
     {% if booking.paid_at and invoice_summary.payment_status == 'Paid' %}
     <span>Paid {{ booking.paid_at[:10] }}</span>
     {% endif %}
-    {% if booking.stripe_total_charged %}
+    {% if booking.stripe_surcharge_amount and booking.stripe_total_charged %}
+    <span>Card: ${{ '%.2f'|format(booking.stripe_total_charged) }} incl. ${{ '%.2f'|format(booking.stripe_surcharge_amount) }} surcharge</span>
+    {% elif booking.stripe_total_charged %}
     <span>Card total: ${{ '%.2f'|format(booking.stripe_total_charged) }}</span>
     {% endif %}
     {% if booking.stripe_payment_intent_id %}
-    <span class="nowrap">Stripe: {{ booking.stripe_payment_intent_id[:24] }}{% if booking.stripe_payment_intent_id|length > 24 %}…{% endif %}</span>
+    <span class="nowrap">Stripe ref: {{ booking.stripe_payment_intent_id[:24] }}{% if booking.stripe_payment_intent_id|length > 24 %}…{% endif %}</span>
     {% endif %}
     {% if booking.xero_payment_id %}
     <span class="status-pill ok">Xero payment linked</span>
+    {% endif %}
+    {% if customer_pay_url and payment_options.can_pay_now %}
+    <span class="nowrap">Customer pay link: <a href="{{ customer_pay_url }}" target="_blank" rel="noopener">Pay Now</a></span>
     {% endif %}
   </div>
   {% endif %}

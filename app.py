@@ -250,6 +250,11 @@ def _integration_status() -> dict:
 
 def _edit_booking_extras(row) -> dict:
     booking = services.booking_to_dict(row)
+    booking_id = int(booking["id"])
+    customer_pay_url = services.prepare_booking_payment_link(booking_id)
+    refreshed = db.get_booking(booking_id)
+    if refreshed:
+        booking = services.booking_to_dict(refreshed)
     linked = xero.is_real_invoice_id(booking.get("xero_invoice_id"))
     job = job_status.display(booking)
     review_row = db.get_review_request_for_booking(int(booking["id"]))
@@ -264,6 +269,7 @@ def _edit_booking_extras(row) -> dict:
         "show_invoice_automation": job == "Completed" and not linked,
         "review_request": dict(review_row) if review_row else None,
         "payment_options": stripe_service.payment_options_for_booking(booking),
+        "customer_pay_url": customer_pay_url,
         "xero_automation_error": (booking.get("xero_invoice_automation_error") or "").strip(),
         "default_driver_name": _default_driver_name(),
         "can_start_on_route": job in ("Confirmed", "On Route"),
@@ -374,6 +380,7 @@ def _create_booking_from_data(data):
         status=data.get("status", job_status.DEFAULT_STATUS),
     )
     services._persist_booking_extras(booking_id, data)
+    services.prepare_booking_payment_link(booking_id)
     return booking_id
 
 
@@ -986,6 +993,68 @@ def review_done(token):
         confirmed=False,
         token=token,
         company_name=config.COMPANY_NAME,
+    )
+
+
+@app.route("/pay/<token>")
+def customer_pay(token):
+    """Public Pay Now link from invoice PDF — redirects to Stripe Checkout."""
+    success_url = (
+        url_for("customer_pay_success", token=token, _external=True)
+        + "?session_id={CHECKOUT_SESSION_ID}"
+    )
+    cancel_url = url_for("customer_pay_cancel", token=token, _external=True)
+    ok, msg, checkout_url = services.start_public_stripe_checkout(
+        token,
+        success_url=success_url,
+        cancel_url=cancel_url,
+    )
+    if ok and checkout_url:
+        return redirect(checkout_url)
+    return render_template(
+        "pay_result.html",
+        success=False,
+        title="Payment unavailable",
+        message=msg,
+        company_name=config.COMPANY_NAME,
+    ), 400
+
+
+@app.route("/pay/<token>/success")
+def customer_pay_success(token):
+    row = db.get_booking_by_payment_token(token)
+    if not row:
+        return render_template("pay_result.html", success=False, title="Not found", message="Payment link not found.", company_name=config.COMPANY_NAME), 404
+    booking = services.booking_to_dict(row)
+    paid = (booking.get("payment_status") or "").strip() == invoice.PAYMENT_STATUS_PAID
+    return render_template(
+        "pay_result.html",
+        success=True,
+        title="Payment received" if paid else "Payment submitted",
+        message=(
+            "Thank you — your payment has been received."
+            if paid
+            else "Thank you — your card payment was submitted. This page will update automatically once Stripe confirms payment."
+        ),
+        company_name=config.COMPANY_NAME,
+        booking=booking,
+    )
+
+
+@app.route("/pay/<token>/cancel")
+def customer_pay_cancel(token):
+    row = db.get_booking_by_payment_token(token)
+    invoice_number = ""
+    if row:
+        invoice_number = (row["invoice_number"] or "").strip()
+    return render_template(
+        "pay_result.html",
+        success=False,
+        title="Payment cancelled",
+        message="No payment was taken. You can use the Pay Now link on your invoice to try again.",
+        company_name=config.COMPANY_NAME,
+        invoice_number=invoice_number,
+        pay_url=services.prepare_booking_payment_link(int(row["id"])) if row else "",
     )
 
 
@@ -1760,6 +1829,8 @@ def invoice_preview(booking_id):
     if row is None:
         flash("Booking not found.", "error")
         return redirect(url_for("all_bookings"))
+    services.prepare_booking_payment_link(booking_id)
+    row = db.get_booking(booking_id)
     booking = services.booking_to_dict(row)
     inv = invoice_pdf_service.build_invoice_document(booking)
     return render_template(
@@ -1776,6 +1847,8 @@ def invoice_pdf(booking_id):
     if row is None:
         flash("Booking not found.", "error")
         return redirect(url_for("all_bookings"))
+    services.prepare_booking_payment_link(booking_id)
+    row = db.get_booking(booking_id)
     booking = services.booking_to_dict(row)
     inv = invoice_pdf_service.build_invoice_document(booking)
     pdf_bytes = invoice_pdf_service.generate_invoice_pdf(booking)
