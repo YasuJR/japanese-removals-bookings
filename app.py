@@ -120,7 +120,32 @@ app.jinja_env.filters["job_status_css"] = job_status.css_class
 app.jinja_env.filters["booking_job_status"] = lambda row: job_status.display(
     _row_to_dict(row)
 )
-app.jinja_env.filters["format_margin"] = lambda pct: "{0:.1f}%".format(float(pct))
+app.jinja_env.filters["format_margin"] = lambda pct: (
+    "—"
+    if pct is None
+    else (
+        "{0:.1f}%".format(float(pct))
+        if _margin_value_ok(pct)
+        else "—"
+    )
+)
+
+
+def _margin_value_ok(pct) -> bool:
+    try:
+        float(pct)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _margin_badge_filter(pct) -> str:
+    if pct is None or not _margin_value_ok(pct):
+        return ""
+    return booking_profit.margin_badge_class(float(pct))
+
+
+app.jinja_env.filters["margin_badge"] = _margin_badge_filter
 from urllib.parse import quote
 
 app.jinja_env.filters["urlencode"] = lambda value: quote(str(value or ""), safe="")
