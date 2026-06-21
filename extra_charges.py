@@ -3,6 +3,20 @@
 from typing import Any, Dict, List, Tuple
 
 
+def _extra_charge_row_is_empty(description: str, qty_raw: str, price_raw: str) -> bool:
+    """True when the user did not enter a description or unit price."""
+    desc = (description or "").strip()
+    price = (price_raw or "").strip()
+    if desc:
+        return False
+    if not price:
+        return True
+    try:
+        return float(price) == 0
+    except (TypeError, ValueError):
+        return False
+
+
 def parse_extra_charges_from_form(form: Any) -> Tuple[List[Dict[str, Any]], List[str]]:
     descriptions = _field_list(form, "extra_description")
     quantities = _field_list(form, "extra_quantity")
@@ -19,7 +33,7 @@ def parse_extra_charges_from_form(form: Any) -> Tuple[List[Dict[str, Any]], List
         qty_raw = (qty_raw or "").strip()
         price_raw = (price_raw or "").strip()
 
-        if not description and not qty_raw and not price_raw:
+        if _extra_charge_row_is_empty(description, qty_raw, price_raw):
             continue
         if not description:
             errors.append("Extra charge row {0}: description is required.".format(index + 1))
