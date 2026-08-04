@@ -94,7 +94,7 @@ def is_configured() -> bool:
 
 
 def is_ready() -> bool:
-    return stripe_config.is_ready()
+    return stripe_config.checkout_ready()
 
 
 def _stripe_client():

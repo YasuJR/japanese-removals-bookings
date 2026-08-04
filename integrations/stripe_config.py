@@ -65,6 +65,28 @@ def get_webhook_secret() -> str:
     return _merged()["webhook_secret"] or config.STRIPE_WEBHOOK_SECRET
 
 
+def publishable_key_valid(value: Optional[str] = None) -> bool:
+    key = (value if value is not None else get_publishable_key()).strip()
+    return key.startswith(("pk_live_", "pk_test_")) and len(key) >= 32
+
+
+def secret_key_valid(value: Optional[str] = None) -> bool:
+    key = (value if value is not None else get_secret_key()).strip()
+    return key.startswith(("sk_live_", "sk_test_", "rk_live_", "rk_test_")) and len(
+        key
+    ) >= 32
+
+
+def webhook_secret_valid(value: Optional[str] = None) -> bool:
+    key = (value if value is not None else get_webhook_secret()).strip()
+    if not key.startswith("whsec_") or len(key) < 32:
+        return False
+    lowered = key.lower()
+    if "local_e2e" in lowered or lowered.endswith("_test_secret"):
+        return False
+    return True
+
+
 def is_enabled() -> bool:
     if not (_merged()["stripe_enabled"] or config.STRIPE_ENABLED):
         return False
@@ -84,11 +106,18 @@ def has_stored_webhook_secret() -> bool:
 
 
 def has_credentials() -> bool:
-    return bool(get_publishable_key()) and bool(get_secret_key())
+    return secret_key_valid() and publishable_key_valid()
 
 
 def is_ready() -> bool:
-    return is_enabled() and has_credentials()
+    return is_enabled() and secret_key_valid()
+
+
+def checkout_ready() -> bool:
+    """Server-side Checkout only needs the secret key."""
+    if not is_enabled():
+        return False
+    return secret_key_valid()
 
 
 def surcharge_percent() -> float:
@@ -141,9 +170,11 @@ def save_settings(
     elif existing_webhook:
         data["webhook_secret"] = existing_webhook
 
-    has_secret = bool(_field_str(data.get("secret_key"))) or bool(config.STRIPE_SECRET_KEY)
-    has_pub = bool(data["publishable_key"]) or bool(config.STRIPE_PUBLISHABLE_KEY)
-    data["stripe_enabled"] = bool(stripe_enabled) and has_secret and has_pub
+    has_secret = secret_key_valid(_field_str(data.get("secret_key")) or config.STRIPE_SECRET_KEY)
+    has_pub = publishable_key_valid(data["publishable_key"]) or publishable_key_valid(
+        config.STRIPE_PUBLISHABLE_KEY
+    )
+    data["stripe_enabled"] = bool(stripe_enabled) and has_secret
 
     _write_file(data)
     return {
@@ -169,6 +200,10 @@ def settings_for_form() -> Dict[str, Any]:
         "card_surcharge_percent": surcharge_percent(),
         "xero_payment_account_code": merged["xero_payment_account_code"],
         "credentials_ok": has_credentials(),
+        "checkout_ready": checkout_ready(),
+        "publishable_key_valid": publishable_key_valid(),
+        "secret_key_valid": secret_key_valid(),
+        "webhook_secret_valid": webhook_secret_valid(),
         "webhook_url": "{0}/integrations/stripe/webhook".format(
             config.APP_BASE_URL.rstrip("/")
         ),

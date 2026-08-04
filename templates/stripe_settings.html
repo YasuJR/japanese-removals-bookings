@@ -7,9 +7,16 @@
   <h2>Stripe card payments</h2>
   <p class="hint">Accept credit card payments via Stripe Checkout. A card processing surcharge is added to the customer total — bank transfer stays fee-free.</p>
 
+  {% if stripe_form.publishable_key_valid %}
+  <p class="status-pill ok">Publishable key format OK</p>
+  {% elif stripe_form.publishable_key %}
+  <p class="status-pill off">Publishable key invalid — must start with pk_live_ or pk_test_</p>
+  {% endif %}
   {% if status.stripe_ready %}
-  <p class="status-pill ok">Stripe enabled &amp; ready</p>
-  {% elif stripe_form.credentials_ok %}
+  <p class="status-pill ok">Stripe checkout enabled</p>
+  {% elif stripe_form.checkout_ready %}
+  <p class="status-pill pending">Secret key OK — fix publishable key to mark fully configured</p>
+  {% elif stripe_form.secret_key_valid %}
   <p class="status-pill pending">Keys saved — enable Stripe below</p>
   {% else %}
   <p class="status-pill off">Not configured</p>

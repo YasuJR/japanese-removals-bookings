@@ -48,6 +48,34 @@ def bootstrap_production() -> None:
     _write_google_credentials()
     _write_json_env("GOOGLE_TOKEN_JSON", config.GOOGLE_TOKEN_FILE)
     _write_json_env("XERO_TOKEN_JSON", config.XERO_TOKEN_FILE)
+    _bootstrap_stripe_settings()
+
+
+def _bootstrap_stripe_settings() -> None:
+    """Write stripe_settings.json from env on Render (ephemeral disk)."""
+    if not config.PRODUCTION:
+        return
+    has_stripe_env = any(
+        [
+            config.STRIPE_PUBLISHABLE_KEY,
+            config.STRIPE_SECRET_KEY,
+            config.STRIPE_WEBHOOK_SECRET,
+        ]
+    )
+    if not has_stripe_env:
+        return
+    from integrations import stripe_config
+
+    merged = stripe_config.settings_for_form()
+    stripe_config.save_settings(
+        stripe_enabled=config.STRIPE_ENABLED or merged.get("stripe_enabled", False),
+        publishable_key=config.STRIPE_PUBLISHABLE_KEY or merged.get("publishable_key") or "",
+        secret_key=config.STRIPE_SECRET_KEY or "",
+        webhook_secret=config.STRIPE_WEBHOOK_SECRET or "",
+        card_surcharge_percent=merged.get("card_surcharge_percent")
+        or stripe_config.DEFAULT_SURCHARGE_PERCENT,
+        xero_payment_account_code=merged.get("xero_payment_account_code") or "",
+    )
 
 
 def ensure_staff_user() -> None:
