@@ -67,9 +67,13 @@ def _bootstrap_stripe_settings() -> None:
     from integrations import stripe_config
 
     merged = stripe_config.settings_for_form()
+    env_publishable = (config.STRIPE_PUBLISHABLE_KEY or "").strip()
+    if env_publishable and not stripe_config.publishable_key_valid(env_publishable):
+        env_publishable = ""
+    publishable_key = env_publishable or merged.get("publishable_key") or ""
     stripe_config.save_settings(
         stripe_enabled=config.STRIPE_ENABLED or merged.get("stripe_enabled", False),
-        publishable_key=config.STRIPE_PUBLISHABLE_KEY or merged.get("publishable_key") or "",
+        publishable_key=publishable_key,
         secret_key=config.STRIPE_SECRET_KEY or "",
         webhook_secret=config.STRIPE_WEBHOOK_SECRET or "",
         card_surcharge_percent=merged.get("card_surcharge_percent")

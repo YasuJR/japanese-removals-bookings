@@ -3,7 +3,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import config
 
@@ -110,12 +110,12 @@ def has_credentials() -> bool:
 
 
 def is_ready() -> bool:
-    return is_enabled() and secret_key_valid()
+    return checkout_ready()
 
 
 def checkout_ready() -> bool:
     """Server-side Checkout only needs the secret key."""
-    if not is_enabled():
+    if not (_merged()["stripe_enabled"] or config.STRIPE_ENABLED):
         return False
     return secret_key_valid()
 
@@ -137,6 +137,16 @@ def xero_payment_account_code() -> str:
     return _merged()["xero_payment_account_code"]
 
 
+def resolve_publishable_key(value: str, existing: Optional[str] = None) -> Tuple[str, bool]:
+    """Return publishable key to store; reject invalid values (e.g. mk_… typos)."""
+    candidate = (value or "").strip()
+    if publishable_key_valid(candidate):
+        return candidate, False
+    if candidate:
+        return _field_str(existing), True
+    return "", False
+
+
 def save_settings(
     *,
     stripe_enabled: bool,
@@ -148,7 +158,10 @@ def save_settings(
 ) -> Dict[str, bool]:
     existing = _read_file()
     data = dict(existing)
-    data["publishable_key"] = (publishable_key or "").strip()
+    resolved_pk, publishable_key_rejected = resolve_publishable_key(
+        publishable_key, _field_str(existing.get("publishable_key"))
+    )
+    data["publishable_key"] = resolved_pk
     data["card_surcharge_percent"] = round(float(card_surcharge_percent or 0), 2)
     data["xero_payment_account_code"] = (xero_payment_account_code or "").strip()
 
@@ -180,6 +193,7 @@ def save_settings(
     return {
         "secret_updated": secret_updated,
         "webhook_updated": webhook_updated,
+        "publishable_key_rejected": publishable_key_rejected,
     }
 
 

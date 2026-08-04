@@ -912,7 +912,13 @@ def stripe_settings():
                     "xero_payment_account_code", ""
                 ).strip(),
             )
-            if result.get("secret_updated"):
+            if result.get("publishable_key_rejected"):
+                flash(
+                    "Publishable key not saved — must start with pk_live_ or pk_test_ "
+                    "(copy from Stripe Dashboard → Developers → API keys).",
+                    "error",
+                )
+            elif result.get("secret_updated"):
                 flash("Stripe settings saved. Secret key stored securely.", "success")
             else:
                 flash("Stripe settings saved.", "success")
