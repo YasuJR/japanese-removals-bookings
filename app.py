@@ -494,7 +494,17 @@ def _flash_integration_messages(messages) -> None:
 
 @app.route("/health")
 def health_check():
-    return {"status": "ok", "production": config.PRODUCTION}, 200
+    import db_backend
+
+    return {
+        "status": "ok",
+        "production": config.PRODUCTION,
+        "git_commit": os.environ.get("RENDER_GIT_COMMIT", "")[:12],
+        "database": "postgres" if db_backend.is_postgres() else "sqlite",
+        "stripe_storage": "database"
+        if config.PRODUCTION and db_backend.is_postgres()
+        else "file",
+    }, 200
 
 
 @app.route("/quote", methods=["GET", "POST"], endpoint="website_quote")

@@ -12,15 +12,14 @@ import config
 
 Params = Optional[Union[Sequence[Any], Dict[str, Any]]]
 
-_USE_POSTGRES = bool(getattr(config, "DATABASE_URL", ""))
-
 
 def is_postgres() -> bool:
-    return _USE_POSTGRES
+    url = (getattr(config, "DATABASE_URL", "") or "").strip()
+    return url.startswith("postgres")
 
 
 def adapt_sql(sql: str) -> str:
-    if not _USE_POSTGRES:
+    if not is_postgres():
         return sql
     text = sql
     text = text.replace("datetime('now')", "CURRENT_TIMESTAMP")
@@ -146,7 +145,7 @@ class CompatConnection:
 
 
 def get_connection() -> CompatConnection:
-    if _USE_POSTGRES:
+    if is_postgres():
         import psycopg2
 
         raw = psycopg2.connect(config.DATABASE_URL)

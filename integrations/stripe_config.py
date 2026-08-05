@@ -97,26 +97,32 @@ def _merged() -> Dict[str, Any]:
 
 def get_publishable_key() -> str:
     stored = _merged()["publishable_key"]
-    if stored:
-        return stored
     env = _field_str(config.STRIPE_PUBLISHABLE_KEY)
-    return env if publishable_key_valid(env) else ""
+    if publishable_key_valid(stored):
+        return stored
+    if publishable_key_valid(env):
+        return env
+    return ""
 
 
 def get_secret_key() -> str:
     stored = _merged()["secret_key"]
-    if stored:
-        return stored
     env = _field_str(config.STRIPE_SECRET_KEY)
-    return env if secret_key_valid(env) else ""
+    if secret_key_valid(stored):
+        return stored
+    if secret_key_valid(env):
+        return env
+    return ""
 
 
 def get_webhook_secret() -> str:
     stored = _merged()["webhook_secret"]
-    if stored:
-        return stored
     env = _field_str(config.STRIPE_WEBHOOK_SECRET)
-    return env if webhook_secret_valid(env) else ""
+    if webhook_secret_valid(stored):
+        return stored
+    if webhook_secret_valid(env):
+        return env
+    return ""
 
 
 def publishable_key_valid(value: Optional[str] = None) -> bool:
@@ -308,16 +314,18 @@ def settings_for_form() -> Dict[str, Any]:
     stored_webhook = _field_str(stored.get("webhook_secret"))
     env_secret = secret_key_valid(config.STRIPE_SECRET_KEY)
     env_webhook = webhook_secret_valid(config.STRIPE_WEBHOOK_SECRET)
+    secret_valid = secret_key_valid()
     storage_label = "database" if _use_db_storage() else "file"
     return {
         "stripe_enabled": merged["stripe_enabled"],
         "publishable_key": get_publishable_key(),
         "has_secret": has_stored_secret(),
-        "secret_saved_in_storage": bool(stored_secret),
+        "secret_saved_in_storage": secret_valid and bool(stored_secret),
         "secret_saved_in_file": bool(_field_str(_read_file().get("secret_key"))),
-        "secret_from_env": env_secret and not stored_secret,
+        "secret_stored_invalid": bool(stored_secret) and not secret_key_valid(stored_secret),
+        "secret_from_env": env_secret and not secret_key_valid(stored_secret),
         "has_webhook_secret": has_stored_webhook_secret(),
-        "webhook_saved_in_storage": bool(stored_webhook),
+        "webhook_saved_in_storage": webhook_secret_valid() and bool(stored_webhook),
         "webhook_saved_in_file": bool(_field_str(_read_file().get("webhook_secret"))),
         "webhook_from_env": env_webhook and not stored_webhook,
         "card_surcharge_percent": surcharge_percent(),

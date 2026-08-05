@@ -39,6 +39,8 @@
         <span class="status-pill ok xero-secret-status">Saved — hidden for security</span>
         {% elif stripe_form.secret_from_env %}
         <span class="status-pill pending xero-secret-status">Using secret from Render env</span>
+        {% elif stripe_form.secret_stored_invalid %}
+        <span class="status-pill off xero-secret-status">Invalid — re-enter secret key</span>
         {% else %}
         <span class="status-pill off xero-secret-status">Not saved yet</span>
         {% endif %}
