@@ -84,9 +84,16 @@ def _bootstrap_stripe_settings() -> None:
 
 def ensure_staff_user() -> None:
     """Create initial staff user when STAFF_USERNAME/STAFF_PASSWORD are set."""
+    import logging
+
+    logger = logging.getLogger(__name__)
     username = (config.STAFF_USERNAME or "").strip()
     password = (config.STAFF_PASSWORD or "").strip()
     if not username or not password:
+        if config.PRODUCTION:
+            logger.warning(
+                "Staff bootstrap skipped — set STAFF_USERNAME and STAFF_PASSWORD on Render."
+            )
         return
     import auth
     import database as db
@@ -94,8 +101,9 @@ def ensure_staff_user() -> None:
     db.init_db()
     if db.staff_user_count() > 0:
         return
-    db.create_staff_user(
+    user_id = db.create_staff_user(
         username,
         auth.hash_password(password),
         config.STAFF_DISPLAY_NAME or username,
     )
+    logger.info("Created initial staff user id=%s username=%s", user_id, username)

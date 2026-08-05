@@ -25,9 +25,11 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: STAFF_USERNAME
-        sync: false
+        value: admin
       - key: STAFF_PASSWORD
         sync: false
+      - key: STAFF_DISPLAY_NAME
+        value: Admin
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
