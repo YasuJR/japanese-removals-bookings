@@ -214,6 +214,7 @@ def settings_for_form() -> Dict[str, Any]:
         "card_surcharge_percent": surcharge_percent(),
         "xero_payment_account_code": merged["xero_payment_account_code"],
         "credentials_ok": has_credentials(),
+        "can_enable_stripe": secret_key_valid(),
         "checkout_ready": checkout_ready(),
         "publishable_key_valid": publishable_key_valid(),
         "secret_key_valid": secret_key_valid(),

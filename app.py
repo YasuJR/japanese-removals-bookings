@@ -243,7 +243,7 @@ def _integration_status() -> dict:
         "xero_configured": xero_config.has_credentials(),
         "xero_connected": xero.is_connected(),
         "xero_ready": xero.is_ready(),
-        "stripe_configured": stripe_config.has_credentials(),
+        "stripe_configured": stripe_config.secret_key_valid(),
         "stripe_ready": stripe_config.is_ready(),
     }
 

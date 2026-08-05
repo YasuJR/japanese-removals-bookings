@@ -67,10 +67,10 @@
     <label class="checkbox-row">
       <input type="checkbox" name="stripe_enabled"
         {% if stripe_form.stripe_enabled %}checked{% endif %}
-        {% if not stripe_form.credentials_ok %}disabled{% endif %}>
+        {% if not stripe_form.can_enable_stripe %}disabled{% endif %}>
       STRIPE_ENABLED — allow Pay by Credit Card on invoices
     </label>
-    <p class="muted form-hint">Stripe stays off until publishable and secret keys are saved. Bank transfer remains available with no surcharge.</p>
+    <p class="muted form-hint">Requires a valid secret key (saved above or from env). Publishable key is optional for Checkout but recommended for full configuration.</p>
 
     <h3>Webhook</h3>
     <p class="muted form-hint">In Stripe Dashboard → Developers → Webhooks, add endpoint:</p>
@@ -94,7 +94,8 @@
 
   <ul class="config-check muted">
     <li>Settings file: <code class="path-code">{{ stripe_form.settings_path }}</code></li>
-    <li>Credentials saved: {% if stripe_form.credentials_ok %}Yes{% else %}No{% endif %}</li>
+    <li>Secret key: {% if stripe_form.secret_key_valid %}OK{% else %}Missing or invalid{% endif %}</li>
+    <li>Publishable key: {% if stripe_form.publishable_key_valid %}OK{% else %}Optional{% endif %}</li>
     <li>Webhook secret: {% if stripe_form.has_webhook_secret %}Yes{% else %}No — add for automatic Paid status{% endif %}</li>
     <li>Default surcharge: {{ stripe_form.card_surcharge_percent }}%</li>
   </ul>
