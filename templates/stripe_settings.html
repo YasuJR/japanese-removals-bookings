@@ -35,10 +35,10 @@
       </label>
       <label>
         Secret key
-        {% if stripe_form.secret_saved_in_file %}
+        {% if stripe_form.secret_saved_in_storage %}
         <span class="status-pill ok xero-secret-status">Saved — hidden for security</span>
         {% elif stripe_form.secret_from_env %}
-        <span class="status-pill pending xero-secret-status">Using secret from .env</span>
+        <span class="status-pill pending xero-secret-status">Using secret from Render env</span>
         {% else %}
         <span class="status-pill off xero-secret-status">Not saved yet</span>
         {% endif %}
@@ -47,10 +47,10 @@
       </label>
       <label>
         Webhook secret
-        {% if stripe_form.webhook_saved_in_file %}
+        {% if stripe_form.webhook_saved_in_storage %}
         <span class="status-pill ok xero-secret-status">Saved — hidden</span>
         {% elif stripe_form.webhook_from_env %}
-        <span class="status-pill pending xero-secret-status">Using webhook secret from .env</span>
+        <span class="status-pill pending xero-secret-status">Using webhook secret from Render env</span>
         {% else %}
         <span class="status-pill off xero-secret-status">Not saved yet</span>
         {% endif %}

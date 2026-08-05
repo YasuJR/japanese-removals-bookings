@@ -51,42 +51,41 @@ def bootstrap_production() -> None:
     _write_google_credentials()
     _write_json_env("GOOGLE_TOKEN_JSON", config.GOOGLE_TOKEN_FILE)
     _write_json_env("XERO_TOKEN_JSON", config.XERO_TOKEN_FILE)
-    _bootstrap_stripe_settings()
 
 
-def _bootstrap_stripe_settings() -> None:
-    """Seed Stripe settings from env without clearing UI-saved PostgreSQL storage."""
+def bootstrap_stripe_settings() -> None:
+    """Seed Stripe settings from env/JSON into PostgreSQL (survives redeploys)."""
     if not config.PRODUCTION:
         return
+
     from integrations import stripe_config
 
-    if config.STRIPE_SETTINGS_JSON:
+    raw_json = (config.STRIPE_SETTINGS_JSON or "").strip()
+    if raw_json:
         try:
-            payload = json.loads(config.STRIPE_SETTINGS_JSON)
+            payload = json.loads(raw_json)
+        except json.JSONDecodeError:
+            logger.warning("STRIPE_SETTINGS_JSON is not valid JSON — skipping.")
+        else:
             if isinstance(payload, dict):
                 stripe_config.import_settings(payload)
-                logger.info("Stripe settings imported from STRIPE_SETTINGS_JSON")
-        except json.JSONDecodeError:
-            logger.warning("STRIPE_SETTINGS_JSON is not valid JSON — skipped")
+                logger.info("Loaded Stripe settings from STRIPE_SETTINGS_JSON.")
+                return
 
-    updates: dict = {}
-    publishable = (config.STRIPE_PUBLISHABLE_KEY or "").strip()
-    if stripe_config.publishable_key_valid(publishable):
-        updates["publishable_key"] = publishable
-    secret = (config.STRIPE_SECRET_KEY or "").strip()
-    if stripe_config.secret_key_valid(secret):
-        updates["secret_key"] = secret
-    webhook = (config.STRIPE_WEBHOOK_SECRET or "").strip()
-    if stripe_config.webhook_secret_valid(webhook):
-        updates["webhook_secret"] = webhook
-    if config.STRIPE_ENABLED:
-        updates["stripe_enabled"] = True
-
-    if not updates:
+    stored = stripe_config.read_stored_settings()
+    has_secret = stripe_config.secret_key_valid(stored.get("secret_key"))
+    if has_secret:
+        stripe_config.merge_env_overrides()
+        logger.info("Stripe settings loaded from persistent storage.")
         return
 
-    stripe_config.merge_settings(updates)
-    logger.info("Stripe settings merged from environment variables")
+    stripe_config.seed_from_env()
+    if stripe_config.secret_key_valid():
+        logger.info("Seeded Stripe settings from environment variables.")
+    else:
+        logger.warning(
+            "Stripe not configured — save in Settings → Stripe or set Render env vars."
+        )
 
 
 def ensure_staff_user() -> None:

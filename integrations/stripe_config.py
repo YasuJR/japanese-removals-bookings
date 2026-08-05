@@ -9,6 +9,7 @@ import config
 import db_backend
 
 SETTINGS_PATH = Path(config.CREDENTIALS_DIR) / "stripe_settings.json"
+STORAGE_KEY = "stripe"
 DEFAULT_SURCHARGE_PERCENT = 2.0
 
 
@@ -18,41 +19,8 @@ def _field_str(value: Any) -> str:
     return str(value).strip()
 
 
-def _uses_postgres_storage() -> bool:
+def _use_db_storage() -> bool:
     return bool(config.PRODUCTION and db_backend.is_postgres())
-
-
-def _read_postgres() -> Dict[str, Any]:
-    try:
-        import database as db
-
-        with db.get_connection() as conn:
-            row = conn.execute(
-                "SELECT data_json FROM stripe_settings WHERE singleton_id = 1"
-            ).fetchone()
-        if not row:
-            return {}
-        data = json.loads(row["data_json"] or "{}")
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-
-
-def _write_postgres(data: Dict[str, Any]) -> None:
-    import database as db
-
-    payload = json.dumps(data, indent=2)
-    with db.get_connection() as conn:
-        conn.execute(
-            """
-            INSERT INTO stripe_settings (singleton_id, data_json, updated_at)
-            VALUES (1, %s, CURRENT_TIMESTAMP)
-            ON CONFLICT (singleton_id) DO UPDATE SET
-                data_json = EXCLUDED.data_json,
-                updated_at = CURRENT_TIMESTAMP
-            """,
-            (payload,),
-        )
 
 
 def _read_file() -> Dict[str, Any]:
@@ -74,27 +42,44 @@ def _write_file(data: Dict[str, Any]) -> None:
         pass
 
 
-def _read_storage() -> Dict[str, Any]:
-    if _uses_postgres_storage():
-        return _read_postgres()
+def _read_db() -> Dict[str, Any]:
+    if not _use_db_storage():
+        return {}
+    import database as db
+
+    return db.get_integration_settings(STORAGE_KEY)
+
+
+def _write_db(data: Dict[str, Any]) -> None:
+    if not _use_db_storage():
+        return
+    import database as db
+
+    db.save_integration_settings(STORAGE_KEY, data)
+
+
+def read_stored_settings() -> Dict[str, Any]:
+    """Load persisted Stripe settings (PostgreSQL on Render, file locally)."""
+    if _use_db_storage():
+        data = _read_db()
+        if data:
+            return data
+        file_data = _read_file()
+        if file_data:
+            _write_db(file_data)
+            return file_data
+        return {}
     return _read_file()
 
 
-def _write_storage(data: Dict[str, Any]) -> None:
-    if _uses_postgres_storage():
-        _write_postgres(data)
-        return
+def write_stored_settings(data: Dict[str, Any]) -> None:
+    """Persist Stripe settings to durable storage."""
+    _write_db(data)
     _write_file(data)
 
 
-def storage_description() -> str:
-    if _uses_postgres_storage():
-        return "PostgreSQL table stripe_settings"
-    return str(SETTINGS_PATH.resolve())
-
-
 def _merged() -> Dict[str, Any]:
-    stored = _read_storage()
+    stored = read_stored_settings()
     return {
         "stripe_enabled": bool(stored.get("stripe_enabled", False)),
         "publishable_key": _field_str(stored.get("publishable_key")),
@@ -110,48 +95,28 @@ def _merged() -> Dict[str, Any]:
     }
 
 
-def _valid_env_publishable() -> str:
-    key = config.STRIPE_PUBLISHABLE_KEY.strip()
-    return key if publishable_key_valid(key) else ""
-
-
-def _valid_env_secret() -> str:
-    key = config.STRIPE_SECRET_KEY.strip()
-    return key if secret_key_valid(key) else ""
-
-
-def _valid_env_webhook() -> str:
-    key = config.STRIPE_WEBHOOK_SECRET.strip()
-    return key if webhook_secret_valid(key) else ""
-
-
 def get_publishable_key() -> str:
     stored = _merged()["publishable_key"]
     if stored:
         return stored
-    return _valid_env_publishable()
-
-
-def get_publishable_key_for_form() -> str:
-    """Stored publishable key only — never show invalid env fallbacks in the UI."""
-    stored = _merged()["publishable_key"]
-    if stored:
-        return stored
-    return _valid_env_publishable()
+    env = _field_str(config.STRIPE_PUBLISHABLE_KEY)
+    return env if publishable_key_valid(env) else ""
 
 
 def get_secret_key() -> str:
     stored = _merged()["secret_key"]
     if stored:
         return stored
-    return _valid_env_secret()
+    env = _field_str(config.STRIPE_SECRET_KEY)
+    return env if secret_key_valid(env) else ""
 
 
 def get_webhook_secret() -> str:
     stored = _merged()["webhook_secret"]
     if stored:
         return stored
-    return _valid_env_webhook()
+    env = _field_str(config.STRIPE_WEBHOOK_SECRET)
+    return env if webhook_secret_valid(env) else ""
 
 
 def publishable_key_valid(value: Optional[str] = None) -> bool:
@@ -183,14 +148,14 @@ def is_enabled() -> bool:
 
 
 def has_stored_secret() -> bool:
-    return bool(_field_str(_read_storage().get("secret_key"))) or bool(
-        _valid_env_secret()
+    return bool(_field_str(read_stored_settings().get("secret_key"))) or secret_key_valid(
+        config.STRIPE_SECRET_KEY
     )
 
 
 def has_stored_webhook_secret() -> bool:
-    return bool(_field_str(_read_storage().get("webhook_secret"))) or bool(
-        _valid_env_webhook()
+    return bool(_field_str(read_stored_settings().get("webhook_secret"))) or webhook_secret_valid(
+        config.STRIPE_WEBHOOK_SECRET
     )
 
 
@@ -233,42 +198,60 @@ def resolve_publishable_key(value: str, existing: Optional[str] = None) -> Tuple
         return candidate, False
     if candidate:
         return _field_str(existing), True
-    return _field_str(existing), False
+    return "", False
 
 
-def merge_settings(updates: Dict[str, Any]) -> None:
-    """Merge non-empty settings without clearing existing stored secrets."""
-    existing = _read_storage()
-    data = dict(existing)
-    for key, value in updates.items():
-        if value is None:
-            continue
-        if key in ("publishable_key", "secret_key", "webhook_secret", "xero_payment_account_code"):
-            text = _field_str(value)
-            if not text:
-                continue
-            if key == "publishable_key" and not publishable_key_valid(text):
-                continue
-            if key == "secret_key" and not secret_key_valid(text):
-                continue
-            if key == "webhook_secret" and not webhook_secret_valid(text):
-                continue
-            data[key] = text
-        elif key == "stripe_enabled":
-            data[key] = bool(value)
-        elif key == "card_surcharge_percent":
-            try:
-                data[key] = round(float(value), 2)
-            except (TypeError, ValueError):
-                pass
-    _write_storage(data)
-
-
-def import_settings(payload: Dict[str, Any]) -> None:
-    """Replace storage with a validated settings payload (bootstrap from env JSON)."""
-    if not isinstance(payload, dict):
+def import_settings(data: Dict[str, Any]) -> None:
+    if not isinstance(data, dict):
         return
-    merge_settings(payload)
+    write_stored_settings(data)
+
+
+def seed_from_env() -> None:
+    """Seed empty storage from valid Render env vars."""
+    data: Dict[str, Any] = {}
+    if publishable_key_valid(config.STRIPE_PUBLISHABLE_KEY):
+        data["publishable_key"] = _field_str(config.STRIPE_PUBLISHABLE_KEY)
+    if secret_key_valid(config.STRIPE_SECRET_KEY):
+        data["secret_key"] = _field_str(config.STRIPE_SECRET_KEY)
+    if webhook_secret_valid(config.STRIPE_WEBHOOK_SECRET):
+        data["webhook_secret"] = _field_str(config.STRIPE_WEBHOOK_SECRET)
+    if not data:
+        return
+    existing = read_stored_settings()
+    existing.update(data)
+    if config.STRIPE_ENABLED:
+        existing["stripe_enabled"] = True
+    write_stored_settings(existing)
+
+
+def merge_env_overrides() -> None:
+    """Fill missing stored fields from valid env vars without wiping saved values."""
+    existing = dict(read_stored_settings())
+    if not existing:
+        seed_from_env()
+        return
+    changed = False
+    if publishable_key_valid(config.STRIPE_PUBLISHABLE_KEY):
+        pk = _field_str(config.STRIPE_PUBLISHABLE_KEY)
+        if pk != _field_str(existing.get("publishable_key")):
+            existing["publishable_key"] = pk
+            changed = True
+    if secret_key_valid(config.STRIPE_SECRET_KEY) and not _field_str(
+        existing.get("secret_key")
+    ):
+        existing["secret_key"] = _field_str(config.STRIPE_SECRET_KEY)
+        changed = True
+    if webhook_secret_valid(config.STRIPE_WEBHOOK_SECRET) and not _field_str(
+        existing.get("webhook_secret")
+    ):
+        existing["webhook_secret"] = _field_str(config.STRIPE_WEBHOOK_SECRET)
+        changed = True
+    if config.STRIPE_ENABLED and not existing.get("stripe_enabled"):
+        existing["stripe_enabled"] = True
+        changed = True
+    if changed:
+        write_stored_settings(existing)
 
 
 def save_settings(
@@ -280,7 +263,7 @@ def save_settings(
     card_surcharge_percent: float = DEFAULT_SURCHARGE_PERCENT,
     xero_payment_account_code: str = "",
 ) -> Dict[str, bool]:
-    existing = _read_storage()
+    existing = read_stored_settings()
     data = dict(existing)
     resolved_pk, publishable_key_rejected = resolve_publishable_key(
         publishable_key, _field_str(existing.get("publishable_key"))
@@ -310,7 +293,7 @@ def save_settings(
     has_secret = secret_key_valid(_field_str(data.get("secret_key")) or config.STRIPE_SECRET_KEY)
     data["stripe_enabled"] = bool(stripe_enabled) and has_secret
 
-    _write_storage(data)
+    write_stored_settings(data)
     return {
         "secret_updated": secret_updated,
         "webhook_updated": webhook_updated,
@@ -320,20 +303,23 @@ def save_settings(
 
 def settings_for_form() -> Dict[str, Any]:
     merged = _merged()
-    stored = _read_storage()
+    stored = read_stored_settings()
     stored_secret = _field_str(stored.get("secret_key"))
     stored_webhook = _field_str(stored.get("webhook_secret"))
-    env_secret = _valid_env_secret()
-    env_webhook = _valid_env_webhook()
+    env_secret = secret_key_valid(config.STRIPE_SECRET_KEY)
+    env_webhook = webhook_secret_valid(config.STRIPE_WEBHOOK_SECRET)
+    storage_label = "database" if _use_db_storage() else "file"
     return {
         "stripe_enabled": merged["stripe_enabled"],
-        "publishable_key": get_publishable_key_for_form(),
+        "publishable_key": get_publishable_key(),
         "has_secret": has_stored_secret(),
-        "secret_saved_in_file": bool(stored_secret),
-        "secret_from_env": bool(env_secret) and not stored_secret,
+        "secret_saved_in_storage": bool(stored_secret),
+        "secret_saved_in_file": bool(_field_str(_read_file().get("secret_key"))),
+        "secret_from_env": env_secret and not stored_secret,
         "has_webhook_secret": has_stored_webhook_secret(),
-        "webhook_saved_in_file": bool(stored_webhook),
-        "webhook_from_env": bool(env_webhook) and not stored_webhook,
+        "webhook_saved_in_storage": bool(stored_webhook),
+        "webhook_saved_in_file": bool(_field_str(_read_file().get("webhook_secret"))),
+        "webhook_from_env": env_webhook and not stored_webhook,
         "card_surcharge_percent": surcharge_percent(),
         "xero_payment_account_code": merged["xero_payment_account_code"],
         "credentials_ok": has_credentials(),
@@ -345,6 +331,5 @@ def settings_for_form() -> Dict[str, Any]:
         "webhook_url": "{0}/integrations/stripe/webhook".format(
             config.APP_BASE_URL.rstrip("/")
         ),
-        "settings_path": storage_description(),
-        "storage_backend": "postgres" if _uses_postgres_storage() else "file",
+        "settings_path": "{0} ({1})".format(SETTINGS_PATH.resolve(), storage_label),
     }

@@ -1,5 +1,6 @@
 """SQLite or PostgreSQL storage for bookings and staff."""
 
+import json
 import secrets
 import sqlite3
 from datetime import date
@@ -283,8 +284,62 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS integration_settings (
+                setting_key TEXT NOT NULL PRIMARY KEY,
+                setting_json TEXT NOT NULL DEFAULT '{}',
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """
+        )
         _ensure_columns(conn)
         _seed_crew_and_trucks(conn)
+        conn.commit()
+
+
+INTEGRATION_SETTING_STRIPE = "stripe"
+
+
+def get_integration_settings(key: str) -> Dict[str, Any]:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT setting_json FROM integration_settings WHERE setting_key = ?",
+            (key,),
+        ).fetchone()
+    if not row:
+        return {}
+    raw = row["setting_json"] if isinstance(row, dict) or hasattr(row, "keys") else row[0]
+    try:
+        data = json.loads(raw or "{}")
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+def save_integration_settings(key: str, data: Dict[str, Any]) -> None:
+    payload = json.dumps(data, indent=2)
+    with get_connection() as conn:
+        if db_backend.is_postgres():
+            conn.execute(
+                """
+                INSERT INTO integration_settings (setting_key, setting_json, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (setting_key) DO UPDATE SET
+                    setting_json = EXCLUDED.setting_json,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (key, payload),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO integration_settings
+                    (setting_key, setting_json, updated_at)
+                VALUES (?, ?, datetime('now'))
+                """,
+                (key, payload),
+            )
         conn.commit()
 
 
