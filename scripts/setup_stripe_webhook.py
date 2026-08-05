@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Register Stripe webhook for production and save signing secret locally."""
 
-import json
 import sys
 from pathlib import Path
 
@@ -49,22 +48,15 @@ def main() -> int:
         print("If you lost it, delete the endpoint in Stripe Dashboard and re-run this script.")
         return 1
 
-    settings_path = Path(stripe_config.SETTINGS_PATH)
-    data = {}
-    if settings_path.is_file():
-        data = json.loads(settings_path.read_text())
-    data["webhook_secret"] = secret
-    data["stripe_enabled"] = bool(data.get("stripe_enabled", True))
-    settings_path.parent.mkdir(parents=True, exist_ok=True)
-    settings_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    try:
-        import os
+    merged = stripe_config.settings_for_form()
+    stripe_config.merge_settings(
+        {
+            "webhook_secret": secret,
+            "stripe_enabled": merged.get("stripe_enabled", True),
+        }
+    )
 
-        os.chmod(settings_path, 0o600)
-    except OSError:
-        pass
-
-    print("Saved webhook secret to", settings_path)
+    print("Saved webhook secret to", stripe_config.storage_description())
     print("Add to Render env: STRIPE_WEBHOOK_SECRET=(value in stripe_settings.json)")
     print("Webhook URL:", PRODUCTION_WEBHOOK_URL)
     print("Events:", ", ".join(EVENTS))

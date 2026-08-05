@@ -1,9 +1,12 @@
 """Bootstrap production secrets from environment variables."""
 
 import json
+import logging
 from pathlib import Path
 
 import config
+
+logger = logging.getLogger(__name__)
 
 
 def _write_json_env(env_key: str, path: str) -> bool:
@@ -52,41 +55,42 @@ def bootstrap_production() -> None:
 
 
 def _bootstrap_stripe_settings() -> None:
-    """Write stripe_settings.json from env on Render (ephemeral disk)."""
+    """Seed Stripe settings from env without clearing UI-saved PostgreSQL storage."""
     if not config.PRODUCTION:
-        return
-    has_stripe_env = any(
-        [
-            config.STRIPE_PUBLISHABLE_KEY,
-            config.STRIPE_SECRET_KEY,
-            config.STRIPE_WEBHOOK_SECRET,
-        ]
-    )
-    if not has_stripe_env:
         return
     from integrations import stripe_config
 
-    merged = stripe_config.settings_for_form()
-    env_publishable = (config.STRIPE_PUBLISHABLE_KEY or "").strip()
-    if env_publishable and not stripe_config.publishable_key_valid(env_publishable):
-        env_publishable = ""
-    publishable_key = env_publishable or merged.get("publishable_key") or ""
-    stripe_config.save_settings(
-        stripe_enabled=config.STRIPE_ENABLED or merged.get("stripe_enabled", False),
-        publishable_key=publishable_key,
-        secret_key=config.STRIPE_SECRET_KEY or "",
-        webhook_secret=config.STRIPE_WEBHOOK_SECRET or "",
-        card_surcharge_percent=merged.get("card_surcharge_percent")
-        or stripe_config.DEFAULT_SURCHARGE_PERCENT,
-        xero_payment_account_code=merged.get("xero_payment_account_code") or "",
-    )
+    if config.STRIPE_SETTINGS_JSON:
+        try:
+            payload = json.loads(config.STRIPE_SETTINGS_JSON)
+            if isinstance(payload, dict):
+                stripe_config.import_settings(payload)
+                logger.info("Stripe settings imported from STRIPE_SETTINGS_JSON")
+        except json.JSONDecodeError:
+            logger.warning("STRIPE_SETTINGS_JSON is not valid JSON — skipped")
+
+    updates: dict = {}
+    publishable = (config.STRIPE_PUBLISHABLE_KEY or "").strip()
+    if stripe_config.publishable_key_valid(publishable):
+        updates["publishable_key"] = publishable
+    secret = (config.STRIPE_SECRET_KEY or "").strip()
+    if stripe_config.secret_key_valid(secret):
+        updates["secret_key"] = secret
+    webhook = (config.STRIPE_WEBHOOK_SECRET or "").strip()
+    if stripe_config.webhook_secret_valid(webhook):
+        updates["webhook_secret"] = webhook
+    if config.STRIPE_ENABLED:
+        updates["stripe_enabled"] = True
+
+    if not updates:
+        return
+
+    stripe_config.merge_settings(updates)
+    logger.info("Stripe settings merged from environment variables")
 
 
 def ensure_staff_user() -> None:
     """Create initial staff user when STAFF_USERNAME/STAFF_PASSWORD are set."""
-    import logging
-
-    logger = logging.getLogger(__name__)
     username = (config.STAFF_USERNAME or "").strip()
     password = (config.STAFF_PASSWORD or "").strip()
     if not username or not password:

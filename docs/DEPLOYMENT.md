@@ -66,7 +66,7 @@ Copy `.env.production.example` into Render **Environment** (or an Environment Gr
 | Twilio | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` |
 | Email | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` |
 
-On deploy, `production_bootstrap.py` writes `GOOGLE_TOKEN_JSON` and `XERO_TOKEN_JSON` to the credentials folder from env vars (Render disks are ephemeral).
+On deploy, `production_bootstrap.py` writes `GOOGLE_TOKEN_JSON`, `XERO_TOKEN_JSON`, and optional `STRIPE_SETTINGS_JSON` from env vars. Stripe settings saved in the UI are stored in PostgreSQL on Render (not the ephemeral disk).
 
 ---
 
