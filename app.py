@@ -501,6 +501,7 @@ def health_check():
         "production": config.PRODUCTION,
         "git_commit": os.environ.get("RENDER_GIT_COMMIT", "")[:12],
         "database": "postgres" if db_backend.is_postgres() else "sqlite",
+        "database_url_set": bool(config.get_database_url()),
         "stripe_storage": "database"
         if config.PRODUCTION and db_backend.is_postgres()
         else "file",

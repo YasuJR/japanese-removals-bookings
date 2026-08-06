@@ -66,7 +66,14 @@ Copy `.env.production.example` into Render **Environment** (or an Environment Gr
 | Twilio | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` |
 | Email | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` |
 
-On deploy, `production_bootstrap.py` writes `GOOGLE_TOKEN_JSON`, `XERO_TOKEN_JSON`, and optional `STRIPE_SETTINGS_JSON` from env vars. Stripe settings saved in the UI are stored in PostgreSQL on Render (not the ephemeral disk).
+On deploy, `production_bootstrap.py` writes `GOOGLE_TOKEN_JSON` and `XERO_TOKEN_JSON` from env vars. Stripe settings saved in the UI are stored in PostgreSQL when `DATABASE_URL` is linked (not on the ephemeral disk).
+
+If `/health` shows `"database":"sqlite"`, link the database:
+
+```bash
+render login   # or set RENDER_API_KEY from Dashboard → Account Settings → API Keys
+python scripts/render_link_database.py --deploy
+```
 
 ---
 

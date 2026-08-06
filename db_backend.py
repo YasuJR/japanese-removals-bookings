@@ -14,7 +14,9 @@ Params = Optional[Union[Sequence[Any], Dict[str, Any]]]
 
 
 def is_postgres() -> bool:
-    url = (getattr(config, "DATABASE_URL", "") or "").strip()
+    url = (getattr(config, "get_database_url", None) and config.get_database_url()) or (
+        getattr(config, "DATABASE_URL", "") or ""
+    ).strip()
     return url.startswith("postgres")
 
 
@@ -148,7 +150,10 @@ def get_connection() -> CompatConnection:
     if is_postgres():
         import psycopg2
 
-        raw = psycopg2.connect(config.DATABASE_URL)
+        raw = psycopg2.connect(
+            (config.get_database_url() if hasattr(config, "get_database_url") else "")
+            or config.DATABASE_URL
+        )
         raw.autocommit = False
         return CompatConnection(raw, True)
     db_path = Path(__file__).parent / "bookings.db"

@@ -36,7 +36,23 @@ def _env_path(key: str, default_relative: str) -> str:
 # Environment detection
 RENDER = _env_bool("RENDER") or bool(_env("RENDER_EXTERNAL_URL"))
 PRODUCTION = _env_bool("PRODUCTION") or RENDER
-DATABASE_URL = _env("DATABASE_URL")
+
+
+def get_database_url() -> str:
+    """Resolve PostgreSQL URL at runtime (Render injects DATABASE_URL on boot)."""
+    for key in (
+        "DATABASE_URL",
+        "POSTGRES_URL",
+        "POSTGRESQL_URL",
+        "INTERNAL_DATABASE_URL",
+    ):
+        value = os.environ.get(key, "").strip()
+        if value.startswith("postgres"):
+            return value
+    return ""
+
+
+DATABASE_URL = get_database_url() or _env("DATABASE_URL")
 RENDER_EXTERNAL_URL = _env("RENDER_EXTERNAL_URL").rstrip("/")
 PRODUCTION_DOMAIN = _env("PRODUCTION_DOMAIN")
 
