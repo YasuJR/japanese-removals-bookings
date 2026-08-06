@@ -112,16 +112,19 @@ class CompatConnection:
             cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             returning = False
             upper = sql_adapted.lstrip().upper()
-            if upper.startswith("INSERT") and "RETURNING" not in upper:
-                if "INTO PROCESSED_GMAIL_MESSAGES" not in upper:
-                    sql_adapted = sql_adapted.rstrip().rstrip(";") + " RETURNING id"
-                    returning = True
+            skip_returning = (
+                "INTO PROCESSED_GMAIL_MESSAGES" in upper
+                or "INTO INTEGRATION_SETTINGS" in upper
+            )
+            if upper.startswith("INSERT") and "RETURNING" not in upper and not skip_returning:
+                sql_adapted = sql_adapted.rstrip().rstrip(";") + " RETURNING id"
+                returning = True
             cur.execute(sql_adapted, params)
             wrapper = CompatCursorFixed(cur, True)
             if returning:
                 row = cur.fetchone()
                 wrapper.lastrowid = int(row["id"]) if row and row.get("id") is not None else None
-            if wrapper.lastrowid is None and upper.startswith("INSERT"):
+            if wrapper.lastrowid is None and upper.startswith("INSERT") and not skip_returning:
                 try:
                     cur.execute("SELECT lastval()")
                     seq_row = cur.fetchone()
