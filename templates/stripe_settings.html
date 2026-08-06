@@ -68,11 +68,10 @@
 
     <label class="checkbox-row">
       <input type="checkbox" name="stripe_enabled"
-        {% if stripe_form.stripe_enabled %}checked{% endif %}
-        {% if not stripe_form.can_enable_stripe %}disabled{% endif %}>
+        {% if stripe_form.stripe_enabled %}checked{% endif %}>
       STRIPE_ENABLED — allow Pay by Credit Card on invoices
     </label>
-    <p class="muted form-hint">Requires a valid secret key (saved above or from env). Publishable key is optional for Checkout but recommended for full configuration.</p>
+    <p class="muted form-hint">Check this and enter your secret key above, then Save. Publishable key is optional for Checkout.</p>
 
     <h3>Webhook</h3>
     <p class="muted form-hint">In Stripe Dashboard → Developers → Webhooks, add endpoint:</p>

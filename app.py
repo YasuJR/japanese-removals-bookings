@@ -928,6 +928,11 @@ def stripe_settings():
                     "(copy from Stripe Dashboard → Developers → API keys).",
                     "error",
                 )
+            elif result.get("stripe_enabled_rejected"):
+                flash(
+                    "Stripe not enabled — enter a valid secret key (sk_live_… or sk_test_…) and save again.",
+                    "error",
+                )
             elif result.get("secret_updated"):
                 flash("Stripe settings saved. Secret key stored securely.", "success")
             else:

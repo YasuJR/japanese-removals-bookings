@@ -243,16 +243,18 @@ def merge_env_overrides() -> None:
         if pk != _field_str(existing.get("publishable_key")):
             existing["publishable_key"] = pk
             changed = True
-    if secret_key_valid(config.STRIPE_SECRET_KEY) and not _field_str(
-        existing.get("secret_key")
-    ):
-        existing["secret_key"] = _field_str(config.STRIPE_SECRET_KEY)
-        changed = True
-    if webhook_secret_valid(config.STRIPE_WEBHOOK_SECRET) and not _field_str(
-        existing.get("webhook_secret")
-    ):
-        existing["webhook_secret"] = _field_str(config.STRIPE_WEBHOOK_SECRET)
-        changed = True
+    if secret_key_valid(config.STRIPE_SECRET_KEY):
+        env_sk = _field_str(config.STRIPE_SECRET_KEY)
+        stored_sk = _field_str(existing.get("secret_key"))
+        if not secret_key_valid(stored_sk):
+            existing["secret_key"] = env_sk
+            changed = True
+    if webhook_secret_valid(config.STRIPE_WEBHOOK_SECRET):
+        env_wh = _field_str(config.STRIPE_WEBHOOK_SECRET)
+        stored_wh = _field_str(existing.get("webhook_secret"))
+        if not webhook_secret_valid(stored_wh):
+            existing["webhook_secret"] = env_wh
+            changed = True
     if config.STRIPE_ENABLED and not existing.get("stripe_enabled"):
         existing["stripe_enabled"] = True
         changed = True
@@ -297,13 +299,15 @@ def save_settings(
         data["webhook_secret"] = existing_webhook
 
     has_secret = secret_key_valid(_field_str(data.get("secret_key")) or config.STRIPE_SECRET_KEY)
-    data["stripe_enabled"] = bool(stripe_enabled) and has_secret
+    requested_enabled = bool(stripe_enabled)
+    data["stripe_enabled"] = requested_enabled and has_secret
 
     write_stored_settings(data)
     return {
         "secret_updated": secret_updated,
         "webhook_updated": webhook_updated,
         "publishable_key_rejected": publishable_key_rejected,
+        "stripe_enabled_rejected": requested_enabled and not has_secret,
     }
 
 
