@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Link Render PostgreSQL to the web service by setting DATABASE_URL.
+"""Create/link Render PostgreSQL and set DATABASE_URL on the web service.
 
-Requires RENDER_API_KEY (Render Dashboard → Account Settings → API Keys).
+Auth: RENDER_API_KEY env var, or token from `render login` (~/.render/cli.yaml).
 
 Usage:
-  RENDER_API_KEY=rnd_... python scripts/render_link_database.py
-  RENDER_API_KEY=rnd_... python scripts/render_link_database.py --deploy
+  python scripts/render_link_database.py
+  python scripts/render_link_database.py --deploy
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -21,6 +21,8 @@ from pathlib import Path
 API_BASE = "https://api.render.com/v1"
 SERVICE_NAME = "japanese-removals-bookings"
 DATABASE_NAME = "japanese-removals-db"
+DATABASE_PLAN = "basic_256mb"
+POSTGRES_VERSION = "16"
 CLI_CONFIG_PATH = os.path.expanduser("~/.render/cli.yaml")
 
 
@@ -50,7 +52,7 @@ def _request(method: str, path: str, api_key: str, payload: dict | None = None) 
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=120) as resp:
             body = resp.read().decode("utf-8")
             return json.loads(body) if body else {}
     except urllib.error.HTTPError as exc:
@@ -72,12 +74,58 @@ def _unwrap(items: list) -> list:
     return out
 
 
-def _find_by_name(items: list, name: str, label: str) -> dict:
+def _find_by_name(items: list, name: str) -> dict | None:
     matches = [item for item in items if (item.get("name") or "") == name]
-    if not matches:
-        names = [item.get("name") for item in items]
-        raise SystemExit("{0} '{1}' not found. Found: {2}".format(label, name, names))
-    return matches[0]
+    return matches[0] if matches else None
+
+
+def _service_region(service: dict) -> str:
+    details = service.get("serviceDetails") or {}
+    return (details.get("region") or service.get("region") or "oregon").strip()
+
+
+def _ensure_database(api_key: str, service: dict) -> dict:
+    postgres_list = _unwrap(_request("GET", "/postgres?limit=100", api_key))
+    existing = _find_by_name(postgres_list, DATABASE_NAME)
+    if existing:
+        return existing
+
+    owner_id = (service.get("ownerId") or "").strip()
+    environment_id = (service.get("environmentId") or "").strip()
+    region = _service_region(service)
+    if not owner_id:
+        raise SystemExit("Could not read ownerId from Render service.")
+
+    print("Creating PostgreSQL '{0}' in {1}...".format(DATABASE_NAME, region))
+    payload = {
+        "name": DATABASE_NAME,
+        "plan": DATABASE_PLAN,
+        "ownerId": owner_id,
+        "region": region,
+        "version": POSTGRES_VERSION,
+    }
+    if environment_id:
+        payload["environmentId"] = environment_id
+
+    created = _request("POST", "/postgres", api_key, payload)
+    postgres_id = created.get("id")
+    if not postgres_id:
+        raise SystemExit("Render did not return a database id after create.")
+
+    print("Waiting for database {0} to become available...".format(postgres_id))
+    for attempt in range(60):
+        detail = _request("GET", "/postgres/{0}".format(postgres_id), api_key)
+        status = (detail.get("status") or "").strip()
+        if status == "available":
+            print("Database is available.")
+            return detail
+        if status in ("unavailable", "recovery_failed"):
+            raise SystemExit("Database entered status: {0}".format(status))
+        time.sleep(10)
+        if attempt % 3 == 0:
+            print("  status={0} ({1}s)".format(status or "unknown", (attempt + 1) * 10))
+
+    raise SystemExit("Timed out waiting for database to become available.")
 
 
 def main() -> int:
@@ -95,10 +143,12 @@ def main() -> int:
         return 1
 
     services = _unwrap(_request("GET", "/services?limit=100", api_key))
-    postgres_list = _unwrap(_request("GET", "/postgres?limit=100", api_key))
+    service = _find_by_name(services, SERVICE_NAME)
+    if not service:
+        names = [item.get("name") for item in services]
+        raise SystemExit("Service '{0}' not found. Found: {1}".format(SERVICE_NAME, names))
 
-    service = _find_by_name(services, SERVICE_NAME, "Service")
-    database = _find_by_name(postgres_list, DATABASE_NAME, "Database")
+    database = _ensure_database(api_key, service)
 
     service_id = service.get("id")
     postgres_id = database.get("id")
@@ -106,9 +156,9 @@ def main() -> int:
         raise SystemExit("Missing service or database id from Render API.")
 
     conn = _request("GET", "/postgres/{0}/connection-info".format(postgres_id), api_key)
-    db_url = (conn.get("internalConnectionString") or "").strip()
+    db_url = (conn.get("internalConnectionString") or conn.get("connectionString") or "").strip()
     if not db_url.startswith("postgres"):
-        raise SystemExit("Could not read internalConnectionString from Render.")
+        raise SystemExit("Could not read postgres connection string from Render.")
 
     _request(
         "PUT",

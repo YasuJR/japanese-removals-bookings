@@ -1,7 +1,7 @@
 databases:
   - name: japanese-removals-db
     plan: basic-256mb
-    region: singapore
+    region: oregon
     ipAllowList: []
 
 services:
@@ -9,7 +9,7 @@ services:
     name: japanese-removals-bookings
     runtime: python
     plan: starter
-    region: singapore
+    region: oregon
     repo: https://github.com/YasuJR/japanese-removals-bookings
     branch: main
     buildCommand: pip install -r requirements.txt
