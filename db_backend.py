@@ -121,6 +121,16 @@ class CompatConnection:
             if returning:
                 row = cur.fetchone()
                 wrapper.lastrowid = int(row["id"]) if row and row.get("id") is not None else None
+            if wrapper.lastrowid is None and upper.startswith("INSERT"):
+                try:
+                    cur.execute("SELECT lastval()")
+                    seq_row = cur.fetchone()
+                    if seq_row is not None:
+                        seq_val = seq_row.get("lastval") if isinstance(seq_row, dict) else seq_row[0]
+                        if seq_val is not None:
+                            wrapper.lastrowid = int(seq_val)
+                except Exception:
+                    pass
             return wrapper
         cur = self._conn.execute(sql_adapted, params)
         wrapper = CompatCursorFixed(cur, False)

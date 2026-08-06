@@ -663,7 +663,7 @@ def add_automation_log(
             ),
         )
         conn.commit()
-        return int(cursor.lastrowid)
+        return int(cursor.lastrowid or 0)
 
 
 def list_automation_logs(
