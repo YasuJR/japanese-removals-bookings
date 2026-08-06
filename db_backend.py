@@ -111,7 +111,7 @@ class CompatConnection:
 
             cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             returning = False
-            upper = sql_adapted.upper()
+            upper = sql_adapted.lstrip().upper()
             if upper.startswith("INSERT") and "RETURNING" not in upper:
                 if "INTO PROCESSED_GMAIL_MESSAGES" not in upper:
                     sql_adapted = sql_adapted.rstrip().rstrip(";") + " RETURNING id"
