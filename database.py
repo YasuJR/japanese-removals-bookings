@@ -753,6 +753,20 @@ def update_booking_status(booking_id: int, status: str) -> None:
         conn.commit()
 
 
+def update_booking_contact_fields(
+    booking_id: int,
+    *,
+    email: str = "",
+    phone: str = "",
+) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE bookings SET email = ?, phone = ? WHERE id = ?",
+            ((email or "").strip(), (phone or "").strip(), booking_id),
+        )
+        conn.commit()
+
+
 def add_automation_log(
     automation_type: str,
     status: str,

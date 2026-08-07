@@ -21,6 +21,18 @@ def test_send_enabled_with_email():
     return True
 
 
+def test_placeholder_email_uses_sms_when_phone_exists():
+    dest = invoice_send.resolve_send_destination(
+        {
+            "email": "info@japaneseremovals.com.au",
+            "phone": "0412987654",
+        }
+    )
+    assert dest["can_send"], dest
+    assert dest["method"] == "sms"
+    return True
+
+
 def test_send_enabled_with_phone_only():
     dest = invoice_send.resolve_send_destination({"email": "", "phone": "0412987654"})
     assert dest["can_send"], dest
@@ -74,6 +86,7 @@ def test_calendar_navigation_fields():
 def main():
     tests = [
         test_send_enabled_with_email,
+        test_placeholder_email_uses_sms_when_phone_exists,
         test_send_enabled_with_phone_only,
         test_send_disabled_without_contact,
         test_profit_panel_removed_from_edit_template,

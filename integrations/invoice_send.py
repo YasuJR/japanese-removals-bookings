@@ -12,6 +12,28 @@ import invoice_numbering
 from integrations import email_send, invoice_pdf, sms, stripe as stripe_service
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+COMPANY_EMAILS = frozenset({"info@japaneseremovals.com.au"})
+
+
+def _settings() -> Dict[str, Any]:
+    from integrations import company_config
+
+    return company_config.get_settings()
+
+
+def is_company_placeholder_email(email: str) -> bool:
+    """True when email is the company default, not a real customer address."""
+    text = (email or "").strip().lower()
+    if not text:
+        return False
+    if text in {e.lower() for e in COMPANY_EMAILS}:
+        return True
+    settings = _settings()
+    for key in ("default_email", "company_email"):
+        default = (settings.get(key) or "").strip().lower()
+        if default and text == default:
+            return True
+    return False
 
 
 def format_phone_display(phone: str) -> str:
@@ -26,13 +48,22 @@ def format_phone_display(phone: str) -> str:
 
 def resolve_send_destination(booking: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Pick email or SMS from the current booking record only.
-    Enable when either contact field is present on the booking.
+    Enable Send Invoice when the booking has an email and/or phone on record.
+    Choose email when a non-placeholder address exists; otherwise SMS when phone exists.
     """
     email = (booking.get("email") or "").strip()
     phone = (booking.get("phone") or "").strip()
 
-    if email:
+    if not email and not phone:
+        return {
+            "can_send": False,
+            "method": "",
+            "destination": "",
+            "destination_display": "",
+            "blocked_reason": "Customer email or phone number required.",
+        }
+
+    if email and not is_company_placeholder_email(email):
         return {
             "can_send": True,
             "method": "email",
@@ -48,6 +79,15 @@ def resolve_send_destination(booking: Dict[str, Any]) -> Dict[str, Any]:
             "method": "sms",
             "destination": phone,
             "destination_display": display,
+            "blocked_reason": "",
+        }
+
+    if email:
+        return {
+            "can_send": True,
+            "method": "email",
+            "destination": email,
+            "destination_display": email,
             "blocked_reason": "",
         }
 

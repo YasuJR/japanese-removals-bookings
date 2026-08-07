@@ -1770,6 +1770,11 @@ def edit_booking(booking_id):
             flash(msg, "success" if ok else "error")
             return redirect(url_for("edit_booking", booking_id=booking_id))
         if action == "send_invoice":
+            db.update_booking_contact_fields(
+                booking_id,
+                email=request.form.get("email", ""),
+                phone=request.form.get("phone", ""),
+            )
             ok, msg = services.send_customer_invoice(booking_id)
             flash(msg, "success" if ok else "error")
             return redirect(url_for("edit_booking", booking_id=booking_id))

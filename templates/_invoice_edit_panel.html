@@ -144,7 +144,8 @@
     <button type="submit" name="action" value="send_invoice" class="btn-primary btn-lg invoice-send-btn"
       {% if not invoice_send.can_send %}disabled title="{{ invoice_send.blocked_reason }}"{% endif %}
       data-send-method="{{ invoice_send.method }}"
-      data-send-destination="{{ invoice_send.destination_display }}">
+      data-send-destination="{{ invoice_send.destination_display }}"
+      data-default-email="{{ company_settings.default_email }}">
       Send Invoice
     </button>
     {% if customer_pay_url and payment_options.can_pay_now %}
