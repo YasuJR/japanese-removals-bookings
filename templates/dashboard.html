@@ -101,22 +101,23 @@
     <table class="sheet dashboard-sheet">
       <thead>
         <tr>
+          <th>Customer</th>
           <th>Status</th>
           <th>Availability</th>
           <th>Payment</th>
           <th>Date</th>
           <th>Start</th>
           <th>Finish</th>
-          <th>Customer</th>
           <th>Crew</th>
           <th>Movers</th>
-          <th>Pickup</th>
-          <th></th>
         </tr>
       </thead>
       <tbody>
         {% for b in jobs %}
         <tr>
+          <td class="customer-cell">
+            <a class="customer-link" href="{{ url_for('edit_booking', booking_id=b.id) }}"><strong>{{ b.customer_name }}</strong></a>
+          </td>
           <td class="nowrap">
             {% with status=b|booking_job_status %}
             {% include '_status_badge.html' %}
@@ -137,13 +138,8 @@
           </td>
           <td class="nowrap">{{ b|booking_start_time }}</td>
           <td class="nowrap">{{ b|booking_finish_time }}</td>
-          <td>{{ b.customer_name }}</td>
           <td class="nowrap">{{ b|booking_crew }}</td>
           <td class="center">{{ b.num_movers }}</td>
-          <td class="pickup-cell">{{ b.pickup_address }}</td>
-          <td class="actions-cell nowrap">
-            <a class="btn-secondary btn-sm" href="{{ url_for('edit_booking', booking_id=b.id) }}">Edit</a>
-          </td>
         </tr>
         {% endfor %}
       </tbody>

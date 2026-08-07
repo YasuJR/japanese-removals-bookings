@@ -138,6 +138,29 @@
     <p class="hint muted">Saves pricing, refreshes the customer invoice PDF, and updates the Xero draft if linked.</p>
   </div>
 
+  <div class="invoice-workflow-bar">
+    <a class="btn-secondary" href="{{ url_for('invoice_preview', booking_id=booking.id) }}" target="_blank">Invoice Preview</a>
+    <a class="btn-secondary" href="{{ url_for('invoice_pdf', booking_id=booking.id) }}" target="_blank">Download PDF</a>
+    <button type="submit" name="action" value="send_invoice" class="btn-primary btn-lg invoice-send-btn"
+      {% if not invoice_send.can_send %}disabled title="{{ invoice_send.blocked_reason }}"{% endif %}
+      data-send-method="{{ invoice_send.method }}"
+      data-send-destination="{{ invoice_send.destination_display }}">
+      Send Invoice
+    </button>
+    {% if customer_pay_url and payment_options.can_pay_now %}
+    <a class="btn-secondary" href="{{ customer_pay_url }}" target="_blank" rel="noopener">Open Pay Link</a>
+    {% endif %}
+  </div>
+  {% if not invoice_send.can_send %}
+  <p class="invoice-send-blocked muted">{{ invoice_send.blocked_reason }}</p>
+  {% endif %}
+
+  <div class="form-actions booking-save-actions">
+    <button type="submit" name="action" value="save" class="btn-primary">Save changes</button>
+    <a class="btn-secondary" href="{{ url_for('dashboard') }}">Cancel</a>
+    <a class="btn-secondary" href="{{ url_for('delete_booking', booking_id=booking.id) }}">Delete booking…</a>
+  </div>
+
   <details class="invoice-overrides-details">
     <summary>Invoice overrides &amp; bank details</summary>
     <p class="hint muted">Leave blank to use company defaults from Settings → Company defaults.</p>
@@ -173,3 +196,4 @@
 </section>
 
 <script src="{{ url_for('static', filename='invoice_pricing.js') }}"></script>
+<script src="{{ url_for('static', filename='invoice_send.js') }}"></script>

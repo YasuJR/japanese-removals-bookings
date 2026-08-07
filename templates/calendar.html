@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Calendar{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='calendar.css') }}">
+
+<section class="panel calendar-page">
+  <div class="calendar-toolbar">
+    <div class="calendar-nav">
+      <a class="btn-secondary btn-sm" href="{{ url_for('booking_calendar', view=cal.view, year=cal.prev_year, month=cal.prev_month, day=cal.prev_day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">‹ Previous</a>
+      <h2 class="calendar-title">{{ cal.title }}</h2>
+      <a class="btn-secondary btn-sm" href="{{ url_for('booking_calendar', view=cal.view, year=cal.next_year, month=cal.next_month, day=cal.next_day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Next ›</a>
+      <a class="btn-secondary btn-sm" href="{{ url_for('booking_calendar', view=cal.view, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Today</a>
+    </div>
+
+    <div class="calendar-view-tabs">
+      <a class="filter-pill{% if cal.view == 'month' %} active{% endif %}" href="{{ url_for('booking_calendar', view='month', year=cal.year, month=cal.month, day=cal.day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Month</a>
+      <a class="filter-pill{% if cal.view == 'week' %} active{% endif %}" href="{{ url_for('booking_calendar', view='week', year=cal.year, month=cal.month, day=cal.day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Week</a>
+      <a class="filter-pill{% if cal.view == 'day' %} active{% endif %}" href="{{ url_for('booking_calendar', view='day', year=cal.year, month=cal.month, day=cal.day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Day</a>
+    </div>
+
+    <form method="get" class="calendar-filters" id="calendar-filters">
+      <input type="hidden" name="view" value="{{ cal.view }}">
+      <input type="hidden" name="year" value="{{ cal.year }}">
+      <input type="hidden" name="month" value="{{ cal.month }}">
+      <input type="hidden" name="day" value="{{ cal.day }}">
+      <label>
+        Status
+        <select name="status" onchange="this.form.submit()">
+          {% for key, label in cal.status_filters %}
+          <option value="{{ key }}"{% if cal.filters.status == key %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Crew
+        <select name="crew" onchange="this.form.submit()">
+          <option value="all">All</option>
+          {% for name in cal.crew_options %}
+          <option value="{{ name }}"{% if cal.filters.crew == name %} selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Truck
+        <select name="truck" onchange="this.form.submit()">
+          <option value="all">All</option>
+          {% for truck in cal.truck_options %}
+          <option value="{{ truck }}"{% if cal.filters.truck == truck %} selected{% endif %}>{{ truck }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Payment
+        <select name="payment" onchange="this.form.submit()">
+          {% for key, label in cal.payment_filters %}
+          <option value="{{ key }}"{% if cal.filters.payment == key %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+  </div>
+
+  {% if cal.view == 'month' %}
+  <div class="calendar-month">
+    <div class="calendar-weekdays">
+      {% for label in cal.weekday_labels %}
+      <div class="calendar-weekday">{{ label[:3] }}</div>
+      {% endfor %}
+    </div>
+    {% for week in cal.month_grid %}
+    <div class="calendar-week">
+      {% for cell in week %}
+      <div class="calendar-day{% if not cell.in_month %} calendar-day-outside{% endif %}{% if cell.is_today %} calendar-day-today{% endif %}"
+           data-date="{{ cell.date }}" tabindex="0" role="button" aria-label="Day {{ cell.date }}">
+        <div class="calendar-day-head">
+          <span class="calendar-day-num">{{ cell.day }}</span>
+          {% if cell.has_conflict %}<span class="calendar-conflict-badge">CONFLICT</span>{% endif %}
+        </div>
+        <div class="calendar-day-body">
+          {% for booking in cell.bookings %}
+          <a class="calendar-booking cal-{{ booking.status_class }}" href="{{ booking.edit_url }}"
+             data-booking-id="{{ booking.id }}">
+            <span class="cal-booking-time">{{ booking.time_range }}</span>
+            <strong class="cal-booking-customer">{{ booking.customer_name }}</strong>
+            <span class="cal-booking-meta">{{ booking.num_movers }} movers · {{ booking.crew }}</span>
+            <span class="cal-booking-status">{{ booking.status|upper }}</span>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% elif cal.view == 'week' %}
+  <div class="calendar-week-grid">
+    <div class="calendar-week-time-col">
+      <div class="calendar-week-corner"></div>
+      {% for slot in cal.time_slots %}
+      <div class="calendar-time-label">{{ slot }}</div>
+      {% endfor %}
+    </div>
+    {% for day in cal.week_days %}
+    <div class="calendar-week-col{% if day.is_today %} calendar-day-today{% endif %}">
+      <div class="calendar-week-col-head">
+        {{ day.label }}
+        {% if day.has_conflict %}<span class="calendar-conflict-badge">CONFLICT</span>{% endif %}
+      </div>
+      <div class="calendar-week-slots">
+        {% for slot in cal.time_slots %}
+        <div class="calendar-slot" data-date="{{ day.date }}"></div>
+        {% endfor %}
+        {% for booking in day.bookings %}
+        <a class="calendar-week-booking cal-{{ booking.status_class }}" href="{{ booking.edit_url }}"
+           style="--cal-start: {{ booking.start_minutes }}; --cal-duration: {{ (booking.duration_hours * 60)|int }};">
+          <strong>{{ booking.customer_name }}</strong>
+          <span>{{ booking.time_range }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="calendar-day-view">
+    <div class="calendar-day-view-head">
+      <h3>{{ cal.title }}</h3>
+      {% if cal.events %}
+      {% set has_conflict = cal.events | selectattr('has_conflict') | list | length > 0 %}
+      {% if has_conflict %}<span class="calendar-conflict-badge">CONFLICT</span>{% endif %}
+      {% endif %}
+    </div>
+    <div class="calendar-day-view-list">
+      {% for booking in cal.events %}
+      <a class="calendar-booking cal-{{ booking.status_class }} calendar-booking-large" href="{{ booking.edit_url }}">
+        <span class="cal-booking-time">{{ booking.time_range }}</span>
+        <strong class="cal-booking-customer">{{ booking.customer_name }}</strong>
+        <span class="cal-booking-meta">{{ booking.num_movers }} movers · {{ booking.crew }} · {{ booking.truck_assigned or 'No truck' }}</span>
+        <span class="cal-booking-status">{{ booking.status|upper }} · {{ booking.payment_status }}</span>
+      </a>
+      {% else %}
+      <p class="empty muted">No bookings on this day.</p>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+<aside class="calendar-day-panel" id="calendar-day-panel" hidden>
+  <div class="calendar-day-panel-inner">
+    <button type="button" class="calendar-day-panel-close" id="calendar-day-panel-close" aria-label="Close">×</button>
+    <h3 id="calendar-day-panel-title">Day</h3>
+    <div id="calendar-day-panel-content"></div>
+    <a class="btn-primary btn-sm" id="calendar-new-booking-link" href="{{ url_for('new_booking') }}">+ New Booking</a>
+  </div>
+</aside>
+
+<script>
+  window.CALENDAR_DAY_DATA = {{ cal.events_by_date | tojson }};
+  window.CALENDAR_TODAY = "{{ cal.today_iso }}";
+</script>
+<script src="{{ url_for('static', filename='calendar.js') }}"></script>
+{% endblock %}

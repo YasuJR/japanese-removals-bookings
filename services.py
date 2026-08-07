@@ -530,4 +530,5 @@ def update_booking_invoice(booking_id: int, form) -> Tuple[bool, List[str], str]
 
 
 def send_customer_invoice(booking_id: int) -> Tuple[bool, str]:
-    return invoice_send_service.send_customer_invoice(booking_id)
+    ok, msg, _method = invoice_send_service.send_customer_invoice(booking_id)
+    return ok, msg

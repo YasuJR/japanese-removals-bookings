@@ -11,6 +11,7 @@ import io
 import os
 import secrets
 from datetime import date, datetime, timedelta
+from calendar import monthrange
 
 from flask import (
     Flask,
@@ -67,6 +68,7 @@ from daily_checklist_data import build_daily_checklist
 from quote_form import parse_quote_form
 from integrations import website_quote, sms_inbound
 from dashboard_data import build_dashboard, dashboard_jobs
+import calendar_data
 from display_dates import format_display_date, get_weekday_class
 import automation
 import invoice
@@ -1262,6 +1264,34 @@ def dashboard():
     )
 
 
+@app.route("/calendar", endpoint="booking_calendar")
+@auth.login_required
+def booking_calendar():
+    today = date.today()
+    view = request.args.get("view", "month").strip().lower()
+    try:
+        year = int(request.args.get("year", today.year))
+        month = int(request.args.get("month", today.month))
+        day = int(request.args.get("day", today.day))
+    except (TypeError, ValueError):
+        year, month, day = today.year, today.month, today.day
+    month = max(1, min(12, month))
+    day = max(1, min(monthrange(year, month)[1], day))
+
+    cal = calendar_data.build_calendar_context(
+        view=view,
+        year=year,
+        month=month,
+        day=day,
+        status_filter=request.args.get("status", "all").strip(),
+        crew_filter=request.args.get("crew", "all").strip(),
+        truck_filter=request.args.get("truck", "all").strip(),
+        payment_filter=request.args.get("payment", "all").strip(),
+        today=today,
+    )
+    return render_template("calendar.html", cal=cal)
+
+
 @app.route("/settings/gmail", methods=["GET", "POST"])
 @auth.login_required
 def gmail_settings():
@@ -1481,6 +1511,9 @@ def new_booking():
         return redirect(url_for("ceo_dashboard"))
 
     form = _booking_form_defaults()
+    move_date = request.args.get("move_date", "").strip()
+    if move_date:
+        form["move_date"] = move_date
     return render_template(
         "new_booking.html",
         form=form,

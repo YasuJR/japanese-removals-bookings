@@ -23,6 +23,7 @@
       <nav id="main-nav" class="main-nav">
         <a href="{{ url_for('ceo_dashboard') }}" class="{% if request.endpoint == 'ceo_dashboard' %}active{% endif %}">Home</a>
         <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="{{ url_for('booking_calendar') }}" class="{% if request.endpoint == 'booking_calendar' %}active{% endif %}">Calendar</a>
         <a href="{{ url_for('executive_dashboard') }}" class="{% if request.endpoint == 'executive_dashboard' %}active{% endif %}">Executive</a>
         <a href="{{ url_for('profit') }}" class="{% if request.endpoint in ('profit', 'profit_export_csv') %}active{% endif %}">Profit</a>
         <a href="{{ url_for('outstanding_invoices') }}" class="{% if request.endpoint == 'outstanding_invoices' %}active{% endif %}">Invoices</a>

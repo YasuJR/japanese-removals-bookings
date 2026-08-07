@@ -2,39 +2,16 @@
 
 import re
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 import automation
 import config
 import database as db
 import invoice
 import invoice_numbering
-from integrations import company_config, email_send, invoice_pdf, sms, stripe as stripe_service
+from integrations import email_send, invoice_pdf, sms, stripe as stripe_service
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-COMPANY_EMAILS = (
-    "info@japaneseremovals.com.au",
-)
-
-
-def _settings() -> Dict[str, Any]:
-    return company_config.get_settings()
-
-
-def is_valid_customer_email(email: str) -> bool:
-    """True when email is a real customer address (not blank or company default)."""
-    text = (email or "").strip()
-    if not text or not EMAIL_RE.match(text):
-        return False
-    lowered = text.lower()
-    settings = _settings()
-    blocked = {
-        (settings.get("default_email") or "").strip().lower(),
-        (settings.get("company_email") or "").strip().lower(),
-    }
-    blocked.update(e.lower() for e in COMPANY_EMAILS)
-    blocked.discard("")
-    return lowered not in blocked
 
 
 def format_phone_display(phone: str) -> str:
@@ -50,17 +27,17 @@ def format_phone_display(phone: str) -> str:
 def resolve_send_destination(booking: Dict[str, Any]) -> Dict[str, Any]:
     """
     Pick email or SMS from the current booking record only.
-    Never use company/default email as recipient.
+    Enable when either contact field is present on the booking.
     """
     email = (booking.get("email") or "").strip()
     phone = (booking.get("phone") or "").strip()
 
-    if is_valid_customer_email(email):
+    if email:
         return {
             "can_send": True,
             "method": "email",
             "destination": email,
-            "confirm_message": "Send invoice to {0}?".format(email),
+            "destination_display": email,
             "blocked_reason": "",
         }
 
@@ -70,9 +47,7 @@ def resolve_send_destination(booking: Dict[str, Any]) -> Dict[str, Any]:
             "can_send": True,
             "method": "sms",
             "destination": phone,
-            "confirm_message": "No customer email. Send invoice by text to {0}?".format(
-                display
-            ),
+            "destination_display": display,
             "blocked_reason": "",
         }
 
@@ -80,7 +55,7 @@ def resolve_send_destination(booking: Dict[str, Any]) -> Dict[str, Any]:
         "can_send": False,
         "method": "",
         "destination": "",
-        "confirm_message": "",
+        "destination_display": "",
         "blocked_reason": "Customer email or phone number required.",
     }
 
@@ -174,18 +149,18 @@ def _log_send(
         )
 
 
-def send_customer_invoice(booking_id: int) -> Tuple[bool, str]:
-    """Send invoice PDF by email or pay link by SMS using current booking contact."""
+def send_customer_invoice(booking_id: int) -> Tuple[bool, str, str]:
+    """Send invoice PDF by email or pay link by SMS. Returns (ok, message, method)."""
     row = db.get_booking(booking_id)
     if not row:
-        return False, "Booking not found."
+        return False, "Booking not found.", ""
 
     from services import booking_to_dict
 
     booking = booking_to_dict(row)
     dest = resolve_send_destination(booking)
     if not dest["can_send"]:
-        return False, dest["blocked_reason"]
+        return False, dest["blocked_reason"], ""
 
     resolved = invoice.resolve_booking_invoice(booking)
     totals = invoice.calculate_invoice_totals(resolved)
@@ -196,12 +171,12 @@ def send_customer_invoice(booking_id: int) -> Tuple[bool, str]:
 
     if method == "email":
         if not email_send.is_configured():
-            return False, "Email not configured — add SMTP settings to .env."
+            return False, "Email not configured — add SMTP settings to .env.", method
         try:
             pdf_bytes = invoice_pdf.generate_invoice_pdf(resolved)
         except Exception as exc:
             _log_send(booking_id, destination, method, invoice_number, False, str(exc))
-            return False, "Could not generate invoice PDF: {0}".format(exc)
+            return False, "Could not generate invoice PDF: {0}".format(exc), method
 
         filename = "Invoice-{0}.pdf".format(
             invoice_number.replace("/", "-") if invoice_number else booking_id
@@ -216,12 +191,12 @@ def send_customer_invoice(booking_id: int) -> Tuple[bool, str]:
         )
         _log_send(booking_id, destination, method, invoice_number, ok, msg)
         if ok:
-            return True, "Invoice sent by email to {0}.".format(destination)
-        return False, msg
+            return True, "✓ Invoice sent successfully.", method
+        return False, msg, method
 
     if method == "sms":
         if not sms.is_configured():
-            return False, "SMS not configured — add Twilio settings to .env."
+            return False, "SMS not configured — add Twilio settings to .env.", method
         body = _sms_body(booking, totals, pay_url)
         ok, msg, _sid = sms.send_message(
             booking,
@@ -231,8 +206,7 @@ def send_customer_invoice(booking_id: int) -> Tuple[bool, str]:
         )
         _log_send(booking_id, destination, method, invoice_number, ok, msg)
         if ok:
-            display = format_phone_display(destination)
-            return True, "Invoice sent by SMS to {0}.".format(display)
-        return False, msg
+            return True, "✓ SMS sent successfully.", method
+        return False, msg, method
 
-    return False, dest["blocked_reason"]
+    return False, dest["blocked_reason"], ""
