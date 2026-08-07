@@ -1,0 +1,175 @@
+<section class="invoice-panel invoice-pricing-panel" id="invoice-pricing-panel"
+         data-calculate-url="{{ url_for('invoice_calculate', booking_id=booking.id) }}">
+  <h3>Invoice</h3>
+
+  {% if invoice_send.sent_at %}
+  <div class="invoice-send-status">
+    <p class="invoice-send-status-title">Invoice sent{% if invoice_send.sent_method == 'sms' %} by SMS{% endif %}</p>
+    {% if invoice_send.sent_method == 'sms' %}
+    <p>Phone: <strong>{{ invoice_send.sent_to_display }}</strong></p>
+    {% else %}
+    <p>Email: <strong>{{ invoice_send.sent_to }}</strong></p>
+    {% endif %}
+    <p class="muted">Time: {{ invoice_send.sent_at[:16] }}</p>
+  </div>
+  {% endif %}
+
+  <div class="invoice-meta-row muted">
+    {% if invoice_summary.invoice_number %}
+    <span>Invoice # <strong>{{ invoice_summary.invoice_number }}</strong></span>
+    {% endif %}
+    <span>Status: <span class="status-pill status-invoice">{{ invoice_summary.invoice_status }}</span></span>
+    <span>Payment: {% with payment_status=invoice_summary.payment_status %}{% include '_payment_badge.html' %}{% endwith %}</span>
+    {% if xero_invoice_draft %}
+    <span class="muted">Xero draft syncs when you update the invoice</span>
+    {% elif xero_invoice_locked %}
+    <span class="muted">Authorised/paid in Xero — create a new invoice version to change pricing</span>
+    {% endif %}
+  </div>
+
+  <h4 class="pricing-heading">Pricing</h4>
+
+  <div class="pricing-controls">
+    <div class="pricing-row">
+      <label class="pricing-label" for="pricing_hourly_rate">Hourly rate ($)</label>
+      <div class="pricing-input-group">
+        <button type="button" class="stepper-btn" data-step-target="hourly_rate" data-step="-10" aria-label="Decrease hourly rate">−</button>
+        <input type="number" name="hourly_rate" id="pricing_hourly_rate" class="pricing-input"
+               min="0" step="0.01"
+               value="{{ form.get('hourly_rate', company_settings.default_hourly_rate) }}">
+        <button type="button" class="stepper-btn" data-step-target="hourly_rate" data-step="10" aria-label="Increase hourly rate">+</button>
+      </div>
+    </div>
+
+    <div class="pricing-row">
+      <label class="pricing-label" for="pricing_duration_hours">Duration (hours)</label>
+      <div class="pricing-input-group">
+        <button type="button" class="stepper-btn" data-step-target="duration_hours" data-step="-0.5" aria-label="Decrease duration">−</button>
+        <input type="number" name="duration_hours" id="pricing_duration_hours" class="pricing-input"
+               min="0.5" max="24" step="0.5"
+               value="{{ form.get('duration_hours', '1') }}">
+        <button type="button" class="stepper-btn" data-step-target="duration_hours" data-step="0.5" aria-label="Increase duration">+</button>
+      </div>
+    </div>
+
+    <div class="pricing-row pricing-row-readonly">
+      <span class="pricing-label">Labour</span>
+      <span class="pricing-value" id="live-labour-total">{{ (invoice_summary.hourly_rate * invoice_summary.hours)|format_aud }}</span>
+    </div>
+
+    <div class="pricing-row">
+      <label class="pricing-label" for="pricing_callout_fee">Callout fee ($)</label>
+      <div class="pricing-input-group">
+        <button type="button" class="stepper-btn" data-step-target="callout_fee" data-step="-10" aria-label="Decrease callout fee">−</button>
+        <input type="number" name="callout_fee" id="pricing_callout_fee" class="pricing-input"
+               min="0" step="0.01"
+               value="{{ form.get('callout_fee', company_settings.default_callout_fee) }}">
+        <button type="button" class="stepper-btn" data-step-target="callout_fee" data-step="10" aria-label="Increase callout fee">+</button>
+      </div>
+    </div>
+
+    <div class="pricing-row pricing-row-full">
+      <span class="pricing-label">Extra charges</span>
+      <div class="extra-charges-inline">
+        <div class="extra-charges-table-wrap">
+          <table class="extra-charges-table" id="extra-charges-table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>Qty</th>
+                <th>Unit ($)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="extra-charges-body">
+              {% set charges = form.get('extra_charges', []) %}
+              {% for item in charges %}
+              <tr class="extra-charge-row">
+                <td><input type="text" name="extra_description" value="{{ item.description }}" placeholder="e.g. Stairs Fee"></td>
+                <td><input type="number" name="extra_quantity" min="0.01" step="0.01" value="{{ item.quantity }}"></td>
+                <td><input type="number" name="extra_unit_price" min="0" step="0.01" value="{{ item.unit_price }}"></td>
+                <td><button type="button" class="btn-secondary btn-sm extra-charge-remove">Remove</button></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <button type="button" class="btn-secondary btn-sm" id="extra-charge-add">+ Add charge</button>
+        <span class="pricing-value" id="live-extras-total">{{ invoice_summary.extras_total|format_aud }}</span>
+      </div>
+    </div>
+
+    <div class="pricing-row">
+      <label class="checkbox-label pricing-gst-label">
+        <input type="checkbox" name="gst_enabled" id="pricing_gst_enabled"
+               {% if form.get('gst_enabled', company_settings.default_gst_enabled) %}checked{% endif %}>
+        GST inclusive pricing (10%)
+      </label>
+    </div>
+  </div>
+
+  <dl class="invoice-totals-live">
+    <div class="invoice-totals-row" id="live-net-row" {% if not invoice_summary.gst_enabled %}hidden{% endif %}>
+      <dt>Net sales (ex GST)</dt>
+      <dd id="live-net-sales">{{ invoice_summary.net_sales|format_aud }}</dd>
+    </div>
+    <div class="invoice-totals-row" id="live-gst-row" {% if not invoice_summary.gst_enabled %}hidden{% endif %}>
+      <dt>GST</dt>
+      <dd id="live-gst-amount">{{ invoice_summary.gst_amount|format_aud }}</dd>
+    </div>
+    <div class="invoice-totals-divider"></div>
+    <div class="invoice-totals-row invoice-totals-highlight">
+      <dt>Bank transfer</dt>
+      <dd id="live-bank-total">{{ payment_options.bank_total_display }}</dd>
+    </div>
+    <div class="invoice-totals-row invoice-totals-highlight">
+      <dt>Credit card</dt>
+      <dd>
+        <span id="live-card-total">{{ payment_options.card_total_display }}</span>
+        <span class="muted invoice-surcharge-note" id="live-surcharge-note">+{{ payment_options.surcharge_percent_display }}% surcharge</span>
+      </dd>
+    </div>
+  </dl>
+
+  <div class="invoice-update-actions">
+    <button type="submit" name="action" value="update_invoice" class="btn-primary btn-lg">
+      Update Invoice
+    </button>
+    <p class="hint muted">Saves pricing, refreshes the customer invoice PDF, and updates the Xero draft if linked.</p>
+  </div>
+
+  <details class="invoice-overrides-details">
+    <summary>Invoice overrides &amp; bank details</summary>
+    <p class="hint muted">Leave blank to use company defaults from Settings → Company defaults.</p>
+    <div class="invoice-fields form-grid">
+      <label>
+        Bank account name
+        <input type="text" name="invoice_bank_account_name"
+               placeholder="{{ company_settings.bank_account_name }}"
+               value="{{ form.get('invoice_bank_account_name', '') }}">
+      </label>
+      <label>
+        Bank BSB
+        <input type="text" name="invoice_bank_bsb"
+               placeholder="{{ company_settings.bank_bsb }}"
+               value="{{ form.get('invoice_bank_bsb', '') }}">
+      </label>
+      <label>
+        Bank account number
+        <input type="text" name="invoice_bank_account"
+               placeholder="{{ company_settings.bank_account_number }}"
+               value="{{ form.get('invoice_bank_account', '') }}">
+      </label>
+      <label class="full-width">
+        Invoice text
+        <textarea name="invoice_custom_text" rows="3"
+                  placeholder="Optional extra invoice text">{{ form.get('invoice_custom_text', '') }}</textarea>
+      </label>
+    </div>
+  </details>
+
+  <input type="hidden" name="payment_status" value="{{ form.get('payment_status', 'Unpaid') }}">
+  <input type="hidden" name="invoice_status" value="{{ form.get('invoice_status', '') }}">
+</section>
+
+<script src="{{ url_for('static', filename='invoice_pricing.js') }}"></script>

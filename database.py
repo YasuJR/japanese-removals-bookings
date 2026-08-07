@@ -77,6 +77,9 @@ BOOKING_EXTRA_COLUMNS = [
     ("payment_reminders_cancelled_at", "TEXT"),
     ("truck_assigned", "TEXT"),
     ("source", "TEXT"),
+    ("invoice_sent_at", "TEXT"),
+    ("invoice_sent_to", "TEXT"),
+    ("invoice_sent_method", "TEXT"),
 ]
 
 
@@ -611,6 +614,9 @@ def update_booking_integration_fields(
         "payment_reminders_cancelled_at",
         "truck_assigned",
         "source",
+        "invoice_sent_at",
+        "invoice_sent_to",
+        "invoice_sent_method",
     }
     parts = []
     values = []

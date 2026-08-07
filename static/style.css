@@ -1004,6 +1004,188 @@ body {
   margin-top: 0.5rem;
 }
 
+.invoice-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+  padding: 0.85rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.invoice-action-bar .btn-lg {
+  padding: 0.55rem 1.25rem;
+  font-size: 1rem;
+}
+
+.invoice-send-blocked {
+  margin: -0.35rem 0 0.85rem;
+}
+
+.invoice-pricing-panel .pricing-heading {
+  margin: 1rem 0 0.65rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.pricing-controls {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.pricing-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 11rem) 1fr;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.pricing-row-full {
+  grid-template-columns: 1fr;
+}
+
+.pricing-row-readonly {
+  padding: 0.15rem 0;
+}
+
+.pricing-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.pricing-value {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.pricing-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 16rem;
+}
+
+.pricing-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.stepper-btn {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stepper-btn:hover {
+  background: var(--bg);
+}
+
+.extra-charges-inline {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.invoice-totals-live {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.invoice-totals-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0;
+  padding: 0.25rem 0;
+}
+
+.invoice-totals-row dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.invoice-totals-row dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.invoice-totals-divider {
+  border-top: 1px solid var(--border);
+  margin: 0.5rem 0;
+}
+
+.invoice-totals-highlight dd {
+  font-size: 1.05rem;
+  color: var(--accent);
+}
+
+.invoice-surcharge-note {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+
+.invoice-update-actions {
+  margin: 1rem 0;
+}
+
+.invoice-update-actions .btn-lg {
+  width: 100%;
+  max-width: 20rem;
+  padding: 0.65rem 1.5rem;
+  font-size: 1.05rem;
+}
+
+.invoice-send-status {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  background: #d4edda;
+  border: 1px solid #b8dfc4;
+  border-radius: 8px;
+}
+
+.invoice-send-status-title {
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+}
+
+.invoice-send-status p {
+  margin: 0.15rem 0;
+}
+
+.invoice-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.invoice-overrides-details {
+  margin-top: 1rem;
+}
+
+.invoice-overrides-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
 .status-pill {
   display: inline-block;
   padding: 0.15rem 0.5rem;

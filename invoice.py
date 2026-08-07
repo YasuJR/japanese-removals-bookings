@@ -114,6 +114,20 @@ def invoice_summary(booking: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def calculate_from_form_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Invoice totals from parsed form pricing fields (no DB read)."""
+    booking = {
+        "hourly_rate": data.get("hourly_rate", 0),
+        "callout_fee": data.get("callout_fee", 0),
+        "duration_hours": data.get("duration_hours"),
+        "start_time": data.get("start_time", ""),
+        "finish_time": data.get("finish_time", ""),
+        "gst_enabled": data.get("gst_enabled", 0),
+        "extra_charges": data.get("extra_charges") or [],
+    }
+    return calculate_invoice_totals(booking)
+
+
 def format_aud(amount: float) -> str:
     return "${0:,.2f}".format(amount)
 

@@ -16,6 +16,7 @@ from flask import (
     Flask,
     flash,
     g,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -288,6 +289,7 @@ def _edit_booking_extras(row) -> dict:
         "payment_reminder_badges": payment_reminder_automation.badges_for_booking(
             booking
         ),
+        **services.invoice_send_context(booking),
         **_double_booking_context(booking),
     }
 
@@ -1715,6 +1717,29 @@ def edit_booking(booking_id):
             ok, msg = services.cancel_payment_reminders(booking_id)
             flash(msg, "success" if ok else "error")
             return redirect(url_for("edit_booking", booking_id=booking_id))
+        if action == "update_invoice":
+            ok, errors, msg = services.update_booking_invoice(
+                booking_id, request.form
+            )
+            if errors:
+                for err in errors:
+                    flash(err, "error")
+                row = db.get_booking(booking_id)
+                data, _ = parse_booking_form(request.form)
+                return render_template(
+                    "edit_booking.html",
+                    booking=row,
+                    form=data,
+                    status=_integration_status(),
+                    pricing_panel_mode=True,
+                    **_edit_booking_extras(row),
+                )
+            flash(msg, "success" if ok else "error")
+            return redirect(url_for("edit_booking", booking_id=booking_id))
+        if action == "send_invoice":
+            ok, msg = services.send_customer_invoice(booking_id)
+            flash(msg, "success" if ok else "error")
+            return redirect(url_for("edit_booking", booking_id=booking_id))
 
         previous_status = job_status.display(services.booking_to_dict(row))
         ok, errors, data = _update_booking_from_form(booking_id, request.form)
@@ -1733,6 +1758,7 @@ def edit_booking(booking_id):
                 form=data,
                 status=_integration_status(),
                 crew_warnings=crew_warnings,
+                pricing_panel_mode=True,
                 **_edit_booking_extras(row),
                 **ctx,
             )
@@ -1786,7 +1812,47 @@ def edit_booking(booking_id):
         form=form,
         status=_integration_status(),
         crew_warnings=_crew_warnings_for_data(form, booking_id=booking_id),
+        pricing_panel_mode=True,
         **_edit_booking_extras(row),
+    )
+
+
+@app.route("/bookings/<int:booking_id>/invoice/calculate", methods=["POST"])
+@auth.login_required
+def invoice_calculate(booking_id):
+    row = db.get_booking(booking_id)
+    if row is None:
+        return jsonify({"error": "Booking not found."}), 404
+
+    data, errors = parse_booking_form(request.form)
+    if errors:
+        return jsonify({"error": errors[0]}), 400
+
+    totals = invoice.calculate_from_form_data(data)
+    payment = stripe_service.payment_options_for_booking(
+        services.booking_to_dict(row),
+        base_total=totals["total"],
+    )
+    labour_only = round(
+        float(totals["hourly_rate"]) * float(totals["hours"]), 2
+    )
+    return jsonify(
+        {
+            "labour_total": labour_only,
+            "labour_gross": totals["labour_gross"],
+            "extras_total": totals["extras_total"],
+            "net_sales": totals["net_sales"],
+            "gst_amount": totals["gst_amount"],
+            "total": totals["total"],
+            "gst_enabled": totals["gst_enabled"],
+            "hours": totals["hours"],
+            "bank_total": payment["bank_total"],
+            "bank_total_display": payment["bank_total_display"],
+            "card_total": payment["card_total"],
+            "card_total_display": payment["card_total_display"],
+            "surcharge_percent_display": payment["surcharge_percent_display"],
+            "surcharge_display": payment["surcharge_display"],
+        }
     )
 
 

@@ -23,6 +23,7 @@ from integrations import (
 )
 from integrations import stripe as stripe_service
 import booking_profit
+from integrations import invoice_send as invoice_send_service
 
 
 def booking_to_dict(row: Any) -> Dict[str, Any]:
@@ -454,3 +455,73 @@ def resend_eta_sms(
         manual_eta_minutes=manual_eta_minutes,
         driver_origin=driver_origin,
     )
+
+
+def invoice_send_context(booking: Dict[str, Any]) -> Dict[str, Any]:
+    """Template context for Send Invoice button and status."""
+    dest = invoice_send_service.resolve_send_destination(booking)
+    sent_at = (booking.get("invoice_sent_at") or "").strip()
+    sent_to = (booking.get("invoice_sent_to") or "").strip()
+    sent_method = (booking.get("invoice_sent_method") or "").strip()
+    return {
+        "invoice_send": {
+            **dest,
+            "sent_at": sent_at,
+            "sent_to": sent_to,
+            "sent_method": sent_method,
+            "sent_to_display": (
+                invoice_send_service.format_phone_display(sent_to)
+                if sent_method == "sms"
+                else sent_to
+            ),
+        }
+    }
+
+
+def update_booking_invoice(booking_id: int, form) -> Tuple[bool, List[str], str]:
+    """
+    Save booking pricing from form, sync Xero draft if linked, refresh pay link.
+    Returns (ok, errors, flash_message).
+    """
+    from validators import parse_booking_form
+
+    parsed, errors = parse_booking_form(form)
+    if errors:
+        return False, errors, ""
+
+    ok = db.update_booking(
+        booking_id=booking_id,
+        customer_name=parsed["customer_name"],
+        phone=parsed["phone"],
+        email=parsed["email"],
+        pickup_address=parsed["pickup_address"],
+        delivery_address=parsed["delivery_address"],
+        move_date=parsed["move_date"],
+        num_movers=parsed["num_movers"],
+        notes=parsed["notes"],
+        start_time=parsed["start_time"],
+        finish_time=parsed["finish_time"],
+        duration_hours=parsed["duration_hours"],
+        crew=parsed["crew_csv"],
+        hourly_rate=parsed["hourly_rate"],
+        callout_fee=parsed["callout_fee"],
+        gst_enabled=parsed["gst_enabled"],
+        payment_status=parsed["payment_status"],
+        invoice_status=parsed["invoice_status"],
+        status=parsed["status"],
+    )
+    if not ok:
+        return False, ["Could not save booking."], ""
+
+    _persist_booking_extras(booking_id, parsed)
+    prepare_booking_payment_link(booking_id)
+
+    xero_msg = sync_xero_draft_if_linked(booking_id)
+    parts = ["Invoice updated."]
+    if xero_msg:
+        parts.append(xero_msg)
+    return True, [], " ".join(parts)
+
+
+def send_customer_invoice(booking_id: int) -> Tuple[bool, str]:
+    return invoice_send_service.send_customer_invoice(booking_id)

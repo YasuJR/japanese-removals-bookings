@@ -79,6 +79,10 @@ class CompatCursorFixed:
         self._is_postgres = is_postgres_backend
         self.lastrowid: Optional[int] = None
 
+    @property
+    def rowcount(self) -> int:
+        return getattr(self._cursor, "rowcount", -1)
+
     def _wrap(self, row):
         if row is None:
             return None

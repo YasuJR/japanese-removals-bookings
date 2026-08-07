@@ -90,10 +90,29 @@
   </div>
   {% endif %}
 
+  <div class="invoice-action-bar">
+    <a class="btn-secondary" href="{{ url_for('invoice_preview', booking_id=booking.id) }}" target="_blank">Invoice Preview</a>
+    <a class="btn-secondary" href="{{ url_for('invoice_pdf', booking_id=booking.id) }}" target="_blank">Download PDF</a>
+    <form method="post" class="inline-form invoice-send-form">
+      <input type="hidden" name="action" value="send_invoice">
+      <button type="submit" class="btn-primary btn-lg invoice-send-btn"
+        {% if not invoice_send.can_send %}disabled title="{{ invoice_send.blocked_reason }}"
+        {% elif invoice_send.method == 'email' and not status.email_configured %}disabled title="Configure SMTP in .env"
+        {% elif invoice_send.method == 'sms' and not status.sms_configured %}disabled title="Configure Twilio in .env"{% endif %}
+        {% if invoice_send.can_send %}onclick="return confirm('{{ invoice_send.confirm_message|e }}');"{% endif %}>
+        Send Invoice
+      </button>
+    </form>
+    {% if customer_pay_url and payment_options.can_pay_now %}
+    <a class="btn-secondary" href="{{ customer_pay_url }}" target="_blank" rel="noopener">Open Pay Link</a>
+    {% endif %}
+  </div>
+  {% if not invoice_send.can_send %}
+  <p class="invoice-send-blocked muted">{{ invoice_send.blocked_reason }}</p>
+  {% endif %}
+
   <div class="tool-bar">
     <a class="btn-secondary btn-sm" href="{{ url_for('job_sheet_pdf', booking_id=booking.id) }}" target="_blank">Download job sheet (PDF)</a>
-    <a class="btn-secondary btn-sm" href="{{ url_for('invoice_preview', booking_id=booking.id) }}" target="_blank">Invoice preview</a>
-    <a class="btn-secondary btn-sm" href="{{ url_for('invoice_pdf', booking_id=booking.id) }}" target="_blank">Download invoice (PDF)</a>
     <form method="post" class="inline-form">
       <input type="hidden" name="action" value="sync_calendar">
       <button type="submit" class="btn-secondary btn-sm" {% if not status.google_connected %}disabled title="Connect Google in Settings"{% endif %}>Sync calendar</button>
@@ -392,8 +411,12 @@
     <input type="hidden" name="action" value="save">
     {% include '_double_booking_banner.html' %}
     {% include '_booking_form.html' %}
+    {% if pricing_panel_mode %}
+    {% include '_invoice_edit_panel.html' %}
+    {% else %}
     {% include '_extra_charges.html' %}
     {% include '_invoice_panel.html' %}
+    {% endif %}
     <div class="form-actions">
       <button type="submit" class="btn-primary">Save changes</button>
       <a class="btn-secondary" href="{{ url_for('dashboard') }}">Cancel</a>
