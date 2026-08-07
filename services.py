@@ -24,6 +24,7 @@ from integrations import (
 from integrations import stripe as stripe_service
 import booking_profit
 from integrations import invoice_send as invoice_send_service
+import invoice_numbering
 
 
 def booking_to_dict(row: Any) -> Dict[str, Any]:
@@ -514,10 +515,15 @@ def update_booking_invoice(booking_id: int, form) -> Tuple[bool, List[str], str]
         return False, ["Could not save booking."], ""
 
     _persist_booking_extras(booking_id, parsed)
+    row = db.get_booking(booking_id)
+    had_number = bool((dict(row).get("invoice_number") or "").strip()) if row else False
+    assigned = invoice_numbering.ensure_booking_invoice_number(booking_id)
     prepare_booking_payment_link(booking_id)
 
     xero_msg = sync_xero_draft_if_linked(booking_id)
     parts = ["Invoice updated."]
+    if assigned and not had_number:
+        parts.append("Invoice #{0} assigned.".format(assigned))
     if xero_msg:
         parts.append(xero_msg)
     return True, [], " ".join(parts)

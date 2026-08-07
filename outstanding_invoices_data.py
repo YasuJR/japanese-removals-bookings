@@ -8,6 +8,7 @@ import config
 import database as db
 import invoice
 from integrations import xero
+import invoice_numbering
 
 INVOICE_FILTERS = [
     ("unpaid", "Unpaid"),
@@ -85,10 +86,7 @@ def invoice_number_display(booking: Dict[str, Any]) -> str:
     number = (booking.get("invoice_number") or "").strip()
     if number:
         return number
-    xid = (booking.get("xero_invoice_id") or "").strip()
-    if xid:
-        return xid[:12]
-    return "Booking #{0}".format(booking.get("id", ""))
+    return invoice_numbering.display_invoice_number(booking)
 
 
 def _invoice_row(booking: Dict[str, Any], today: date) -> Dict[str, Any]:

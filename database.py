@@ -128,12 +128,116 @@ def _seed_crew_and_trucks(conn) -> None:
             )
 
 
+def _ensure_invoice_sequence(conn) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS invoice_sequence (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            next_number INTEGER NOT NULL DEFAULT 1
+        )
+        """
+    )
+    if db_backend.is_postgres():
+        conn.execute(
+            """
+            INSERT INTO invoice_sequence (id, next_number)
+            VALUES (1, 1)
+            ON CONFLICT (id) DO NOTHING
+            """
+        )
+    else:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO invoice_sequence (id, next_number)
+            VALUES (1, 1)
+            """
+        )
+    _bootstrap_invoice_sequence(conn)
+
+
+def _bootstrap_invoice_sequence(conn) -> None:
+    """Ensure the counter stays ahead of any numeric invoice numbers already in use."""
+    rows = conn.execute(
+        """
+        SELECT invoice_number FROM bookings
+        WHERE invoice_number IS NOT NULL AND TRIM(invoice_number) != ''
+        """
+    ).fetchall()
+    max_used = 0
+    for row in rows:
+        text = str(row["invoice_number"] if hasattr(row, "keys") else row[0]).strip()
+        if text.isdigit():
+            max_used = max(max_used, int(text))
+    if max_used <= 0:
+        return
+    floor = max_used + 1
+    if db_backend.is_postgres():
+        conn.execute(
+            """
+            UPDATE invoice_sequence
+            SET next_number = GREATEST(next_number, %s)
+            WHERE id = 1
+            """,
+            (floor,),
+        )
+    else:
+        conn.execute(
+            """
+            UPDATE invoice_sequence
+            SET next_number = MAX(next_number, ?)
+            WHERE id = 1
+            """,
+            (floor,),
+        )
+
+
+def allocate_invoice_number() -> int:
+    """Atomically take the next invoice number (never reused)."""
+    with get_connection() as conn:
+        if db_backend.is_postgres():
+            row = conn.execute(
+                """
+                SELECT next_number FROM invoice_sequence
+                WHERE id = 1
+                FOR UPDATE
+                """
+            ).fetchone()
+            current = int(row["next_number"])
+            conn.execute(
+                """
+                UPDATE invoice_sequence
+                SET next_number = %s
+                WHERE id = 1
+                """,
+                (current + 1,),
+            )
+            conn.commit()
+            return current
+
+        conn._conn.execute("BEGIN IMMEDIATE")
+        try:
+            row = conn.execute(
+                "SELECT next_number FROM invoice_sequence WHERE id = 1"
+            ).fetchone()
+            current = int(row["next_number"])
+            conn.execute(
+                "UPDATE invoice_sequence SET next_number = ? WHERE id = 1",
+                (current + 1,),
+            )
+            conn.commit()
+            return current
+        except Exception:
+            conn._conn.rollback()
+            raise
+
+
 def init_db() -> None:
     if db_backend.is_postgres():
         with get_connection() as conn:
             for ddl in db_backend.postgres_ddl():
                 conn.execute(ddl)
             _ensure_columns(conn)
+            _ensure_invoice_sequence(conn)
             _seed_crew_and_trucks(conn)
         return
     with get_connection() as conn:
@@ -297,6 +401,7 @@ def init_db() -> None:
             """
         )
         _ensure_columns(conn)
+        _ensure_invoice_sequence(conn)
         _seed_crew_and_trucks(conn)
         conn.commit()
 

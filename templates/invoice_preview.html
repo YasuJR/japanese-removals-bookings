@@ -20,7 +20,9 @@
       <img class="invoice-logo" src="{{ inv.logo_url }}" alt="Japanese Removals">
       {% endif %}
       <div class="invoice-brand-text">
-        <p class="invoice-contact-line">{{ inv.company_contact_line }}</p>
+        {% for line in inv.company_contact_lines %}
+        <p class="invoice-contact-line">{{ line }}</p>
+        {% endfor %}
       </div>
     </header>
 

@@ -8,6 +8,7 @@ import automation
 import config
 import database as db
 import invoice
+import invoice_numbering
 from integrations import company_config, email_send, invoice_pdf, sms, stripe as stripe_service
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -90,7 +91,9 @@ def _email_body(
     pay_url: str,
 ) -> Tuple[str, str]:
     customer = (booking.get("customer_name") or "Customer").strip()
-    invoice_number = (booking.get("invoice_number") or "").strip() or "DRAFT"
+    invoice_number = invoice_numbering.display_invoice_number(booking)
+    if invoice_number == "—":
+        invoice_number = "DRAFT"
     booking_id = int(booking["id"])
     total_display = invoice.format_aud(totals["total"])
 
@@ -129,7 +132,9 @@ def _sms_body(
     totals: Dict[str, Any],
     pay_url: str,
 ) -> str:
-    invoice_number = (booking.get("invoice_number") or "").strip() or "DRAFT"
+    invoice_number = invoice_numbering.display_invoice_number(booking)
+    if invoice_number == "—":
+        invoice_number = "DRAFT"
     total_display = invoice.format_aud(totals["total"])
     parts = [
         "{0}: Your invoice #{1} is ready.".format(config.COMPANY_NAME, invoice_number),

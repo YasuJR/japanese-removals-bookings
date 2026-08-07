@@ -8,6 +8,7 @@ import booking_profit
 import config
 import database as db
 import invoice
+import invoice_numbering
 from integrations import sms_automation, stripe_config, xero
 
 COMPLIANCE_NOTE = "Card surcharge reflects payment processing costs."
@@ -125,7 +126,9 @@ def create_checkout_session(
         invoice.resolve_booking_invoice(booking)
     )
     calc = calculate_card_payment(totals["total"])
-    invoice_number = (booking.get("invoice_number") or "").strip() or "DRAFT"
+    invoice_number = invoice_numbering.display_invoice_number(booking)
+    if invoice_number == "—":
+        invoice_number = "DRAFT"
     booking_id = int(booking["id"])
     amount_cents = int(round(calc["card_total"] * 100))
 

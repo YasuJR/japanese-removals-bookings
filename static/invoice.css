@@ -42,8 +42,9 @@
 
 .invoice-brand {
   display: flex;
-  align-items: center;
-  gap: 1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
   margin-bottom: var(--section-gap);
   padding: 0.15rem 0;
 }
@@ -78,8 +79,7 @@
   margin: 0;
   font-size: 0.68rem;
   color: var(--jr-text);
-  line-height: 1.35;
-  white-space: nowrap;
+  line-height: 1.45;
 }
 
 .invoice-accent-line {

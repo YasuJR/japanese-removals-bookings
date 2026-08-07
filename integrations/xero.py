@@ -498,6 +498,9 @@ def _draft_invoice_payload(
             theme_id = ""
     if theme_id:
         payload["BrandingThemeID"] = theme_id
+    local_number = (resolved.get("invoice_number") or "").strip()
+    if local_number:
+        payload["InvoiceNumber"] = local_number
     return payload, totals, booking_id, issue_date, due_date
 
 
@@ -510,11 +513,16 @@ def persist_invoice_from_xero(
     invoice_id = inv.get("InvoiceID") or ""
     saved_issue = _parse_xero_date(inv.get("Date")) or fallback_issue
     saved_due = _parse_xero_date(inv.get("DueDate")) or fallback_due
+    row = db.get_booking(booking_id)
+    existing_number = ""
+    if row:
+        existing_number = (dict(row).get("invoice_number") or "").strip()
     db.update_booking_invoice_fields(
         booking_id,
         {
             "xero_invoice_id": invoice_id,
-            "invoice_number": inv.get("InvoiceNumber") or "",
+            "invoice_number": existing_number
+            or (inv.get("InvoiceNumber") or "").strip(),
             "invoice_status": inv.get("Status") or "",
             "invoice_issue_date": saved_issue,
             "invoice_due_date": saved_due,
@@ -621,10 +629,11 @@ def sync_invoice_after_stripe_payment(
     persist_invoice_from_xero(booking_id, inv)
     payment_status, paid_at = derive_payment_status_from_invoice(inv, booking)
     xero_status = (inv.get("Status") or "").strip().upper()
+    local_number = (booking.get("invoice_number") or "").strip()
     fields: Dict[str, Any] = {
         "invoice_status": xero_status or (booking.get("invoice_status") or ""),
-        "invoice_number": (inv.get("InvoiceNumber") or "").strip()
-        or (booking.get("invoice_number") or ""),
+        "invoice_number": local_number
+        or (inv.get("InvoiceNumber") or "").strip(),
     }
     if payment_status == invoice.PAYMENT_STATUS_PAID:
         fields["payment_status"] = payment_status

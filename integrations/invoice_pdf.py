@@ -13,6 +13,7 @@ from extra_charges import charge_line_total
 from integrations import company_config, xero_branding
 from integrations import stripe as stripe_service
 import invoice
+import invoice_numbering
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
@@ -60,18 +61,22 @@ def _website_display(settings: Dict[str, Any]) -> str:
     return site.strip("/")
 
 
-def _contact_line(settings: Dict[str, Any]) -> str:
-    parts: List[str] = []
+def _contact_lines(settings: Dict[str, Any]) -> List[str]:
+    lines: List[str] = []
     phone = str(settings.get("company_phone") or "").strip()
     email = str(settings.get("company_email") or "").strip()
     website = _website_display(settings)
     if phone:
-        parts.append("Phone: {0}".format(phone))
+        lines.append("Phone: {0}".format(phone))
     if email:
-        parts.append("Email: {0}".format(email))
+        lines.append("Email: {0}".format(email))
     if website:
-        parts.append("Website: {0}".format(website))
-    return " | ".join(parts)
+        lines.append("Website: {0}".format(website))
+    return lines
+
+
+def _contact_line(settings: Dict[str, Any]) -> str:
+    return "<br/>".join(_contact_lines(settings))
 
 
 def _issue_and_due_dates(booking: Dict[str, Any]) -> tuple:
@@ -170,11 +175,14 @@ def build_invoice_document(booking: Dict[str, Any]) -> Dict[str, Any]:
     settings = company_config.get_settings()
     totals = invoice.calculate_invoice_totals(booking)
     issue_date, due_date = _issue_and_due_dates(booking)
-    invoice_number = (booking.get("invoice_number") or "").strip() or "DRAFT"
+    invoice_number = invoice_numbering.display_invoice_number(booking)
     logo_file = xero_branding.invoice_logo_path(hires=True)
     if not logo_file.is_file():
         logo_file = xero_branding.invoice_logo_path()
-    company_abn = str(settings.get("company_abn") or "").strip()
+    company_abn = (
+        str(settings.get("company_abn") or "").strip()
+        or invoice_numbering.DEFAULT_ABN
+    )
     payment_options = stripe_service.payment_options_for_booking(booking, totals["total"])
 
     return {
@@ -185,8 +193,9 @@ def build_invoice_document(booking: Dict[str, Any]) -> Dict[str, Any]:
         "company_phone": settings.get("company_phone") or "",
         "company_email": settings.get("company_email") or "",
         "company_website": _website_display(settings),
+        "company_contact_lines": _contact_lines(settings),
         "company_contact_line": _contact_line(settings),
-        "company_abn": company_abn or "—",
+        "company_abn": company_abn,
         "company_location": settings.get("company_location") or "",
         "customer_name": booking.get("customer_name") or "",
         "invoice_number": invoice_number,
@@ -223,7 +232,7 @@ def _styles():
             parent=base["Normal"],
             fontName="Helvetica",
             fontSize=7.5,
-            leading=9,
+            leading=10,
             textColor=JR_TEXT,
             alignment=TA_LEFT,
         ),
@@ -570,31 +579,13 @@ def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
 
     story: List[Any] = []
 
-    # --- Header: wide logo (includes company name) + contact line only ---
+    # --- Header: logo then contact lines stacked ---
     logo = _logo_flowable(doc_data.get("logo_path"))
     contact_block = Paragraph(doc_data["company_contact_line"], styles["contact_line"])
     if logo:
-        brand_row = Table(
-            [[logo, contact_block]],
-            colWidths=[LOGO_WIDTH + LOGO_GAP, CONTENT_WIDTH - LOGO_WIDTH - LOGO_GAP],
-            hAlign="LEFT",
-        )
-        brand_row.setStyle(
-            TableStyle(
-                [
-                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("LEFTPADDING", (0, 0), (0, 0), 0),
-                    ("RIGHTPADDING", (0, 0), (0, 0), LOGO_GAP),
-                    ("LEFTPADDING", (1, 0), (1, 0), 2 * mm),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                    ("TOPPADDING", (0, 0), (-1, -1), 0),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-                ]
-            )
-        )
-        story.append(brand_row)
-    else:
-        story.append(contact_block)
+        story.append(logo)
+        story.append(Spacer(1, 2 * mm))
+    story.append(contact_block)
 
     story.append(Spacer(1, SECTION_GAP))
     story.append(HRFlowable(width="100%", thickness=0.5, color=JR_BORDER_SUBTLE, spaceAfter=SECTION_GAP))

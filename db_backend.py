@@ -330,4 +330,10 @@ def postgres_ddl() -> List[str]:
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS invoice_sequence (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            next_number INTEGER NOT NULL DEFAULT 1
+        )
+        """,
     ]

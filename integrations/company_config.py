@@ -28,7 +28,7 @@ def _default_settings() -> Dict[str, Any]:
         "company_email": "info@japaneseremovals.com.au",
         "company_location": "Perth, Western Australia",
         "company_website": "www.japaneseremovals.com.au",
-        "company_abn": "",
+        "company_abn": "93 645 845 227",
         "logo_path": "static/branding/japanese-removals-invoice-logo.png",
         "xero_branding_theme_id": "",
         "xero_sync_org_header": True,
