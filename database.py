@@ -157,10 +157,14 @@ def _ensure_invoice_sequence(conn) -> None:
 
 def _bootstrap_invoice_sequence(conn) -> None:
     """Ensure the counter stays ahead of any numeric invoice numbers already in use."""
+    columns = db_backend.table_columns(conn, "bookings")
+    if "invoice_number" not in columns:
+        return
+
     rows = conn.execute(
         """
         SELECT invoice_number FROM bookings
-        WHERE invoice_number IS NOT NULL AND TRIM(invoice_number) != ''
+        WHERE invoice_number IS NOT NULL
         """
     ).fetchall()
     max_used = 0
@@ -171,30 +175,20 @@ def _bootstrap_invoice_sequence(conn) -> None:
     if max_used <= 0:
         return
     floor = max_used + 1
-    if db_backend.is_postgres():
-        conn.execute(
-            """
-            UPDATE invoice_sequence
-            SET next_number = GREATEST(next_number, %s)
-            WHERE id = 1
-            """,
-            (floor,),
-        )
-    else:
-        conn.execute(
-            """
-            UPDATE invoice_sequence
-            SET next_number = MAX(next_number, ?)
-            WHERE id = 1
-            """,
-            (floor,),
-        )
+    conn.execute(
+        """
+        UPDATE invoice_sequence
+        SET next_number = CASE WHEN next_number > ? THEN next_number ELSE ? END
+        WHERE id = 1
+        """,
+        (floor, floor),
+    )
 
 
 def allocate_invoice_number() -> int:
     """Atomically take the next invoice number (never reused)."""
     with get_connection() as conn:
-        if db_backend.is_postgres():
+        if conn._is_postgres:
             row = conn.execute(
                 """
                 SELECT next_number FROM invoice_sequence
@@ -206,7 +200,7 @@ def allocate_invoice_number() -> int:
             conn.execute(
                 """
                 UPDATE invoice_sequence
-                SET next_number = %s
+                SET next_number = ?
                 WHERE id = 1
                 """,
                 (current + 1,),
@@ -231,14 +225,21 @@ def allocate_invoice_number() -> int:
             raise
 
 
+_INIT_DB_LOCK_KEY = 824739161
+
+
 def init_db() -> None:
     if db_backend.is_postgres():
         with get_connection() as conn:
-            for ddl in db_backend.postgres_ddl():
-                conn.execute(ddl)
-            _ensure_columns(conn)
-            _ensure_invoice_sequence(conn)
-            _seed_crew_and_trucks(conn)
+            conn.execute("SELECT pg_advisory_lock(?)", (_INIT_DB_LOCK_KEY,))
+            try:
+                for ddl in db_backend.postgres_ddl():
+                    conn.execute(ddl)
+                _ensure_columns(conn)
+                _ensure_invoice_sequence(conn)
+                _seed_crew_and_trucks(conn)
+            finally:
+                conn.execute("SELECT pg_advisory_unlock(?)", (_INIT_DB_LOCK_KEY,))
         return
     with get_connection() as conn:
         conn.execute(

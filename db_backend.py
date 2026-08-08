@@ -119,6 +119,8 @@ class CompatConnection:
             skip_returning = (
                 "INTO PROCESSED_GMAIL_MESSAGES" in upper
                 or "INTO INTEGRATION_SETTINGS" in upper
+                or "INTO INVOICE_SEQUENCE" in upper
+                or "ON CONFLICT" in upper
             )
             if upper.startswith("INSERT") and "RETURNING" not in upper and not skip_returning:
                 sql_adapted = sql_adapted.rstrip().rstrip(";") + " RETURNING id"
@@ -130,14 +132,19 @@ class CompatConnection:
                 wrapper.lastrowid = int(row["id"]) if row and row.get("id") is not None else None
             if wrapper.lastrowid is None and upper.startswith("INSERT") and not skip_returning:
                 try:
+                    cur.execute("SAVEPOINT compat_lastval")
                     cur.execute("SELECT lastval()")
                     seq_row = cur.fetchone()
                     if seq_row is not None:
                         seq_val = seq_row.get("lastval") if isinstance(seq_row, dict) else seq_row[0]
                         if seq_val is not None:
                             wrapper.lastrowid = int(seq_val)
+                    cur.execute("RELEASE SAVEPOINT compat_lastval")
                 except Exception:
-                    pass
+                    try:
+                        cur.execute("ROLLBACK TO SAVEPOINT compat_lastval")
+                    except Exception:
+                        pass
             return wrapper
         cur = self._conn.execute(sql_adapted, params)
         wrapper = CompatCursorFixed(cur, False)
