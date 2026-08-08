@@ -52,6 +52,16 @@ def _create_booking(email="", phone="0412345678", **kwargs):
     return booking_id
 
 
+def test_email_wins_when_both_present():
+    booking_id = _create_booking(email="customer@example.com", phone="0412987654")
+    dest = invoice_send.resolve_send_destination(
+        services.booking_to_dict(db.get_booking(booking_id))
+    )
+    assert dest["can_send"] and dest["method"] == "email", dest
+    assert dest["destination"] == "customer@example.com"
+    return {"name": "email_priority", "ok": True}
+
+
 def test_email_send_only():
     booking_id = _create_booking(email="customer@example.com")
     with patch("integrations.email_send.is_configured", return_value=True), patch(
@@ -178,6 +188,7 @@ class _FakeForm(dict):
 def main():
     db.init_db()
     tests = [
+        test_email_wins_when_both_present,
         test_email_send_only,
         test_sms_when_no_email,
         test_blocks_without_contact,

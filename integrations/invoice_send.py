@@ -15,10 +15,16 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 COMPANY_EMAILS = frozenset({"info@japaneseremovals.com.au"})
 
 
-def _settings() -> Dict[str, Any]:
-    from integrations import company_config
+def normalize_phone_digits(phone: str) -> str:
+    """Return digits only, normalising leading +61 to 0."""
+    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
+    if digits.startswith("61") and len(digits) >= 11:
+        digits = "0" + digits[2:]
+    return digits
 
-    return company_config.get_settings()
+
+def is_valid_email_format(email: str) -> bool:
+    return bool(EMAIL_RE.match((email or "").strip()))
 
 
 def is_company_placeholder_email(email: str) -> bool:
@@ -36,34 +42,62 @@ def is_company_placeholder_email(email: str) -> bool:
     return False
 
 
+def is_valid_customer_email(email: str) -> bool:
+    text = (email or "").strip()
+    if not is_valid_email_format(text):
+        return False
+    return not is_company_placeholder_email(text)
+
+
+def is_company_placeholder_phone(phone: str) -> bool:
+    digits = normalize_phone_digits(phone)
+    if not digits:
+        return True
+    company_numbers = set()
+    settings = _settings()
+    for key in ("default_phone", "company_phone"):
+        value = (settings.get(key) or "").strip()
+        if value:
+            company_numbers.add(normalize_phone_digits(value))
+    company_phone = (config.COMPANY_PHONE or "").strip()
+    if company_phone:
+        company_numbers.add(normalize_phone_digits(company_phone))
+    return digits in company_numbers
+
+
+def is_valid_customer_phone(phone: str) -> bool:
+    text = (phone or "").strip()
+    if not text:
+        return False
+    if is_company_placeholder_phone(text):
+        return False
+    digits = normalize_phone_digits(text)
+    return len(digits) >= 9
+
+
 def format_phone_display(phone: str) -> str:
     """Australian mobile display e.g. 0412 345 678."""
-    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
-    if digits.startswith("61") and len(digits) >= 11:
-        digits = "0" + digits[2:]
+    digits = normalize_phone_digits(phone)
     if len(digits) == 10 and digits.startswith("0"):
         return "{0} {1} {2}".format(digits[:4], digits[4:7], digits[7:])
     return (phone or "").strip()
 
 
+def _settings() -> Dict[str, Any]:
+    from integrations import company_config
+
+    return company_config.get_settings()
+
+
 def resolve_send_destination(booking: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Enable Send Invoice when the booking has an email and/or phone on record.
-    Choose email when a non-placeholder address exists; otherwise SMS when phone exists.
+    Choose invoice delivery method from booking contact fields.
+    Priority: valid customer email, else valid customer phone, else blocked.
     """
     email = (booking.get("email") or "").strip()
     phone = (booking.get("phone") or "").strip()
 
-    if not email and not phone:
-        return {
-            "can_send": False,
-            "method": "",
-            "destination": "",
-            "destination_display": "",
-            "blocked_reason": "Customer email or phone number required.",
-        }
-
-    if email and not is_company_placeholder_email(email):
+    if is_valid_customer_email(email):
         return {
             "can_send": True,
             "method": "email",
@@ -72,7 +106,7 @@ def resolve_send_destination(booking: Dict[str, Any]) -> Dict[str, Any]:
             "blocked_reason": "",
         }
 
-    if phone:
+    if is_valid_customer_phone(phone):
         display = format_phone_display(phone)
         return {
             "can_send": True,
@@ -82,21 +116,25 @@ def resolve_send_destination(booking: Dict[str, Any]) -> Dict[str, Any]:
             "blocked_reason": "",
         }
 
-    if email:
-        return {
-            "can_send": True,
-            "method": "email",
-            "destination": email,
-            "destination_display": email,
-            "blocked_reason": "",
-        }
+    if not email and not phone:
+        blocked_reason = "Customer email or phone number required."
+    elif email and phone:
+        blocked_reason = (
+            "Enter a valid customer email or mobile number (not company defaults)."
+        )
+    elif email:
+        blocked_reason = "Enter a valid customer email, or add a customer mobile number."
+    elif phone:
+        blocked_reason = "Enter a valid customer mobile number, or add a customer email."
+    else:
+        blocked_reason = "Customer email or phone number required."
 
     return {
         "can_send": False,
         "method": "",
         "destination": "",
         "destination_display": "",
-        "blocked_reason": "Customer email or phone number required.",
+        "blocked_reason": blocked_reason,
     }
 
 

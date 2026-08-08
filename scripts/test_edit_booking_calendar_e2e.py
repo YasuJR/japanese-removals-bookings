@@ -18,6 +18,18 @@ def test_send_enabled_with_email():
     )
     assert dest["can_send"], dest
     assert dest["method"] == "email"
+    assert dest["destination"] == "customer@example.com"
+    return True
+
+
+def test_company_defaults_disabled():
+    dest = invoice_send.resolve_send_destination(
+        {
+            "email": "info@japaneseremovals.com.au",
+            "phone": "0481 089 573",
+        }
+    )
+    assert not dest["can_send"], dest
     return True
 
 
@@ -86,6 +98,7 @@ def test_calendar_navigation_fields():
 def main():
     tests = [
         test_send_enabled_with_email,
+        test_company_defaults_disabled,
         test_placeholder_email_uses_sms_when_phone_exists,
         test_send_enabled_with_phone_only,
         test_send_disabled_without_contact,
