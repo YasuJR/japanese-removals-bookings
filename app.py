@@ -1489,6 +1489,31 @@ def _form_invoice_summary(form_data: dict) -> dict:
 @auth.login_required
 def new_booking():
     if request.method == "POST":
+        action = (request.form.get("action") or "save").strip()
+        if action == "analyse_paste":
+            from integrations import enquiry_parser
+
+            paste_text = request.form.get("paste_text", "")
+            parsed = enquiry_parser.parse_pasted_text(paste_text)
+            form = _booking_form_defaults()
+            move_date = request.form.get("move_date", "").strip()
+            if move_date:
+                form["move_date"] = move_date
+            form = enquiry_parser.apply_parsed_fields(form, parsed)
+            if not paste_text.strip():
+                flash("Paste customer information first, then click Analyse.", "error")
+            else:
+                flash("Customer details analysed — review the fields below.", "success")
+            return render_template(
+                "new_booking.html",
+                form=form,
+                paste_text=paste_text,
+                parsed_summary=enquiry_parser.summary_rows(parsed),
+                crew_warnings=[],
+                invoice_summary=_form_invoice_summary(form),
+                **_double_booking_context(form),
+            )
+
         data, errors = parse_booking_form(request.form)
         crew_warnings = _crew_warnings_for_data(data)
         db_errors, db_conflicts, override_applied = _validate_double_booking(data)
@@ -1496,9 +1521,19 @@ def new_booking():
             for msg in errors + db_errors:
                 flash(msg, "error")
             ctx = _double_booking_context(data)
+            paste_text = request.form.get("paste_text", "")
+            parsed_summary = None
+            if paste_text.strip():
+                from integrations import enquiry_parser
+
+                parsed_summary = enquiry_parser.summary_rows(
+                    enquiry_parser.parse_pasted_text(paste_text)
+                )
             return render_template(
                 "new_booking.html",
                 form=data,
+                paste_text=paste_text,
+                parsed_summary=parsed_summary,
                 crew_warnings=crew_warnings,
                 invoice_summary=_form_invoice_summary(data),
                 **ctx,
@@ -1517,6 +1552,7 @@ def new_booking():
     return render_template(
         "new_booking.html",
         form=form,
+        paste_text="",
         crew_warnings=[],
         invoice_summary=_form_invoice_summary(form),
         **_double_booking_context(form),

@@ -1,0 +1,24 @@
+<div class="paste-enquiry-panel">
+  <h3>Paste Customer Information</h3>
+  <p class="hint muted">Paste an SMS, email, or enquiry message. Click Analyse to fill the booking form below.</p>
+  <label class="paste-enquiry-label">
+    <textarea name="paste_text" rows="6" class="paste-enquiry-text"
+      placeholder="Hi Yasu, this is John Smith&#10;0412 345 678&#10;10 ABC St, Cannington&#10;moving to 25 XYZ Rd, Innaloo&#10;15/08/2026&#10;Start time 8:00 AM">{{ paste_text or '' }}</textarea>
+  </label>
+  <div class="paste-enquiry-actions">
+    <button type="submit" name="action" value="analyse_paste" class="btn-secondary">Analyse</button>
+  </div>
+</div>
+
+{% if parsed_summary %}
+<div class="paste-enquiry-results" aria-live="polite">
+  <h4>Extracted details</h4>
+  <dl class="paste-enquiry-summary">
+    {% for label, value in parsed_summary %}
+    <dt>{{ label }}</dt>
+    <dd>{{ value }}</dd>
+    {% endfor %}
+  </dl>
+  <p class="hint muted">Review and edit the fields below, then confirm the booking.</p>
+</div>
+{% endif %}

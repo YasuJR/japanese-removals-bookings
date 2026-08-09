@@ -1244,6 +1244,70 @@ body {
   border-top: 1px solid var(--border);
 }
 
+.paste-enquiry-panel {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.paste-enquiry-panel h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.paste-enquiry-label {
+  display: block;
+  margin-top: 0.75rem;
+}
+
+.paste-enquiry-text {
+  width: 100%;
+  min-height: 8rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.paste-enquiry-actions {
+  margin-top: 0.85rem;
+}
+
+.paste-enquiry-results {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid #c7d7fe;
+  border-radius: 10px;
+  background: #eef2ff;
+}
+
+.paste-enquiry-results h4 {
+  margin: 0 0 0.75rem;
+  font-size: 0.98rem;
+}
+
+.paste-enquiry-summary {
+  display: grid;
+  grid-template-columns: minmax(7rem, 9rem) 1fr;
+  gap: 0.45rem 1rem;
+  margin: 0;
+}
+
+.paste-enquiry-summary dt {
+  margin: 0;
+  font-weight: 600;
+  color: #334155;
+}
+
+.paste-enquiry-summary dd {
+  margin: 0;
+  color: #0f172a;
+}
+
 .extra-charges-panel h3 {
   margin: 0 0 0.5rem;
   font-size: 1rem;

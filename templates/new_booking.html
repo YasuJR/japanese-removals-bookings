@@ -4,15 +4,18 @@
 {% block content %}
 <section class="panel">
   <h2>New booking</h2>
-  <p class="hint">Fill in the customer and move details, then save.</p>
+  <p class="hint">Paste customer details to analyse, review the fields, then confirm the booking.</p>
 
   <form method="post" class="booking-form">
+    {% include '_paste_enquiry_panel.html' %}
     {% include '_double_booking_banner.html' %}
     {% include '_booking_form.html' %}
     {% include '_extra_charges.html' %}
     {% include '_invoice_panel.html' %}
     <div class="form-actions">
-      <button type="submit" class="btn-primary">Save booking</button>
+      <button type="submit" name="action" value="save" class="btn-primary">
+        {% if parsed_summary %}Confirm Booking{% else %}Save booking{% endif %}
+      </button>
     </div>
   </form>
 </section>
