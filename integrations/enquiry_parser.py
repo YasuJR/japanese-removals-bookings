@@ -151,7 +151,62 @@ def _extract_start_time(text: str) -> str:
     return ""
 
 
+def _line_matches_field(line: str, value: str) -> bool:
+    text = (line or "").strip()
+    field = (value or "").strip()
+    if not text or not field:
+        return False
+    if field.lower() in text.lower():
+        return True
+    if field.replace(" ", "") in text.replace(" ", ""):
+        return True
+    return False
+
+
+def _extract_notes(text: str, parsed: Dict[str, Any]) -> str:
+    """Keep only supplementary lines not already mapped to structured fields."""
+    remaining = []
+    for line in (text or "").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if _line_matches_field(stripped, parsed.get("customer_name", "")):
+            continue
+        if gmail_parser.PHONE_RE.search(stripped) or _line_matches_field(
+            stripped, parsed.get("phone", "")
+        ):
+            continue
+        if _line_matches_field(stripped, parsed.get("pickup_address", "")):
+            continue
+        if _line_matches_field(stripped, parsed.get("delivery_address", "")):
+            continue
+        if MOVING_TO_RE.search(stripped):
+            continue
+        if gmail_parser._parse_move_date(stripped):
+            continue
+        if _extract_start_time(stripped):
+            continue
+        if re.search(
+            r"\b(?:start(?:\s*time)?|starting\s+at|arrive|arrival)\b",
+            stripped,
+            re.IGNORECASE,
+        ):
+            continue
+        remaining.append(stripped)
+    return "\n".join(remaining).strip()
+
+
 def _build_notes(text: str, fields: Dict[str, str]) -> str:
+    parsed = {
+        "customer_name": fields.get("customer_name") or "",
+        "phone": fields.get("phone") or "",
+        "pickup_address": fields.get("pickup_address") or "",
+        "delivery_address": fields.get("delivery_address") or "",
+    }
+    supplementary = _extract_notes(text, parsed)
+    if supplementary:
+        return supplementary
+
     gmail_fields = dict(fields)
     gmail_fields["source_text"] = text[:4000]
     gmail_fields["subject"] = ""
@@ -220,16 +275,15 @@ def apply_parsed_fields(form: Dict[str, Any], parsed: Dict[str, Any]) -> Dict[st
     merged = dict(form)
     mapping = {
         "customer_name": parsed.get("customer_name") or "",
-        "phone": parsed.get("phone") or merged.get("phone", ""),
-        "email": parsed.get("email") or merged.get("email", ""),
-        "move_date": parsed.get("move_date") or merged.get("move_date", ""),
+        "phone": parsed.get("phone") or "",
+        "email": parsed.get("email") or "",
+        "move_date": parsed.get("move_date") or "",
         "pickup_address": parsed.get("pickup_address") or "",
         "delivery_address": parsed.get("delivery_address") or "",
         "notes": parsed.get("notes") or "",
+        "start_time": parsed.get("start_time") or merged.get("start_time", ""),
     }
     merged.update(mapping)
-    if parsed.get("start_time"):
-        merged["start_time"] = parsed["start_time"]
     return merged
 
 
