@@ -14,14 +14,18 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-local-tests-only")
 def test_icon_files_exist_with_correct_sizes():
     from PIL import Image
 
-    apple = Image.open(ROOT / "static" / "apple-touch-icon.png")
+    apple = Image.open(ROOT / "static" / "apple-touch-icon.png").convert("RGBA")
     assert apple.size == (180, 180)
+    for corner in ((0, 0), (179, 0), (0, 179), (179, 179)):
+        assert apple.getpixel(corner)[:3] == (255, 255, 255), corner
 
-    fav16 = Image.open(ROOT / "static" / "favicon-16x16.png")
+    fav16 = Image.open(ROOT / "static" / "favicon-16x16.png").convert("RGBA")
     assert fav16.size == (16, 16)
+    assert fav16.getpixel((0, 0))[:3] == (255, 255, 255)
 
-    fav32 = Image.open(ROOT / "static" / "favicon-32x32.png")
+    fav32 = Image.open(ROOT / "static" / "favicon-32x32.png").convert("RGBA")
     assert fav32.size == (32, 32)
+    assert fav32.getpixel((0, 0))[:3] == (255, 255, 255)
 
     assert (ROOT / "static" / "favicon.ico").is_file()
     return True

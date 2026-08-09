@@ -8,11 +8,12 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "static" / "branding" / "japanese-removals-logo.png"
 STATIC = ROOT / "static"
+ICON_BACKGROUND = (255, 255, 255, 255)
 
 
 def _square_icon(size: int, padding: float = 0.92) -> Image.Image:
     src = Image.open(SOURCE).convert("RGBA")
-    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 255))
+    canvas = Image.new("RGBA", (size, size), ICON_BACKGROUND)
     scale = min(size / src.width, size / src.height) * padding
     width = max(1, int(src.width * scale))
     height = max(1, int(src.height * scale))
