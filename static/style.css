@@ -3396,6 +3396,63 @@ button:disabled {
   overflow-x: auto;
 }
 
+.crew-mgmt-cards {
+  display: none;
+}
+
+.crew-mgmt-table form {
+  display: contents;
+}
+
+.crew-mgmt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.crew-mgmt-actions-cell {
+  min-width: 12rem;
+}
+
+.crew-row-inactive {
+  opacity: 0.82;
+}
+
+.crew-mgmt-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.85rem;
+  background: #fff;
+}
+
+.crew-mgmt-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.crew-mgmt-meta {
+  margin: 0.15rem 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.crew-mgmt-edit-form {
+  margin: 0.75rem 0;
+}
+
+.status-badge.status-active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.status-inactive {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
 .quote-page {
   background: #f0fdf4;
   min-height: 100vh;

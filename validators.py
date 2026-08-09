@@ -4,11 +4,13 @@ from typing import Any, Dict, List, Tuple
 
 import job_status
 from booking_times import validate_times
-from crew import crew_storage_value, parse_crew_from_form
+from crew import crew_storage_value, merge_crew_for_edit, parse_crew_from_form
 from extra_charges import parse_extra_charges_from_form
 
 
-def parse_booking_form(form: Any) -> Tuple[Dict[str, Any], List[str]]:
+def parse_booking_form(
+    form: Any, existing_crew_csv: str = ""
+) -> Tuple[Dict[str, Any], List[str]]:
     """Read and validate booking fields from a Flask form."""
     customer_name = form.get("customer_name", "")
     phone = form.get("phone", "")
@@ -45,7 +47,10 @@ def parse_booking_form(form: Any) -> Tuple[Dict[str, Any], List[str]]:
     )
     errors.extend(time_errors)
 
-    crew_names = parse_crew_from_form(form)
+    if existing_crew_csv:
+        crew_names = merge_crew_for_edit(existing_crew_csv, form)
+    else:
+        crew_names = parse_crew_from_form(form)
 
     hourly_rate = None
     callout_fee = None

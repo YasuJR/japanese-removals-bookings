@@ -514,4 +514,27 @@
   .login-form button {
     width: 100%;
   }
+
+  .crew-mgmt-table-wrap {
+    display: none;
+  }
+
+  .crew-mgmt-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .crew-mgmt-actions {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .crew-mgmt-actions button,
+  .crew-mgmt-actions .btn-secondary,
+  .crew-mgmt-actions .btn-primary,
+  .crew-mgmt-actions .btn-danger {
+    width: 100%;
+    min-height: var(--touch);
+  }
 }

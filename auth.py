@@ -39,6 +39,15 @@ def get_current_user_id() -> Optional[int]:
         return None
 
 
+def is_admin_user(user: Any) -> bool:
+    if not user:
+        return False
+    try:
+        return bool(user["is_admin"])
+    except (KeyError, TypeError):
+        return False
+
+
 def load_logged_in_user() -> None:
     user_id = get_current_user_id()
     g.user = db.get_staff_user(user_id) if user_id else None
@@ -52,6 +61,20 @@ def login_required(view: Callable) -> Callable:
         if g.get("user") is None:
             flash("Please log in to continue.", "error")
             return redirect(url_for("login", next=request.path))
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
+def admin_required(view: Callable) -> Callable:
+    @wraps(view)
+    def wrapped(*args: Any, **kwargs: Any):
+        if g.get("user") is None:
+            flash("Please log in to continue.", "error")
+            return redirect(url_for("login", next=request.path))
+        if not is_admin_user(g.user):
+            flash("Admin access is required to manage crew members.", "error")
+            return redirect(url_for("settings"))
         return view(*args, **kwargs)
 
     return wrapped

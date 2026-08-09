@@ -23,7 +23,8 @@ def main() -> None:
         sys.exit(1)
 
     user_id = db.create_staff_user(
-        username, auth.hash_password(password), display_name=username
+        username, auth.hash_password(password), display_name=username,
+        is_admin=1 if username.strip().lower() == "admin" else 0,
     )
     print("Staff user created (id={0}): {1}".format(user_id, username))
 

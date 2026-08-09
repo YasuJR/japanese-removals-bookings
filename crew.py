@@ -45,6 +45,21 @@ def parse_crew_from_form(form: Any) -> List[str]:
     return [name for name in selected if name in allowed]
 
 
+def merge_crew_for_edit(existing_crew_value: Any, form: Any) -> List[str]:
+    """Keep deactivated/legacy crew on existing bookings while applying active selections."""
+    existing = crew_from_storage(existing_crew_value)
+    selected = parse_crew_from_form(form)
+    active = set(active_crew_names())
+    historical = [name for name in existing if name not in active]
+    merged: List[str] = []
+    seen = set()
+    for name in historical + selected:
+        if name and name not in seen:
+            seen.add(name)
+            merged.append(name)
+    return merged
+
+
 def crew_storage_value(names: Sequence[str]) -> str:
     return ",".join(names)
 
@@ -53,11 +68,10 @@ def crew_from_storage(value: Any) -> List[str]:
     text = str(value or "").strip()
     if not text:
         return []
-    known = set(all_crew_names())
     return [
         name
         for name in (part.strip() for part in text.split(","))
-        if name and (not known or name in known)
+        if name
     ]
 
 

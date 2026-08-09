@@ -36,8 +36,10 @@
       <li>CEO dashboard and checklist warnings</li>
       <li>Driver run sheet filtered by crew and truck</li>
     </ul>
-    <a class="btn-secondary btn-sm" href="{{ url_for('crew_management') }}">Crew table</a>
     <a class="btn-secondary btn-sm" href="{{ url_for('truck_management') }}">Truck table</a>
+    {% if is_admin %}
+    <a class="btn-secondary btn-sm" href="{{ url_for('crew_management') }}">Crew table</a>
+    {% endif %}
   </article>
 
   <article class="automation-card">

@@ -82,6 +82,10 @@ BOOKING_EXTRA_COLUMNS = [
     ("invoice_sent_method", "TEXT"),
 ]
 
+STAFF_EXTRA_COLUMNS = [
+    ("is_admin", "INTEGER NOT NULL DEFAULT 0"),
+]
+
 
 def get_connection():
     return db_backend.get_connection()
@@ -94,6 +98,19 @@ def _ensure_columns(conn) -> None:
             conn.execute(
                 "ALTER TABLE bookings ADD COLUMN {0} {1}".format(name, col_type)
             )
+
+
+def _ensure_staff_columns(conn) -> None:
+    existing = db_backend.table_columns(conn, "staff_users")
+    for name, col_type in STAFF_EXTRA_COLUMNS:
+        if name not in existing:
+            conn.execute(
+                "ALTER TABLE staff_users ADD COLUMN {0} {1}".format(name, col_type)
+            )
+    conn.execute(
+        "UPDATE staff_users SET is_admin = 1 WHERE username = ? AND is_admin = 0",
+        ("admin",),
+    )
 
 
 def _seed_crew_and_trucks(conn) -> None:
@@ -236,6 +253,7 @@ def init_db() -> None:
                 for ddl in db_backend.postgres_ddl():
                     conn.execute(ddl)
                 _ensure_columns(conn)
+                _ensure_staff_columns(conn)
                 _ensure_invoice_sequence(conn)
                 _seed_crew_and_trucks(conn)
             finally:
@@ -402,6 +420,7 @@ def init_db() -> None:
             """
         )
         _ensure_columns(conn)
+        _ensure_staff_columns(conn)
         _ensure_invoice_sequence(conn)
         _seed_crew_and_trucks(conn)
         conn.commit()
@@ -452,14 +471,24 @@ def save_integration_settings(key: str, data: Dict[str, Any]) -> None:
         conn.commit()
 
 
-def create_staff_user(username: str, password_hash: str, display_name: str = "") -> int:
+def create_staff_user(
+    username: str,
+    password_hash: str,
+    display_name: str = "",
+    is_admin: int = 0,
+) -> int:
     with get_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO staff_users (username, password_hash, display_name)
-            VALUES (?, ?, ?)
+            INSERT INTO staff_users (username, password_hash, display_name, is_admin)
+            VALUES (?, ?, ?, ?)
             """,
-            (username.strip().lower(), password_hash, display_name or username),
+            (
+                username.strip().lower(),
+                password_hash,
+                display_name or username,
+                int(is_admin),
+            ),
         )
         conn.commit()
         return int(cursor.lastrowid)
@@ -476,7 +505,10 @@ def get_staff_by_username(username: str) -> Optional[sqlite3.Row]:
 def get_staff_user(user_id: int) -> Optional[sqlite3.Row]:
     with get_connection() as conn:
         return conn.execute(
-            "SELECT id, username, display_name, created_at FROM staff_users WHERE id = ?",
+            """
+            SELECT id, username, display_name, is_admin, created_at
+            FROM staff_users WHERE id = ?
+            """,
             (user_id,),
         ).fetchone()
 
@@ -1465,6 +1497,46 @@ def update_crew_member(
                 int(active),
                 crew_id,
             ),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def set_crew_member_active(crew_id: int, active: int) -> bool:
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "UPDATE crew_members SET active = ? WHERE id = ?",
+            (int(active), crew_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def count_bookings_with_crew_name(name: str) -> int:
+    needle = (name or "").strip()
+    if not needle:
+        return 0
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT crew FROM bookings
+            WHERE crew IS NOT NULL AND TRIM(crew) != ''
+            """
+        ).fetchall()
+    count = 0
+    for row in rows:
+        crew_csv = row["crew"] if hasattr(row, "keys") else row[0]
+        names = [part.strip() for part in str(crew_csv).split(",") if part.strip()]
+        if needle in names:
+            count += 1
+    return count
+
+
+def delete_crew_member(crew_id: int) -> bool:
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "DELETE FROM crew_members WHERE id = ?",
+            (crew_id,),
         )
         conn.commit()
         return cursor.rowcount > 0
