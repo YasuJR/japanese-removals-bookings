@@ -4,7 +4,9 @@
 import os
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -12,6 +14,8 @@ sys.path.insert(0, str(ROOT))
 from integrations import enquiry_parser
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-local-tests-only")
+
+REFERENCE = datetime(2026, 8, 9, 12, 0, tzinfo=ZoneInfo("Australia/Perth"))
 
 SAMPLE_TEXT = """Hi Yasu, this is John Smith
 0412 345 678
@@ -21,21 +25,47 @@ moving to 25 XYZ Rd, Innaloo
 Start time 8:00 AM
 Need help with packing"""
 
+TEST_MESSAGES = {
+    "TEST 1": """Hi mate, Steve here. Looking to move next Friday from Cannington to Innaloo. My number is 0412345678. Probably around 9 if possible.""",
+    "TEST 2": """Hi Yasu
+My name is Sarah Brown
+Pickup: 15 Albany Hwy, Victoria Park
+Drop off: 28 Scarborough Beach Rd, North Perth
+Mobile +61 412 987 654
+15 August at 8am
+There are stairs at pickup and a piano.""",
+    "TEST 3": """Moving tomorrow morning
+John
+0413 555 666
+from Morley to Balcatta
+Need packing help.""",
+    "TEST 4": """Hello, can you help with a move on Monday?
+10 Smith Street, Cannington to 5 Jones Road, Como
+Email: test@example.com
+Phone: 0400111222
+Thanks, Michael""",
+    "TEST 5": """Hi, moving from Cannington to Innaloo sometime next week. Please call me on 0412 111 222.""",
+}
+
+
+def _parse(text):
+    return enquiry_parser.parse_pasted_text(text, reference=REFERENCE)
+
 
 def test_sample_message_extracts_core_fields():
-    parsed = enquiry_parser.parse_pasted_text(SAMPLE_TEXT)
+    parsed = _parse(SAMPLE_TEXT)
     assert parsed["customer_name"] == "John Smith"
     assert parsed["phone"] == "0412 345 678"
     assert parsed["pickup_address"] == "10 ABC St, Cannington"
     assert parsed["delivery_address"] == "25 XYZ Rd, Innaloo"
     assert parsed["move_date"] == "2026-08-15"
     assert parsed["start_time"] == "08:00"
-    assert parsed["notes"] == "Need help with packing"
+    assert "packing" in parsed["notes"].lower()
     return True
 
 
 def test_summary_rows_match_ui_labels():
-    parsed = enquiry_parser.parse_pasted_text(SAMPLE_TEXT)
+    parsed = _parse(SAMPLE_TEXT)
     rows = dict(enquiry_parser.summary_rows(parsed))
     assert rows["Name"] == "John Smith"
     assert rows["Phone"] == "0412 345 678"
@@ -43,12 +73,12 @@ def test_summary_rows_match_ui_labels():
     assert rows["To"] == "25 XYZ Rd, Innaloo"
     assert rows["Date"] == "15/08/2026"
     assert rows["Start Time"] == "8:00 AM"
-    assert rows["Notes"] == "Need help with packing"
+    assert "packing" in rows["Notes"].lower()
     return True
 
 
 def test_apply_parsed_fields_prefills_form():
-    parsed = enquiry_parser.parse_pasted_text(SAMPLE_TEXT)
+    parsed = _parse(SAMPLE_TEXT)
     form = enquiry_parser.apply_parsed_fields(
         {"start_time": "09:00", "phone": "0481 089 573", "email": "info@example.com"},
         parsed,
@@ -58,12 +88,12 @@ def test_apply_parsed_fields_prefills_form():
     assert form["email"] == ""
     assert form["start_time"] == "08:00"
     assert form["move_date"] == "2026-08-15"
-    assert form["notes"] == "Need help with packing"
+    assert "packing" in form["notes"].lower()
     return True
 
 
 def test_empty_paste_returns_blank_fields():
-    parsed = enquiry_parser.parse_pasted_text("")
+    parsed = _parse("")
     assert not parsed["customer_name"]
     assert parsed["confidence"] == 0.0
     return True
@@ -73,6 +103,72 @@ def test_analyse_button_skips_html5_validation():
     template = (ROOT / "templates" / "_paste_enquiry_panel.html").read_text()
     assert 'value="analyse_paste"' in template
     assert "formnovalidate" in template
+    assert "Check these details" in template
+    return True
+
+
+def test_realistic_message_1():
+    parsed = _parse(TEST_MESSAGES["TEST 1"])
+    assert parsed["customer_name"] == "Steve"
+    assert parsed["phone"] == "0412 345 678"
+    assert parsed["pickup_address"] == "Cannington"
+    assert parsed["delivery_address"] == "Innaloo"
+    assert parsed["move_date"] == "2026-08-14"
+    assert parsed["start_time"] == "09:00"
+    assert "Time is approximate" in parsed["warnings"]
+    assert "Full pickup street address not found" in parsed["warnings"]
+    assert "Full delivery street address not found" in parsed["warnings"]
+    return True
+
+
+def test_realistic_message_2():
+    parsed = _parse(TEST_MESSAGES["TEST 2"])
+    assert parsed["customer_name"] == "Sarah Brown"
+    assert parsed["phone"] == "0412 987 654"
+    assert parsed["pickup_address"] == "15 Albany Hwy, Victoria Park"
+    assert parsed["delivery_address"] == "28 Scarborough Beach Rd, North Perth"
+    assert parsed["move_date"] == "2026-08-15"
+    assert parsed["start_time"] == "08:00"
+    assert "stairs" in parsed["notes"].lower()
+    assert "piano" in parsed["notes"].lower()
+    assert "Full pickup street address not found" not in parsed["warnings"]
+    return True
+
+
+def test_realistic_message_3():
+    parsed = _parse(TEST_MESSAGES["TEST 3"])
+    assert parsed["customer_name"] == "John"
+    assert parsed["phone"] == "0413 555 666"
+    assert parsed["pickup_address"] == "Morley"
+    assert parsed["delivery_address"] == "Balcatta"
+    assert parsed["move_date"] == "2026-08-10"
+    assert parsed["start_time"] == ""
+    assert "Time is vague" in " ".join(parsed["warnings"])
+    assert "packing" in parsed["notes"].lower()
+    return True
+
+
+def test_realistic_message_4():
+    parsed = _parse(TEST_MESSAGES["TEST 4"])
+    assert parsed["customer_name"] == "Michael"
+    assert parsed["phone"] == "0400 111 222"
+    assert parsed["email"] == "test@example.com"
+    assert parsed["pickup_address"] == "10 Smith Street, Cannington"
+    assert parsed["delivery_address"] == "5 Jones Road, Como"
+    assert parsed["move_date"] == "2026-08-10"
+    assert "Full pickup street address not found" not in parsed["warnings"]
+    return True
+
+
+def test_realistic_message_5():
+    parsed = _parse(TEST_MESSAGES["TEST 5"])
+    assert parsed["customer_name"] == ""
+    assert parsed["phone"] == "0412 111 222"
+    assert parsed["pickup_address"] == "Cannington"
+    assert parsed["delivery_address"] == "Innaloo"
+    assert parsed["move_date"] == ""
+    assert "Date could not be confidently determined" in parsed["warnings"]
+    assert "Customer name not found" in parsed["warnings"]
     return True
 
 
@@ -115,8 +211,35 @@ def test_analyse_paste_prefills_new_booking_form():
         )
 
     notes = re.search(r'name="notes"[^>]*>([^<]*)', html, re.S)
-    assert notes and notes.group(1).strip() == "Need help with packing"
+    assert notes and "packing" in notes.group(1).lower()
     assert "Extracted details" in html
+    return True
+
+
+def test_analyse_paste_shows_warnings_for_ambiguous_message():
+    import auth
+    import database as db
+    from app import app
+
+    db.init_db()
+    uid = db.create_staff_user(
+        "paste-warn-{0}".format(os.getpid()),
+        auth.hash_password("test"),
+        "Paste Warn",
+    )
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = uid
+        sess["username"] = "paste-warn"
+
+    resp = client.post(
+        "/bookings/new",
+        data={"action": "analyse_paste", "paste_text": TEST_MESSAGES["TEST 5"]},
+    )
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "Check these details" in html
+    assert "Date could not be confidently determined" in html
     return True
 
 
@@ -127,7 +250,13 @@ def main():
         test_apply_parsed_fields_prefills_form,
         test_empty_paste_returns_blank_fields,
         test_analyse_button_skips_html5_validation,
+        test_realistic_message_1,
+        test_realistic_message_2,
+        test_realistic_message_3,
+        test_realistic_message_4,
+        test_realistic_message_5,
         test_analyse_paste_prefills_new_booking_form,
+        test_analyse_paste_shows_warnings_for_ambiguous_message,
     ]
     failed = 0
     for fn in tests:

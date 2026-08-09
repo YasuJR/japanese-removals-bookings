@@ -19,6 +19,16 @@
     <dd>{{ value }}</dd>
     {% endfor %}
   </dl>
+  {% if parsed_warnings %}
+  <div class="paste-enquiry-warnings">
+    <h5>Check these details</h5>
+    <ul>
+      {% for warning in parsed_warnings %}
+      <li>{{ warning }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
   <p class="hint muted">Review and edit the fields below, then confirm the booking.</p>
 </div>
 {% endif %}
