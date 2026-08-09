@@ -1,0 +1,9 @@
+{# phone: customer phone string #}
+<div class="touch-action-bar">
+  {% if phone and phone|tel_href %}
+  <a class="touch-action-btn touch-action-call" href="{{ phone|tel_href }}">Call</a>
+  {% endif %}
+  {% if phone and phone|sms_href %}
+  <a class="touch-action-btn touch-action-text" href="{{ phone|sms_href }}">Text</a>
+  {% endif %}
+</div>

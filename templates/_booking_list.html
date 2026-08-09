@@ -14,12 +14,20 @@
       <span>{{ b|booking_finish_time }}</span>
     </p>
     <h3 class="booking-card-name">{{ b.customer_name }}</h3>
-    <dl class="booking-card-meta">
-      <div><dt>Phone</dt><dd>{% with phone=b.phone %}{% include '_phone_link.html' %}{% endwith %}</dd></div>
-      <div><dt>Email</dt><dd>{% if b.email %}<a href="mailto:{{ b.email }}">{{ b.email }}</a>{% else %}Not provided{% endif %}</dd></div>
-      <div><dt>Start</dt><dd>{{ b|booking_start_time }}</dd></div>
-      <div><dt>Finish</dt><dd>{{ b|booking_finish_time }}</dd></div>
+    <div class="booking-card-badges">
+      {% with status=b|booking_job_status %}
+      {% include '_status_badge.html' %}
+      {% endwith %}
+      {% with payment_status=b.payment_status or 'Unpaid' %}
+      {% include '_payment_badge.html' %}
+      {% endwith %}
+    </div>
+    <dl class="booking-card-meta booking-card-meta-key">
       <div><dt>Crew</dt><dd>{{ b|booking_crew }}</dd></div>
+      <div><dt>Phone</dt><dd>{% with phone=b.phone %}{% include '_phone_link.html' %}{% endwith %}</dd></div>
+    </dl>
+    <dl class="booking-card-meta">
+      <div><dt>Email</dt><dd>{% if b.email %}<a href="mailto:{{ b.email }}">{{ b.email }}</a>{% else %}Not provided{% endif %}</dd></div>
       <div><dt>Pickup</dt><dd>{{ b.pickup_address }}</dd></div>
       <div><dt>Delivery</dt><dd>{{ b.delivery_address }}</dd></div>
       <div><dt>Movers</dt><dd>{{ b.num_movers }}</dd></div>
@@ -30,11 +38,14 @@
       <div><dt>Saved</dt><dd>{{ b.created_at[:10] }}</dd></div>
       {% endif %}
     </dl>
+    {% with phone=b.phone %}
+    {% include '_contact_actions.html' %}
+    {% endwith %}
     {% with pickup=b.pickup_address, delivery=b.delivery_address %}
     {% include '_map_buttons.html' %}
     {% endwith %}
     <div class="booking-card-actions">
-      <a class="btn-secondary btn-sm" href="{{ url_for('edit_booking', booking_id=b.id) }}">Edit</a>
+      <a class="btn-primary touch-action-btn touch-action-edit" href="{{ url_for('edit_booking', booking_id=b.id) }}">Edit booking</a>
     </div>
   </article>
   {% endfor %}
@@ -49,6 +60,8 @@
         <th>Start</th>
         <th>Finish</th>
         <th>Customer</th>
+        <th>Status</th>
+        <th>Payment</th>
         <th>Phone</th>
         <th>Crew</th>
         <th>Pickup</th>
@@ -72,6 +85,16 @@
         <td class="nowrap">{{ b|booking_start_time }}</td>
         <td class="nowrap">{{ b|booking_finish_time }}</td>
         <td>{{ b.customer_name }}</td>
+        <td class="nowrap">
+          {% with status=b|booking_job_status %}
+          {% include '_status_badge.html' %}
+          {% endwith %}
+        </td>
+        <td class="nowrap">
+          {% with payment_status=b.payment_status or 'Unpaid' %}
+          {% include '_payment_badge.html' %}
+          {% endwith %}
+        </td>
         <td class="nowrap">{% with phone=b.phone %}{% include '_phone_link.html' %}{% endwith %}</td>
         <td class="nowrap">{{ b|booking_crew }}</td>
         <td>{{ b.pickup_address }}</td>

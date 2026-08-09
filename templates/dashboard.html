@@ -97,7 +97,49 @@
   </div>
 
   {% if jobs %}
-  <div class="table-scroll">
+  <div class="dashboard-job-cards mobile-only">
+    {% for b in jobs %}
+    <article class="booking-card">
+      <header class="booking-card-head">
+        <span class="booking-ref">#{{ b.id }}</span>
+        {% with date_str=b.move_date %}
+        {% include '_date_badge.html' %}
+        {% endwith %}
+      </header>
+      <p class="booking-card-times">
+        <span>{{ b|booking_start_time }}</span>
+        <span aria-hidden="true">→</span>
+        <span>{{ b|booking_finish_time }}</span>
+      </p>
+      <h3 class="booking-card-name">
+        <a class="customer-link" href="{{ url_for('edit_booking', booking_id=b.id) }}">{{ b.customer_name }}</a>
+      </h3>
+      <div class="booking-card-badges">
+        {% with status=b|booking_job_status %}
+        {% include '_status_badge.html' %}
+        {% endwith %}
+        {% with payment_status=b.payment_status or 'Unpaid' %}
+        {% include '_payment_badge.html' %}
+        {% endwith %}
+        {% with double_booking_badge=b.double_booking_badge %}
+        {% include '_double_booking_badge.html' %}
+        {% endwith %}
+      </div>
+      <dl class="booking-card-meta booking-card-meta-key">
+        <div><dt>Crew</dt><dd>{{ b|booking_crew }}</dd></div>
+        <div><dt>Movers</dt><dd>{{ b.num_movers }}</dd></div>
+      </dl>
+      {% with phone=b.phone %}
+      {% include '_contact_actions.html' %}
+      {% endwith %}
+      <div class="booking-card-actions">
+        <a class="btn-primary touch-action-btn touch-action-edit" href="{{ url_for('edit_booking', booking_id=b.id) }}">Edit booking</a>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+
+  <div class="table-scroll desktop-only">
     <table class="sheet dashboard-sheet">
       <thead>
         <tr>

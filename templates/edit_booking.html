@@ -72,8 +72,23 @@
 
   {% set pickup_addr = form.get('pickup_address', booking.pickup_address) %}
   {% set delivery_addr = form.get('delivery_address', booking.delivery_address) %}
+
+  <div class="mobile-quick-actions">
+    {% with phone=booking.phone %}
+    {% include '_contact_actions.html' %}
+    {% endwith %}
+    {% with pickup=pickup_addr, delivery=delivery_addr %}
+    {% include '_map_buttons.html' %}
+    {% endwith %}
+    {% if customer_pay_url and payment_options.can_pay_now %}
+    <a class="touch-action-btn touch-action-pay btn-primary" href="{{ customer_pay_url }}" target="_blank" rel="noopener">Pay link</a>
+    {% endif %}
+  </div>
+
   {% with pickup=pickup_addr, delivery=delivery_addr %}
+  <div class="edit-booking-maps-default">
   {% include '_map_buttons.html' %}
+  </div>
   {% endwith %}
 
   {% if show_invoice_automation %}
