@@ -4,7 +4,7 @@
 {% block content %}
 <section class="panel crew-schedule-header">
   <h2>Crew schedule</h2>
-  <p class="hint">{{ schedule.range_label }}</p>
+  <p class="hint">{{ schedule.range_label }}{% if is_admin %} · <a href="#crew-management">Manage crew</a>{% endif %}</p>
 
   <nav class="filter-bar crew-range-bar" aria-label="Date range">
     {% for key, label in crew_schedule_ranges %}
@@ -74,4 +74,8 @@
   {% endif %}
 </section>
 {% endfor %}
+
+{% if is_admin and crew_members is defined %}
+{% include "_crew_management_section.html" %}
+{% endif %}
 {% endblock %}

@@ -84,10 +84,11 @@ def test_rename_preserves_booking_history():
         crew=unique_name,
     )
     member = db.get_crew_member(crew_id)
-    db.update_crew_member(crew_id, "Renamed Crew", member["phone"], member["role"], 1)
+    renamed = "Renamed Crew {0}".format(time.time_ns())
+    db.update_crew_member(crew_id, renamed, member["phone"], member["role"], 1)
     row = db.get_booking(booking_id)
     assert display_crew(dict(row)) == unique_name, display_crew(dict(row))
-    assert "Renamed Crew" in active_crew_names()
+    assert renamed in active_crew_names()
     return True
 
 
@@ -150,12 +151,15 @@ def test_new_crew_member_appears_in_booking_form():
             "name": unique_name,
             "phone": "0400000000",
             "role": "Driver",
+            "return_to": "crew_schedule",
         },
         follow_redirects=True,
     )
     assert resp.status_code == 200, resp.status_code
     html = resp.get_data(as_text=True)
     assert unique_name in html
+    assert "Crew schedule" in html
+    assert "Add crew member" in html
 
     resp = client.get("/bookings/new")
     assert resp.status_code == 200, resp.status_code
@@ -164,16 +168,47 @@ def test_new_crew_member_appears_in_booking_form():
     return True
 
 
+def test_crew_schedule_shows_management_for_admin():
+    client = _admin_client()
+    resp = client.get("/crew-schedule")
+    assert resp.status_code == 200, resp.status_code
+    html = resp.get_data(as_text=True)
+    assert "Crew schedule" in html
+    assert 'id="crew-management"' in html
+    assert "Crew management" in html
+    assert "Edit" in html
+    assert "Add crew member" in html
+    assert "Deactivate" in html or "Reactivate" in html
+    return True
+
+
+def test_crew_schedule_hides_management_for_staff():
+    client = _staff_client()
+    resp = client.get("/crew-schedule")
+    assert resp.status_code == 200, resp.status_code
+    html = resp.get_data(as_text=True)
+    assert "Crew schedule" in html
+    assert 'id="crew-management"' not in html
+    assert "Add crew member" not in html
+    return True
+
+
 def test_admin_required_for_crew_management():
     staff = _staff_client()
-    resp = staff.get("/settings/crew", follow_redirects=True)
+    resp = staff.post(
+        "/settings/crew",
+        data={"action": "create", "name": "Blocked", "return_to": "crew_schedule"},
+        follow_redirects=True,
+    )
     assert resp.status_code == 200, resp.status_code
     assert "Admin access is required" in resp.get_data(as_text=True)
 
     admin = _admin_client()
-    resp = admin.get("/settings/crew")
+    resp = admin.get("/settings/crew", follow_redirects=True)
     assert resp.status_code == 200, resp.status_code
-    assert "Crew management" in resp.get_data(as_text=True)
+    html = resp.get_data(as_text=True)
+    assert "Crew management" in html
+    assert "Crew schedule" in html
     return True
 
 
@@ -195,7 +230,11 @@ def test_delete_blocked_when_booking_history_exists():
     client = _admin_client()
     resp = client.post(
         "/settings/crew",
-        data={"action": "delete", "crew_id": str(crew_id)},
+        data={
+            "action": "delete",
+            "crew_id": str(crew_id),
+            "return_to": "crew_schedule",
+        },
         follow_redirects=True,
     )
     assert resp.status_code == 200, resp.status_code
@@ -231,6 +270,8 @@ def main() -> int:
         test_rename_preserves_booking_history,
         test_deactivate_preserves_booking_on_edit,
         test_new_crew_member_appears_in_booking_form,
+        test_crew_schedule_shows_management_for_admin,
+        test_crew_schedule_hides_management_for_staff,
         test_admin_required_for_crew_management,
         test_delete_blocked_when_booking_history_exists,
         test_migration_preserves_existing_bookings,

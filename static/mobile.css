@@ -537,4 +537,10 @@
     width: 100%;
     min-height: var(--touch);
   }
+
+  .crew-mgmt-add .btn-primary,
+  .crew-mgmt-add .btn-secondary {
+    width: 100%;
+    min-height: var(--touch);
+  }
 }

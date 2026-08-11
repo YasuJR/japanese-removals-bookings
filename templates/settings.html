@@ -19,7 +19,7 @@
       <p class="status-pill ok">Phase 19</p>
       <p>Manage crew members and trucks for booking assignment, conflict detection, and run sheets.</p>
       {% if is_admin %}
-      <a class="btn-primary btn-sm" href="{{ url_for('crew_management') }}">Crew table</a>
+      <a class="btn-primary btn-sm" href="{{ url_for('crew_schedule') }}#crew-management">Crew management</a>
       {% endif %}
       <a class="btn-secondary btn-sm" href="{{ url_for('truck_management') }}">Truck table</a>
     </article>

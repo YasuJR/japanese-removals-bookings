@@ -714,97 +714,109 @@ def company_settings():
     )
 
 
+def _crew_members_for_management():
+    members = db.list_crew_members()
+    for member in members:
+        member["booking_count"] = db.count_bookings_with_crew_name(member["name"])
+    return members
+
+
+def _crew_management_redirect():
+    return_to = (request.form.get("return_to") or request.args.get("return_to") or "").strip()
+    if return_to == "crew_schedule":
+        return redirect(url_for("crew_schedule") + "#crew-management")
+    return redirect(url_for("crew_schedule") + "#crew-management")
+
+
+def _process_crew_management_post():
+    action = request.form.get("action", "save")
+    if action == "create":
+        name = (request.form.get("name") or "").strip()
+        if not name:
+            flash("Crew name is required.", "error")
+        else:
+            try:
+                db.create_crew_member(
+                    name,
+                    request.form.get("phone", ""),
+                    request.form.get("role", ""),
+                    1,
+                )
+                flash("Crew member added.", "success")
+            except Exception as exc:
+                flash("Could not add crew member: {0}".format(exc), "error")
+    elif action == "update":
+        crew_id_raw = (request.form.get("crew_id") or "").strip()
+        name = (request.form.get("name") or "").strip()
+        if not crew_id_raw.isdigit() or not name:
+            flash("Invalid crew update.", "error")
+        else:
+            member = db.get_crew_member(int(crew_id_raw))
+            if not member:
+                flash("Crew member not found.", "error")
+            else:
+                ok = db.update_crew_member(
+                    int(crew_id_raw),
+                    name,
+                    request.form.get("phone", ""),
+                    request.form.get("role", ""),
+                    int(member["active"]),
+                )
+                flash(
+                    "Crew member updated." if ok else "Crew member not found.",
+                    "success" if ok else "error",
+                )
+    elif action == "deactivate":
+        crew_id_raw = (request.form.get("crew_id") or "").strip()
+        if not crew_id_raw.isdigit():
+            flash("Invalid crew member.", "error")
+        else:
+            ok = db.set_crew_member_active(int(crew_id_raw), 0)
+            flash(
+                "Crew member deactivated." if ok else "Crew member not found.",
+                "success" if ok else "error",
+            )
+    elif action == "reactivate":
+        crew_id_raw = (request.form.get("crew_id") or "").strip()
+        if not crew_id_raw.isdigit():
+            flash("Invalid crew member.", "error")
+        else:
+            ok = db.set_crew_member_active(int(crew_id_raw), 1)
+            flash(
+                "Crew member reactivated." if ok else "Crew member not found.",
+                "success" if ok else "error",
+            )
+    elif action == "delete":
+        crew_id_raw = (request.form.get("crew_id") or "").strip()
+        if not crew_id_raw.isdigit():
+            flash("Invalid crew member.", "error")
+        else:
+            member = db.get_crew_member(int(crew_id_raw))
+            if not member:
+                flash("Crew member not found.", "error")
+            else:
+                history_count = db.count_bookings_with_crew_name(member["name"])
+                if history_count:
+                    flash(
+                        "Cannot delete {0}: used on {1} booking(s). Deactivate instead.".format(
+                            member["name"], history_count
+                        ),
+                        "error",
+                    )
+                elif db.delete_crew_member(int(crew_id_raw)):
+                    flash("Crew member deleted.", "success")
+                else:
+                    flash("Crew member not found.", "error")
+
+
 @app.route("/settings/crew", methods=["GET", "POST"], endpoint="crew_management")
 @auth.admin_required
 def crew_management():
     if request.method == "POST":
-        action = request.form.get("action", "save")
-        if action == "create":
-            name = (request.form.get("name") or "").strip()
-            if not name:
-                flash("Crew name is required.", "error")
-            else:
-                try:
-                    db.create_crew_member(
-                        name,
-                        request.form.get("phone", ""),
-                        request.form.get("role", ""),
-                        1,
-                    )
-                    flash("Crew member added.", "success")
-                except Exception as exc:
-                    flash("Could not add crew member: {0}".format(exc), "error")
-        elif action == "update":
-            crew_id_raw = (request.form.get("crew_id") or "").strip()
-            name = (request.form.get("name") or "").strip()
-            if not crew_id_raw.isdigit() or not name:
-                flash("Invalid crew update.", "error")
-            else:
-                member = db.get_crew_member(int(crew_id_raw))
-                if not member:
-                    flash("Crew member not found.", "error")
-                else:
-                    ok = db.update_crew_member(
-                        int(crew_id_raw),
-                        name,
-                        request.form.get("phone", ""),
-                        request.form.get("role", ""),
-                        int(member["active"]),
-                    )
-                    flash(
-                        "Crew member updated." if ok else "Crew member not found.",
-                        "success" if ok else "error",
-                    )
-        elif action == "deactivate":
-            crew_id_raw = (request.form.get("crew_id") or "").strip()
-            if not crew_id_raw.isdigit():
-                flash("Invalid crew member.", "error")
-            else:
-                ok = db.set_crew_member_active(int(crew_id_raw), 0)
-                flash(
-                    "Crew member deactivated." if ok else "Crew member not found.",
-                    "success" if ok else "error",
-                )
-        elif action == "reactivate":
-            crew_id_raw = (request.form.get("crew_id") or "").strip()
-            if not crew_id_raw.isdigit():
-                flash("Invalid crew member.", "error")
-            else:
-                ok = db.set_crew_member_active(int(crew_id_raw), 1)
-                flash(
-                    "Crew member reactivated." if ok else "Crew member not found.",
-                    "success" if ok else "error",
-                )
-        elif action == "delete":
-            crew_id_raw = (request.form.get("crew_id") or "").strip()
-            if not crew_id_raw.isdigit():
-                flash("Invalid crew member.", "error")
-            else:
-                member = db.get_crew_member(int(crew_id_raw))
-                if not member:
-                    flash("Crew member not found.", "error")
-                else:
-                    history_count = db.count_bookings_with_crew_name(member["name"])
-                    if history_count:
-                        flash(
-                            "Cannot delete {0}: used on {1} booking(s). Deactivate instead.".format(
-                                member["name"], history_count
-                            ),
-                            "error",
-                        )
-                    elif db.delete_crew_member(int(crew_id_raw)):
-                        flash("Crew member deleted.", "success")
-                    else:
-                        flash("Crew member not found.", "error")
-        return redirect(url_for("crew_management"))
+        _process_crew_management_post()
+        return _crew_management_redirect()
 
-    members = db.list_crew_members()
-    for member in members:
-        member["booking_count"] = db.count_bookings_with_crew_name(member["name"])
-    return render_template(
-        "crew_management.html",
-        crew_members=members,
-    )
+    return redirect(url_for("crew_schedule") + "#crew-management")
 
 
 @app.route("/settings/trucks", methods=["GET", "POST"], endpoint="truck_management")
@@ -1504,11 +1516,13 @@ def crew_schedule():
     schedule = build_crew_schedule(
         active_range, date.today(), custom_date=custom_date or None
     )
-    return render_template(
-        "crew_schedule.html",
-        schedule=schedule,
-        active_range=schedule["active_range"],
-    )
+    context = {
+        "schedule": schedule,
+        "active_range": schedule["active_range"],
+    }
+    if auth.is_admin_user(g.user):
+        context["crew_members"] = _crew_members_for_management()
+    return render_template("crew_schedule.html", **context)
 
 
 @app.route("/daily-checklist", methods=["GET", "POST"], endpoint="daily_checklist")

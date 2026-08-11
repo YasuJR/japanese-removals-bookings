@@ -1,0 +1,200 @@
+<section class="panel" id="crew-management">
+  <div class="crew-mgmt-head">
+    <h2>Crew management</h2>
+    <p class="hint">Add, edit, deactivate, or reactivate crew members. Active members appear on bookings, calendars, job sheets, and invoices. Renaming a member does not change historical booking records.</p>
+  </div>
+
+  <h3>Crew members</h3>
+
+  <div class="table-scroll crew-mgmt-table-wrap">
+    <table class="data-table resource-table crew-mgmt-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for member in crew_members %}
+        <tr class="crew-mgmt-view-row {% if not member.active %}crew-row-inactive{% endif %}" id="crew-view-{{ member.id }}">
+          <td>{{ member.name }}</td>
+          <td>{{ member.phone or '—' }}</td>
+          <td>{{ member.role or '—' }}</td>
+          <td>
+            {% if member.active %}
+            <span class="status-badge status-active">Active</span>
+            {% else %}
+            <span class="status-badge status-inactive">Inactive</span>
+            {% endif %}
+          </td>
+          <td class="crew-mgmt-actions-cell">
+            <div class="crew-mgmt-actions">
+              <button type="button" class="btn-secondary btn-sm crew-edit-btn" data-crew-id="{{ member.id }}">Edit</button>
+              <form method="post" action="{{ url_for('crew_management') }}">
+                <input type="hidden" name="return_to" value="crew_schedule">
+                <input type="hidden" name="crew_id" value="{{ member.id }}">
+                {% if member.active %}
+                <button type="submit" name="action" value="deactivate" class="btn-secondary btn-sm">Deactivate</button>
+                {% else %}
+                <button type="submit" name="action" value="reactivate" class="btn-primary btn-sm">Reactivate</button>
+                {% endif %}
+              </form>
+            </div>
+          </td>
+        </tr>
+        <tr class="crew-mgmt-edit-panel {% if not member.active %}crew-row-inactive{% endif %}" id="crew-edit-{{ member.id }}" hidden>
+          <form method="post" action="{{ url_for('crew_management') }}">
+            <input type="hidden" name="return_to" value="crew_schedule">
+            <input type="hidden" name="crew_id" value="{{ member.id }}">
+            <td><input type="text" name="name" value="{{ member.name }}" required aria-label="Name for {{ member.name }}"></td>
+            <td><input type="tel" name="phone" value="{{ member.phone }}" aria-label="Phone for {{ member.name }}"></td>
+            <td><input type="text" name="role" value="{{ member.role }}" aria-label="Role for {{ member.name }}"></td>
+            <td>
+              {% if member.active %}
+              <span class="status-badge status-active">Active</span>
+              {% else %}
+              <span class="status-badge status-inactive">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="crew-mgmt-actions-cell">
+              <div class="crew-mgmt-actions">
+                <button type="submit" name="action" value="update" class="btn-primary btn-sm">Save</button>
+                <button type="button" class="btn-secondary btn-sm crew-cancel-btn" data-crew-id="{{ member.id }}">Cancel</button>
+              </div>
+            </td>
+          </form>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty">No crew members yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="crew-mgmt-cards">
+    {% for member in crew_members %}
+    <article class="crew-mgmt-card {% if not member.active %}crew-row-inactive{% endif %}" id="crew-card-{{ member.id }}">
+      <div class="crew-mgmt-view-row" id="crew-card-view-{{ member.id }}">
+        <div class="crew-mgmt-card-head">
+          <strong>{{ member.name }}</strong>
+          {% if member.active %}
+          <span class="status-badge status-active">Active</span>
+          {% else %}
+          <span class="status-badge status-inactive">Inactive</span>
+          {% endif %}
+        </div>
+        <p class="crew-mgmt-meta">{{ member.role or 'No role set' }} · {{ member.phone or 'No phone' }}</p>
+        <div class="crew-mgmt-actions">
+          <button type="button" class="btn-secondary crew-edit-btn" data-crew-id="{{ member.id }}">Edit</button>
+          <form method="post" action="{{ url_for('crew_management') }}">
+            <input type="hidden" name="return_to" value="crew_schedule">
+            <input type="hidden" name="crew_id" value="{{ member.id }}">
+            {% if member.active %}
+            <button type="submit" name="action" value="deactivate" class="btn-secondary">Deactivate</button>
+            {% else %}
+            <button type="submit" name="action" value="reactivate" class="btn-primary">Reactivate</button>
+            {% endif %}
+          </form>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('crew_management') }}" class="form-grid resource-form crew-mgmt-edit-panel crew-mgmt-edit-form" id="crew-card-edit-{{ member.id }}" hidden>
+        <input type="hidden" name="return_to" value="crew_schedule">
+        <input type="hidden" name="crew_id" value="{{ member.id }}">
+        <label>
+          Name *
+          <input type="text" name="name" value="{{ member.name }}" required>
+        </label>
+        <label>
+          Phone
+          <input type="tel" name="phone" value="{{ member.phone }}">
+        </label>
+        <label>
+          Role
+          <input type="text" name="role" value="{{ member.role }}">
+        </label>
+        <div class="full-width crew-mgmt-actions">
+          <button type="submit" name="action" value="update" class="btn-primary">Save</button>
+          <button type="button" class="btn-secondary crew-cancel-btn" data-crew-id="{{ member.id }}">Cancel</button>
+        </div>
+      </form>
+    </article>
+    {% else %}
+    <p class="empty">No crew members yet.</p>
+    {% endfor %}
+  </div>
+
+  <div class="crew-mgmt-add">
+    <button type="button" class="btn-primary" id="crew-add-toggle">Add crew member</button>
+    <form method="post" action="{{ url_for('crew_management') }}" class="form-grid resource-form crew-mgmt-add-form" id="crew-add-form" hidden>
+      <input type="hidden" name="return_to" value="crew_schedule">
+      <input type="hidden" name="action" value="create">
+      <label>
+        Name *
+        <input type="text" name="name" required>
+      </label>
+      <label>
+        Phone
+        <input type="tel" name="phone">
+      </label>
+      <label>
+        Role
+        <input type="text" name="role" placeholder="Driver">
+      </label>
+      <div class="full-width crew-mgmt-actions">
+        <button type="submit" class="btn-primary">Save new crew member</button>
+        <button type="button" class="btn-secondary" id="crew-add-cancel">Cancel</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<script>
+(function () {
+  function hideAllEditPanels() {
+    document.querySelectorAll(".crew-mgmt-edit-panel").forEach(function (panel) {
+      panel.hidden = true;
+    });
+    document.querySelectorAll(".crew-mgmt-view-row").forEach(function (row) {
+      row.hidden = false;
+    });
+  }
+
+  document.querySelectorAll(".crew-edit-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var crewId = btn.getAttribute("data-crew-id");
+      hideAllEditPanels();
+      var view = document.getElementById("crew-view-" + crewId);
+      var edit = document.getElementById("crew-edit-" + crewId);
+      var cardView = document.getElementById("crew-card-view-" + crewId);
+      var cardEdit = document.getElementById("crew-card-edit-" + crewId);
+      if (view) view.hidden = true;
+      if (edit) edit.hidden = false;
+      if (cardView) cardView.hidden = true;
+      if (cardEdit) cardEdit.hidden = false;
+    });
+  });
+
+  document.querySelectorAll(".crew-cancel-btn").forEach(function (btn) {
+    btn.addEventListener("click", hideAllEditPanels);
+  });
+
+  var addToggle = document.getElementById("crew-add-toggle");
+  var addForm = document.getElementById("crew-add-form");
+  var addCancel = document.getElementById("crew-add-cancel");
+  if (addToggle && addForm) {
+    addToggle.addEventListener("click", function () {
+      addForm.hidden = false;
+      addToggle.hidden = true;
+    });
+  }
+  if (addCancel && addForm && addToggle) {
+    addCancel.addEventListener("click", function () {
+      addForm.hidden = true;
+      addToggle.hidden = false;
+    });
+  }
+})();
+</script>
