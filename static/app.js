@@ -1,10 +1,45 @@
 (function () {
-  var toggle = document.querySelector(".nav-toggle");
-  var nav = document.getElementById("main-nav");
-  if (toggle && nav) {
-    toggle.addEventListener("click", function () {
-      var open = nav.classList.toggle("is-open");
-      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  var moreBtn = document.getElementById("mobile-nav-more-btn");
+  var morePanel = document.getElementById("mobile-more-panel");
+  var moreBackdrop = document.getElementById("mobile-more-backdrop");
+  var moreClose = document.getElementById("mobile-more-close");
+
+  function setMoreOpen(open) {
+    if (!morePanel || !moreBtn) {
+      return;
+    }
+    morePanel.hidden = !open;
+    if (moreBackdrop) {
+      moreBackdrop.hidden = !open;
+    }
+    moreBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) {
+      moreBtn.classList.add("active");
+    } else {
+      moreBtn.classList.remove("active");
+    }
+  }
+
+  if (moreBtn && morePanel) {
+    moreBtn.addEventListener("click", function () {
+      setMoreOpen(morePanel.hidden);
+    });
+  }
+  if (moreClose) {
+    moreClose.addEventListener("click", function () {
+      setMoreOpen(false);
+    });
+  }
+  if (moreBackdrop) {
+    moreBackdrop.addEventListener("click", function () {
+      setMoreOpen(false);
+    });
+  }
+  if (morePanel) {
+    morePanel.querySelectorAll("a").forEach(function (link) {
+      link.addEventListener("click", function () {
+        setMoreOpen(false);
+      });
     });
   }
 

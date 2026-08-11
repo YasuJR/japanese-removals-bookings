@@ -1,12 +1,10 @@
 /* Mobile responsive layout — iPhone / Android (~390px and up to tablet) */
 
-.mobile-only {
-  display: block;
-}
-
-@media (min-width: 900px) {
-  .mobile-only {
-    display: none;
+@media (min-width: 768px) {
+  .mobile-bottom-nav,
+  .mobile-more-panel,
+  .mobile-more-backdrop {
+    display: none !important;
   }
 }
 
@@ -44,15 +42,111 @@
     font-size: 0.72rem;
   }
 
-  .nav-toggle {
-    min-width: 5.5rem;
-    font-size: 0.95rem;
+  .main-nav-desktop {
+    display: none;
   }
 
-  .main-nav a {
+  body {
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 120;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.15rem;
+    padding: 0.35rem 0.35rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(180deg, var(--navy-light) 0%, var(--navy) 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.18);
+  }
+
+  .mobile-bottom-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     min-height: var(--touch);
-    padding: 0.75rem 0.85rem;
+    padding: 0.35rem 0.25rem;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.92);
+    text-decoration: none;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .mobile-bottom-link.active,
+  .mobile-bottom-link:hover {
+    background: rgba(188, 0, 45, 0.35);
+    color: #fff;
+  }
+
+  .mobile-bottom-new {
+    background: rgba(188, 0, 45, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    font-size: 0.82rem;
+  }
+
+  .mobile-bottom-label {
+    text-align: center;
+    line-height: 1.15;
+  }
+
+  .mobile-more-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 130;
+    background: rgba(15, 23, 42, 0.45);
+  }
+
+  .mobile-more-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+    z-index: 140;
+    max-height: min(70vh, 32rem);
+    overflow: auto;
+    background: var(--navy);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.25);
+  }
+
+  .mobile-more-panel-inner {
+    padding: 0.85rem 0.75rem 1rem;
+  }
+
+  .mobile-more-title {
+    margin: 0 0 0.65rem;
+    color: #fff;
     font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .mobile-more-links {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .mobile-more-links a {
+    min-height: var(--touch);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .mobile-more-close {
+    width: 100%;
+    margin-top: 0.75rem;
+  }
+
+  .driver-run-tools {
+    margin: 0.5rem 0 0;
   }
 
   /* Buttons — large tap targets */

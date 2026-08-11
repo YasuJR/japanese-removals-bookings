@@ -4,7 +4,7 @@
 {% block content %}
 <section class="panel">
   <h2>Settings</h2>
-  <p class="hint">Configure company defaults and integrations.</p>
+  <p class="hint">Configure company defaults, integrations, and admin tools.</p>
 
   <div class="integration-grid">
     <article class="integration-card">
@@ -22,6 +22,55 @@
       <a class="btn-primary btn-sm" href="{{ url_for('crew_schedule') }}#crew-management">Crew management</a>
       {% endif %}
       <a class="btn-secondary btn-sm" href="{{ url_for('truck_management') }}">Truck table</a>
+    </article>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Admin &amp; reports</h2>
+  <p class="hint">Business reports, exports, and secondary booking lists.</p>
+
+  <div class="integration-grid">
+    <article class="integration-card">
+      <h3>Executive dashboard</h3>
+      <p>Revenue targets, crew utilization, and business overview.</p>
+      <a class="btn-primary btn-sm" href="{{ url_for('executive_dashboard') }}">Open Executive</a>
+    </article>
+
+    <article class="integration-card">
+      <h3>Profit dashboard</h3>
+      <p>Job profit, margins, and monthly performance.</p>
+      <a class="btn-primary btn-sm" href="{{ url_for('profit') }}">Open Profit</a>
+    </article>
+
+    <article class="integration-card">
+      <h3>Automation hub</h3>
+      <p>SMS, Gmail, Stripe, Xero, and review automations.</p>
+      <a class="btn-primary btn-sm" href="{{ url_for('automation_hub') }}">Open Automation</a>
+    </article>
+
+    <article class="integration-card">
+      <h3>Export bookings (CSV)</h3>
+      <p>Download all bookings for backup or spreadsheet analysis.</p>
+      <a class="btn-secondary btn-sm" href="{{ url_for('export_csv') }}">Export CSV</a>
+    </article>
+
+    <article class="integration-card">
+      <h3>Leads</h3>
+      <p>Draft leads from inbound SMS before they become bookings.</p>
+      <a class="btn-secondary btn-sm" href="{{ url_for('leads') }}">Open Leads</a>
+    </article>
+
+    <article class="integration-card">
+      <h3>Upcoming bookings</h3>
+      <p>Future jobs sorted by move date. Calendar is the main schedule view.</p>
+      <a class="btn-secondary btn-sm" href="{{ url_for('upcoming') }}">Upcoming list</a>
+    </article>
+
+    <article class="integration-card">
+      <h3>All bookings</h3>
+      <p>Full booking list. Search is the fastest way to find a specific job.</p>
+      <a class="btn-secondary btn-sm" href="{{ url_for('all_bookings') }}">All bookings</a>
     </article>
   </div>
 </section>

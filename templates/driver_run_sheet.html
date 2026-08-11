@@ -6,6 +6,9 @@
   <section class="panel driver-run-header">
     <h2>Driver run sheet</h2>
     <p class="hint">{{ sheet.date_heading }}{% if sheet.is_today %} · Today{% endif %}</p>
+    <p class="driver-run-tools">
+      <a class="btn-secondary btn-sm" href="{{ url_for('daily_checklist', filter='today') }}">Daily checklist</a>
+    </p>
 
     <nav class="driver-crew-bar" aria-label="Crew member">
       {% for name in crew_options %}

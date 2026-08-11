@@ -4,7 +4,7 @@
 {% block content %}
 <section class="panel">
   <h2>Search bookings</h2>
-  <p class="hint">Search by name, phone, email, address, date, notes, or booking number.</p>
+  <p class="hint">Search by name, phone, email, address, date, notes, or booking number. <a href="{{ url_for('all_bookings') }}">Browse all bookings</a>.</p>
 
   <form method="get" action="{{ url_for('search_bookings') }}" class="search-bar">
     <input type="search" name="q" value="{{ query }}" placeholder="e.g. Smith, 0412, Perth, 15"

@@ -1,0 +1,61 @@
+{% set settings_active_endpoints = (
+  'settings', 'company_settings', 'xero_settings', 'stripe_settings',
+  'sms_settings', 'gmail_settings', 'review_settings', 'truck_management'
+) %}
+{% set crew_active_endpoints = ('crew_schedule', 'crew_management') %}
+{% set driver_active_endpoints = ('driver', 'driver_run_sheet_pdf') %}
+
+<nav class="main-nav main-nav-desktop" aria-label="Main">
+  <a href="{{ url_for('ceo_dashboard') }}" class="{% if request.endpoint == 'ceo_dashboard' %}active{% endif %}">Home</a>
+  <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
+  <a href="{{ url_for('booking_calendar') }}" class="{% if request.endpoint == 'booking_calendar' %}active{% endif %}">Calendar</a>
+  <a href="{{ url_for('new_booking') }}" class="nav-new {% if request.endpoint == 'new_booking' %}active{% endif %}">New</a>
+  <a href="{{ url_for('crew_schedule') }}" class="{% if request.endpoint in crew_active_endpoints %}active{% endif %}">Crew</a>
+  <a href="{{ url_for('driver') }}" class="{% if request.endpoint in driver_active_endpoints %}active{% endif %}">Driver</a>
+  <a href="{{ url_for('outstanding_invoices') }}" class="{% if request.endpoint == 'outstanding_invoices' %}active{% endif %}">Invoices</a>
+  <a href="{{ url_for('search_bookings') }}" class="{% if request.endpoint == 'search_bookings' %}active{% endif %}">Search</a>
+  <a href="{{ url_for('settings') }}" class="{% if request.endpoint in settings_active_endpoints %}active{% endif %}">Settings</a>
+  <a href="{{ url_for('logout') }}" class="nav-logout">Log out{% if g.user %} ({{ g.user.username }}){% endif %}</a>
+</nav>
+
+<nav class="mobile-bottom-nav" aria-label="Primary mobile">
+  <a href="{{ url_for('dashboard') }}" class="mobile-bottom-link{% if request.endpoint == 'dashboard' %} active{% endif %}">
+    <span class="mobile-bottom-label">Dashboard</span>
+  </a>
+  <a href="{{ url_for('booking_calendar') }}" class="mobile-bottom-link{% if request.endpoint == 'booking_calendar' %} active{% endif %}">
+    <span class="mobile-bottom-label">Calendar</span>
+  </a>
+  <a href="{{ url_for('new_booking') }}" class="mobile-bottom-link mobile-bottom-new{% if request.endpoint == 'new_booking' %} active{% endif %}">
+    <span class="mobile-bottom-label">New</span>
+  </a>
+  <a href="{{ url_for('crew_schedule') }}" class="mobile-bottom-link{% if request.endpoint in crew_active_endpoints %} active{% endif %}">
+    <span class="mobile-bottom-label">Crew</span>
+  </a>
+  <button type="button" class="mobile-bottom-link mobile-bottom-more" id="mobile-nav-more-btn" aria-expanded="false" aria-controls="mobile-more-panel">
+    <span class="mobile-bottom-label">More</span>
+  </button>
+</nav>
+
+<div class="mobile-more-panel" id="mobile-more-panel" hidden>
+  <div class="mobile-more-panel-inner">
+    <p class="mobile-more-title">More</p>
+    <div class="mobile-more-links">
+      <a href="{{ url_for('ceo_dashboard') }}" class="{% if request.endpoint == 'ceo_dashboard' %}active{% endif %}">Home</a>
+      <a href="{{ url_for('driver') }}" class="{% if request.endpoint in driver_active_endpoints %}active{% endif %}">Driver</a>
+      <a href="{{ url_for('outstanding_invoices') }}" class="{% if request.endpoint == 'outstanding_invoices' %}active{% endif %}">Invoices</a>
+      <a href="{{ url_for('search_bookings') }}" class="{% if request.endpoint == 'search_bookings' %}active{% endif %}">Search</a>
+      <a href="{{ url_for('settings') }}" class="{% if request.endpoint in settings_active_endpoints %}active{% endif %}">Settings</a>
+      <a href="{{ url_for('executive_dashboard') }}" class="{% if request.endpoint == 'executive_dashboard' %}active{% endif %}">Executive</a>
+      <a href="{{ url_for('profit') }}" class="{% if request.endpoint in ('profit', 'profit_export_csv') %}active{% endif %}">Profit</a>
+      <a href="{{ url_for('automation_hub') }}" class="{% if request.endpoint == 'automation_hub' %}active{% endif %}">Automation</a>
+      <a href="{{ url_for('daily_checklist') }}" class="{% if request.endpoint == 'daily_checklist' %}active{% endif %}">Checklist</a>
+      <a href="{{ url_for('leads') }}" class="{% if request.endpoint == 'leads' %}active{% endif %}">Leads</a>
+      <a href="{{ url_for('upcoming') }}" class="{% if request.endpoint == 'upcoming' %}active{% endif %}">Upcoming</a>
+      <a href="{{ url_for('all_bookings') }}" class="{% if request.endpoint == 'all_bookings' %}active{% endif %}">All bookings</a>
+      <a href="{{ url_for('export_csv') }}">Export CSV</a>
+      <a href="{{ url_for('logout') }}" class="nav-logout">Log out{% if g.user %} ({{ g.user.username }}){% endif %}</a>
+    </div>
+    <button type="button" class="btn-secondary mobile-more-close" id="mobile-more-close">Close</button>
+  </div>
+</div>
+<div class="mobile-more-backdrop" id="mobile-more-backdrop" hidden></div>

@@ -19,29 +19,7 @@
           <p class="tagline">Perth, Western Australia</p>
         </div>
       </div>
-      <button type="button" class="nav-toggle" aria-expanded="false" aria-controls="main-nav">
-        Menu
-      </button>
-      <nav id="main-nav" class="main-nav">
-        <a href="{{ url_for('ceo_dashboard') }}" class="{% if request.endpoint == 'ceo_dashboard' %}active{% endif %}">Home</a>
-        <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
-        <a href="{{ url_for('booking_calendar') }}" class="{% if request.endpoint == 'booking_calendar' %}active{% endif %}">Calendar</a>
-        <a href="{{ url_for('executive_dashboard') }}" class="{% if request.endpoint == 'executive_dashboard' %}active{% endif %}">Executive</a>
-        <a href="{{ url_for('profit') }}" class="{% if request.endpoint in ('profit', 'profit_export_csv') %}active{% endif %}">Profit</a>
-        <a href="{{ url_for('outstanding_invoices') }}" class="{% if request.endpoint == 'outstanding_invoices' %}active{% endif %}">Invoices</a>
-        <a href="{{ url_for('automation_hub') }}" class="{% if request.endpoint == 'automation_hub' %}active{% endif %}">Automation</a>
-        <a href="{{ url_for('crew_schedule') }}" class="{% if request.endpoint == 'crew_schedule' %}active{% endif %}">Crew</a>
-        <a href="{{ url_for('daily_checklist') }}" class="{% if request.endpoint == 'daily_checklist' %}active{% endif %}">Checklist</a>
-        <a href="{{ url_for('driver') }}" class="{% if request.endpoint in ('driver', 'driver_run_sheet_pdf') %}active{% endif %}">Driver</a>
-        <a href="{{ url_for('leads') }}" class="{% if request.endpoint == 'leads' %}active{% endif %}">Leads</a>
-        <a href="{{ url_for('upcoming') }}" class="{% if request.endpoint == 'upcoming' %}active{% endif %}">Upcoming</a>
-        <a href="{{ url_for('new_booking') }}" class="{% if request.endpoint == 'new_booking' %}active{% endif %}">New</a>
-        <a href="{{ url_for('search_bookings') }}" class="{% if request.endpoint == 'search_bookings' %}active{% endif %}">Search</a>
-        <a href="{{ url_for('all_bookings') }}" class="{% if request.endpoint == 'all_bookings' %}active{% endif %}">All</a>
-        <a class="nav-export" href="{{ url_for('export_csv') }}">Export CSV</a>
-        <a href="{{ url_for('settings') }}" class="{% if request.endpoint in ('settings', 'company_settings', 'xero_settings') %}active{% endif %}">Settings</a>
-        <a href="{{ url_for('logout') }}" class="nav-logout">Log out{% if g.user %} ({{ g.user.username }}){% endif %}</a>
-      </nav>
+      {% include '_navigation.html' %}
     </div>
   </header>
 
