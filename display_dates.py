@@ -1,6 +1,6 @@
 """Format move dates for booking tables (display only; DB stays ISO)."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict
 
 _WEEKDAY_SHORT = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -21,6 +21,10 @@ _MONTH_SHORT = (
 
 
 def _parse_iso_date(date_string: Any):
+    if isinstance(date_string, datetime):
+        return date_string.date()
+    if isinstance(date_string, date):
+        return date_string
     text = str(date_string or "").strip()[:10]
     if not text:
         return None
@@ -30,10 +34,16 @@ def _parse_iso_date(date_string: Any):
         return None
 
 
+def normalize_move_date(value: Any) -> str:
+    """Return move_date as YYYY-MM-DD for queries and calendar grouping."""
+    parsed = _parse_iso_date(value)
+    return parsed.isoformat() if parsed else ""
+
+
 def format_display_date(date_string: Any) -> Dict[str, str]:
     """
     Two-line display parts for booking tables.
-    Example: {'weekday': 'Sun', 'day_month': '7 Jun'}
+    Example: {'weekday': 'Sun', 'day_month': '7 Jun 2026'}
     """
     parsed = _parse_iso_date(date_string)
     if parsed is None:
@@ -41,8 +51,8 @@ def format_display_date(date_string: Any) -> Dict[str, str]:
         return {"weekday": "—", "day_month": fallback}
     return {
         "weekday": _WEEKDAY_SHORT[parsed.weekday()],
-        "day_month": "{0} {1}".format(
-            parsed.day, _MONTH_SHORT[parsed.month - 1]
+        "day_month": "{0} {1} {2}".format(
+            parsed.day, _MONTH_SHORT[parsed.month - 1], parsed.year
         ),
     }
 

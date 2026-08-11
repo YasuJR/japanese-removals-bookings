@@ -1155,14 +1155,24 @@ def list_by_date(move_date: str) -> List[sqlite3.Row]:
 
 def list_between_dates(start_date: str, end_date: str) -> List[sqlite3.Row]:
     with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT * FROM bookings
-            WHERE move_date >= ? AND move_date <= ?
-            ORDER BY move_date ASC, start_time ASC, id ASC
-            """,
-            (start_date, end_date),
-        ).fetchall()
+        if db_backend.is_postgres():
+            rows = conn.execute(
+                """
+                SELECT * FROM bookings
+                WHERE move_date::date >= %s::date AND move_date::date <= %s::date
+                ORDER BY move_date ASC, start_time ASC, id ASC
+                """,
+                (start_date, end_date),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT * FROM bookings
+                WHERE move_date >= ? AND move_date <= ?
+                ORDER BY move_date ASC, start_time ASC, id ASC
+                """,
+                (start_date, end_date),
+            ).fetchall()
     return list(rows)
 
 

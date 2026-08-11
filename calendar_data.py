@@ -16,6 +16,7 @@ from booking_times import (
 )
 from crew import active_crew_names, crew_from_storage, display_crew
 import double_booking
+from display_dates import normalize_move_date
 
 STATUS_FILTERS = [
     ("all", "All"),
@@ -32,7 +33,12 @@ PAYMENT_FILTERS = [
 
 
 def _booking_dict(row) -> Dict[str, Any]:
-    return dict(row) if row else {}
+    data = dict(row) if row else {}
+    if data:
+        iso = normalize_move_date(data.get("move_date"))
+        if iso:
+            data["move_date"] = iso
+    return data
 
 
 def _time_to_minutes(hm: str) -> int:
@@ -45,7 +51,7 @@ def _time_to_minutes(hm: str) -> int:
 
 def calendar_event(booking: Dict[str, Any]) -> Dict[str, Any]:
     """Serialize one booking for the calendar UI."""
-    b = dict(booking)
+    b = _booking_dict(booking)
     bid = int(b["id"])
     status = job_status.display(b)
     payment = invoice.normalize_payment_status(b.get("payment_status"))
@@ -56,7 +62,7 @@ def calendar_event(booking: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "id": bid,
         "customer_name": b.get("customer_name") or "—",
-        "move_date": (b.get("move_date") or "")[:10],
+        "move_date": normalize_move_date(b.get("move_date")),
         "start_time": start_hm,
         "finish_time": finish_hm,
         "start_display": format_time_12h(start_hm),
