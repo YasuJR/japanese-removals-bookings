@@ -192,10 +192,39 @@ def test_new_booking_page_includes_mover_pricing_scripts():
     html = resp.get_data(as_text=True)
     assert 'name="num_movers"' in html
     assert 'name="callout_fee"' in html
+    assert 'id="hourly_rate"' in html
     assert "mover_pricing.js" in html
-    assert "new_booking_pricing.js" in html
     assert "117.5" in (ROOT / "static" / "mover_pricing.js").read_text()
-    assert 'id="new-booking-invoice-panel"' in html
+    assert "Net sales (ex GST)" not in html
+    assert "Invoice overrides" not in html
+    assert "GST inclusive pricing" not in html
+    assert "Invoice status" not in html
+    assert "Payment status" not in html
+    assert 'id="new-booking-invoice-panel"' not in html
+    assert "new_booking_pricing.js" not in html
+    return True
+
+
+def test_new_booking_page_simplified_layout():
+    db.init_db()
+    uid = db.create_staff_user(
+        "new-booking-ui-{0}".format(os.getpid()),
+        auth.hash_password("test"),
+        "New Booking UI",
+    )
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = uid
+        sess["username"] = "new-booking-ui"
+
+    html = client.get("/bookings/new").get_data(as_text=True)
+    assert "Paste customer information" in html or "Analyse" in html
+    assert "Extra charges" in html or "extra" in html.lower()
+    assert "Hourly rate" in html
+    assert "Callout fee" in html
+    assert "Save booking" in html or "Confirm Booking" in html
+    assert "invoice_bank_account_name" not in html
+    assert "invoice_custom_text" not in html
     return True
 
 
@@ -250,6 +279,7 @@ def main():
         test_preview_calculate_endpoint_returns_updated_total_for_three_movers,
         test_preview_calculate_endpoint_returns_updated_total_for_two_movers,
         test_new_booking_page_includes_mover_pricing_scripts,
+        test_new_booking_page_simplified_layout,
         test_edit_booking_page_includes_mover_pricing_script,
     ]
     failed = 0

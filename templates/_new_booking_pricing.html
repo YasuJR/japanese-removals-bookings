@@ -1,0 +1,23 @@
+<section class="panel new-booking-pricing">
+  <h3>Pricing</h3>
+  <p class="hint muted">GST and bank details use Settings → Company defaults when you create an invoice later.</p>
+  <div class="form-grid invoice-fields">
+    <label>
+      Hourly rate ($)
+      <input type="number" name="hourly_rate" id="hourly_rate" min="0" step="0.01"
+             value="{{ form.get('hourly_rate', company_settings.default_hourly_rate) }}">
+    </label>
+    <label>
+      Callout fee ($)
+      <input type="number" name="callout_fee" id="callout_fee" min="0" step="0.01"
+             value="{{ form.get('callout_fee', company_settings.default_callout_fee) }}">
+    </label>
+  </div>
+  {% if company_settings.default_gst_enabled %}
+  <input type="hidden" name="gst_enabled" value="on">
+  {% endif %}
+  <input type="hidden" name="payment_status" value="Unpaid">
+  <input type="hidden" name="invoice_status" value="">
+</section>
+
+<script src="{{ url_for('static', filename='mover_pricing.js') }}"></script>

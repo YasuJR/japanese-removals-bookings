@@ -2,21 +2,22 @@
 {% block title %}New booking{% endblock %}
 
 {% block content %}
-<section class="panel">
-  <h2>New booking</h2>
-  <p class="hint">Paste customer details to analyse, review the fields, then confirm the booking.</p>
-
-  <form method="post" class="booking-form">
+<form method="post" class="booking-form">
+  <section class="panel">
+    <h2>New booking</h2>
+    <p class="hint">Paste customer details to analyse, review the fields, then confirm the booking.</p>
     {% include '_paste_enquiry_panel.html' %}
     {% include '_double_booking_banner.html' %}
     {% include '_booking_form.html' %}
-    {% include '_extra_charges.html' %}
-    {% include '_invoice_panel.html' %}
-    <div class="form-actions">
-      <button type="submit" name="action" value="save" class="btn-primary">
-        {% if parsed_summary %}Confirm Booking{% else %}Save booking{% endif %}
-      </button>
-    </div>
-  </form>
-</section>
+  </section>
+
+  {% include '_extra_charges.html' %}
+  {% include '_new_booking_pricing.html' %}
+
+  <div class="form-actions">
+    <button type="submit" name="action" value="save" class="btn-primary">
+      {% if parsed_summary %}Confirm Booking{% else %}Save booking{% endif %}
+    </button>
+  </div>
+</form>
 {% endblock %}

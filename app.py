@@ -1580,7 +1580,6 @@ def new_booking():
                 parsed_summary=enquiry_parser.summary_rows(parsed),
                 parsed_warnings=parsed.get("warnings") or [],
                 crew_warnings=[],
-                invoice_summary=_form_invoice_summary(form),
                 **_double_booking_context(form),
             )
 
@@ -1607,7 +1606,6 @@ def new_booking():
                 parsed_summary=parsed_summary,
                 parsed_warnings=parsed_warnings,
                 crew_warnings=crew_warnings,
-                invoice_summary=_form_invoice_summary(data),
                 **ctx,
             )
         _flash_crew_warnings(crew_warnings)
@@ -1626,7 +1624,6 @@ def new_booking():
         form=form,
         paste_text="",
         crew_warnings=[],
-        invoice_summary=_form_invoice_summary(form),
         **_double_booking_context(form),
     )
 
