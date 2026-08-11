@@ -47,6 +47,110 @@ Thanks, Michael""",
     "TEST 5": """Hi, moving from Cannington to Innaloo sometime next week. Please call me on 0412 111 222.""",
 }
 
+LABELLED_NAME_DUAL_ADDRESS = """First Name: Prava
+Last Name: Timilsina
+Email: tprava@hotmail.com
+Phone Number: 04333911541
+6 Morgan Street, Shenton Park and the new address is
+128A Broome Street, Cottesloe"""
+
+MOVING_TO_DUAL_ADDRESS = """Name: Alex Chen
+0412 999 888
+12 King Street, Fremantle moving to 45 Beach Road, Scarborough"""
+
+DESTINATION_IS_DUAL_ADDRESS = """Contact: Jamie Lee
+0400 222 333
+3/88 Hay Street, Subiaco and destination is
+Unit 7, 19 Park Avenue, Nedlands WA 6009"""
+
+NEW_PLACE_DUAL_ADDRESS = """Hi there
+Sam Taylor
+0412 345 678
+22 River Road, Applecross — new place is 5 Ocean Drive, Cottesloe"""
+
+NOTES_ONLY_EXTRA = """First Name: Casey
+Last Name: Nguyen
+Phone: 0411 222 333
+Email: casey@example.com
+7 Short Street, Belmont and the new address is
+14 Long Avenue, Morley
+Please bring extra boxes and a dolly."""
+
+
+def _assert_notes_exclude_structured(parsed, *forbidden):
+    notes = (parsed.get("notes") or "").lower()
+    for fragment in forbidden:
+        assert fragment.lower() not in notes, "notes must not contain {0!r}: {1!r}".format(
+            fragment, parsed.get("notes")
+        )
+
+
+def test_labelled_first_last_name_and_new_address_is():
+    parsed = _parse(LABELLED_NAME_DUAL_ADDRESS)
+    assert parsed["customer_name"] == "Prava Timilsina"
+    assert parsed["phone"] == "0433 911 541"
+    assert parsed["email"] == "tprava@hotmail.com"
+    assert parsed["pickup_address"] == "6 Morgan Street, Shenton Park"
+    assert parsed["delivery_address"] == "128A Broome Street, Cottesloe"
+    assert parsed["notes"] == ""
+    assert "is" not in (parsed["delivery_address"] or "").lower().split()
+    return True
+
+
+def test_moving_to_dual_street_addresses():
+    parsed = _parse(MOVING_TO_DUAL_ADDRESS)
+    assert parsed["customer_name"] == "Alex Chen"
+    assert parsed["pickup_address"] == "12 King Street, Fremantle"
+    assert parsed["delivery_address"] == "45 Beach Road, Scarborough"
+    _assert_notes_exclude_structured(parsed, "Alex Chen", "King Street", "Beach Road")
+    return True
+
+
+def test_destination_is_dual_street_addresses():
+    parsed = _parse(DESTINATION_IS_DUAL_ADDRESS)
+    assert parsed["customer_name"] == "Jamie Lee"
+    assert parsed["pickup_address"] == "3/88 Hay Street, Subiaco"
+    assert parsed["delivery_address"] == "Unit 7, 19 Park Avenue, Nedlands WA 6009"
+    _assert_notes_exclude_structured(parsed, "Jamie Lee", "Hay Street", "Park Avenue")
+    return True
+
+
+def test_new_place_is_dual_street_addresses():
+    parsed = _parse(NEW_PLACE_DUAL_ADDRESS)
+    assert parsed["customer_name"] == "Sam Taylor"
+    assert parsed["phone"] == "0412 345 678"
+    assert parsed["pickup_address"] == "22 River Road, Applecross"
+    assert parsed["delivery_address"] == "5 Ocean Drive, Cottesloe"
+    _assert_notes_exclude_structured(parsed, "Sam Taylor", "River Road", "Ocean Drive")
+    return True
+
+
+def test_structured_fields_not_in_notes():
+    parsed = _parse(NOTES_ONLY_EXTRA)
+    assert parsed["customer_name"] == "Casey Nguyen"
+    assert parsed["pickup_address"] == "7 Short Street, Belmont"
+    assert parsed["delivery_address"] == "14 Long Avenue, Morley"
+    assert "boxes" in parsed["notes"].lower()
+    assert "dolly" in parsed["notes"].lower()
+    _assert_notes_exclude_structured(
+        parsed,
+        "Casey",
+        "Nguyen",
+        "Short Street",
+        "Long Avenue",
+        "First Name",
+        "Last Name",
+    )
+    return True
+
+
+def test_invalid_tokens_never_used_as_addresses():
+    parsed = _parse(LABELLED_NAME_DUAL_ADDRESS)
+    for field in ("pickup_address", "delivery_address"):
+        value = (parsed.get(field) or "").strip().lower()
+        assert value not in {"is", "to", "and", "from"}, field
+    return True
+
 
 def _parse(text):
     return enquiry_parser.parse_pasted_text(text, reference=REFERENCE)
@@ -298,6 +402,12 @@ def main():
         test_address_strips_trailing_schedule_labelled_delivery,
         test_analyse_paste_prefills_new_booking_form,
         test_analyse_paste_shows_warnings_for_ambiguous_message,
+        test_labelled_first_last_name_and_new_address_is,
+        test_moving_to_dual_street_addresses,
+        test_destination_is_dual_street_addresses,
+        test_new_place_is_dual_street_addresses,
+        test_structured_fields_not_in_notes,
+        test_invalid_tokens_never_used_as_addresses,
     ]
     failed = 0
     for fn in tests:
