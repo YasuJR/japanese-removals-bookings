@@ -60,14 +60,16 @@ def _sample_booking_id():
     return booking_id
 
 
-def test_dashboard_job_cards_have_details_and_edit_buttons():
+def test_dashboard_jobs_table_has_details_and_edit_buttons():
     client = _login_client()
     booking_id = _sample_booking_id()
     html = client.get("/dashboard").get_data(as_text=True)
     assert "Details Test Customer" in html
     assert 'href="/bookings/{0}"'.format(booking_id) in html
     assert ">Details</a>" in html
-    assert ">Edit booking</a>" in html or ">Edit</a>" in html
+    assert ">Edit</a>" in html
+    assert "dashboard-job-cards" not in html
+    assert "dashboard-sheet" in html
     return True
 
 
@@ -173,7 +175,7 @@ def test_view_booking_not_found_redirects():
 
 def main():
     tests = [
-        test_dashboard_job_cards_have_details_and_edit_buttons,
+        test_dashboard_jobs_table_has_details_and_edit_buttons,
         test_view_booking_page_shows_correct_booking,
         test_view_booking_page_is_read_only,
         test_view_booking_page_shows_pricing_and_status_fields,

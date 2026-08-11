@@ -40,10 +40,11 @@ def test_booking_list_has_mobile_cards_and_key_fields():
     return True
 
 
-def test_dashboard_has_mobile_job_cards():
+def test_dashboard_uses_compact_table_only():
     html = (ROOT / "templates" / "dashboard.html").read_text()
-    assert "dashboard-job-cards mobile-only" in html
-    assert "desktop-only" in html
+    assert "dashboard-job-cards" not in html
+    assert "dashboard-sheet" in html
+    assert 'class="table-scroll desktop-only"' not in html
     return True
 
 
@@ -92,7 +93,7 @@ def main():
         test_mobile_css_exists_and_covers_390px,
         test_base_template_links_mobile_css,
         test_booking_list_has_mobile_cards_and_key_fields,
-        test_dashboard_has_mobile_job_cards,
+        test_dashboard_uses_compact_table_only,
         test_edit_booking_has_mobile_quick_actions,
         test_new_booking_page_renders_mobile_friendly,
         test_touch_target_css_at_least_44px,

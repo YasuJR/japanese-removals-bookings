@@ -361,10 +361,14 @@
     border: 1px solid var(--border);
   }
 
-  .dashboard-job-cards {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
+  /* Dashboard jobs table — horizontal scroll on small screens */
+  .dashboard-sheet {
+    min-width: 36rem;
+  }
+
+  .dashboard-actions-cell .btn-sm {
+    min-height: var(--touch);
+    padding: 0.45rem 0.65rem;
   }
 
   /* Tables — horizontal scroll fallback */
