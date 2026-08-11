@@ -172,6 +172,43 @@ def test_realistic_message_5():
     return True
 
 
+def test_address_strips_trailing_schedule_from_delivery():
+    text = (
+        "We need to move from 25 Station St, Cannington to "
+        "8 Scarborough Beach Rd, Innaloo next Saturday around 9am."
+    )
+    parsed = _parse(text)
+    assert parsed["pickup_address"] == "25 Station St, Cannington"
+    assert parsed["delivery_address"] == "8 Scarborough Beach Rd, Innaloo"
+    assert parsed["move_date"] == "2026-08-15"
+    assert parsed["start_time"] == "09:00"
+    assert "Time is approximate" in parsed["warnings"]
+    return True
+
+
+def test_address_strips_trailing_schedule_suburb_move():
+    parsed = _parse("from Cannington to Innaloo tomorrow at 8am")
+    assert parsed["pickup_address"] == "Cannington"
+    assert parsed["delivery_address"] == "Innaloo"
+    assert parsed["move_date"] == "2026-08-10"
+    assert parsed["start_time"] == "08:00"
+    return True
+
+
+def test_address_strips_trailing_schedule_standalone_to():
+    parsed = _parse("to 5 Jones Rd, Como on Monday")
+    assert parsed["delivery_address"] == "5 Jones Rd, Como"
+    assert parsed["move_date"] == "2026-08-10"
+    return True
+
+
+def test_address_strips_trailing_schedule_labelled_delivery():
+    parsed = _parse("delivery 28 Scarborough Beach Rd, North Perth at 9:30am")
+    assert parsed["delivery_address"] == "28 Scarborough Beach Rd, North Perth"
+    assert parsed["start_time"] == "09:30"
+    return True
+
+
 def test_analyse_paste_prefills_new_booking_form():
     import auth
     import database as db
@@ -255,6 +292,10 @@ def main():
         test_realistic_message_3,
         test_realistic_message_4,
         test_realistic_message_5,
+        test_address_strips_trailing_schedule_from_delivery,
+        test_address_strips_trailing_schedule_suburb_move,
+        test_address_strips_trailing_schedule_standalone_to,
+        test_address_strips_trailing_schedule_labelled_delivery,
         test_analyse_paste_prefills_new_booking_form,
         test_analyse_paste_shows_warnings_for_ambiguous_message,
     ]

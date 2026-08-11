@@ -329,6 +329,7 @@ def _booking_form_defaults() -> dict:
         "start_time": DEFAULT_START_TIME,
         "finish_time": DEFAULT_FINISH_TIME,
         "duration_hours": str(int(DEFAULT_DURATION_HOURS)),
+        "num_movers": "2",
     }
 
 
@@ -1945,6 +1946,29 @@ def edit_booking(booking_id):
         crew_warnings=_crew_warnings_for_data(form, booking_id=booking_id),
         pricing_panel_mode=True,
         **_edit_booking_extras(row),
+    )
+
+
+@app.route("/bookings/invoice/preview-calculate", methods=["POST"])
+@auth.login_required
+def invoice_preview_calculate():
+    data, errors = parse_booking_form(request.form)
+    if errors:
+        return jsonify({"error": errors[0]}), 400
+
+    totals = invoice.calculate_from_form_data(data)
+    return jsonify(
+        {
+            "hourly_rate": totals["hourly_rate"],
+            "hours": totals["hours"],
+            "callout_fee": totals["callout_fee"],
+            "labour_gross": totals["labour_gross"],
+            "extras_total": totals["extras_total"],
+            "net_sales": totals["net_sales"],
+            "gst_amount": totals["gst_amount"],
+            "total": totals["total"],
+            "gst_enabled": totals["gst_enabled"],
+        }
     )
 
 

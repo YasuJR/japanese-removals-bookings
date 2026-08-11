@@ -64,7 +64,7 @@ STREET_HINT_RE = re.compile(
 )
 SUBURB_ONLY_RE = re.compile(r"^[A-Za-z][A-Za-z\s\-']+$")
 TIME_EXACT_RE = re.compile(
-    r"\b(?:at\s+|@)?(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b",
+    r"(?<!around )(?<!about )\b(?:at\s+|@)?(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b",
     re.IGNORECASE,
 )
 TIME_APPROX_RE = re.compile(
@@ -135,6 +135,26 @@ MONTH_NAMES = {
     "dec": 12,
     "december": 12,
 }
+STANDALONE_TO_RE = re.compile(
+    r"(?:^|[.\n])\s*to\s+(\d+[A-Za-z]?\s+.+?)(?:[.!?]|$|\n)",
+    re.IGNORECASE | re.MULTILINE,
+)
+_WEEKDAY_PATTERN = "|".join(WEEKDAY_NAMES.keys())
+_MONTH_PATTERN = "|".join(MONTH_NAMES.keys())
+SCHEDULE_TAIL_START_RE = re.compile(
+    r"\s+(?:"
+    r"next\s+(?:week|{0})|"
+    r"this\s+(?:{0})|"
+    r"tomorrow|"
+    r"on\s+(?:\d{{1,2}}\s+(?:{1})|\d{{1,2}}[/-]\d{{1,2}}(?:[/-]\d{{2,4}})?|(?:{1})\s+\d{{1,2}})|"
+    r"(?:on\s+)?(?:{0})|"
+    r"\d{{1,2}}[/-]\d{{1,2}}(?:[/-]\d{{2,4}})?|"
+    r"(?:at|around|about|after)\s+\d{{1,2}}(?::\d{{2}})?\s*(?:am|pm)?|"
+    r"(?:at|around|about|after)\s+\d{{1,2}}(?::\d{{2}})?|"
+    r"morning|afternoon|evening|arvo"
+    r")\b".format(_WEEKDAY_PATTERN, _MONTH_PATTERN),
+    re.IGNORECASE,
+)
 INVALID_NAMES = {
     "sms enquiry",
     "unknown",
@@ -396,9 +416,20 @@ def _extract_move_date(text: str, reference: date) -> Tuple[str, bool]:
     return "", False
 
 
+def _strip_address_schedule_tail(value: str) -> str:
+    text = (value or "").strip()
+    if not text:
+        return ""
+    match = SCHEDULE_TAIL_START_RE.search(text)
+    if match:
+        text = text[: match.start()].rstrip(" ,;")
+    return text
+
+
 def _clean_address(value: str) -> str:
     text = (value or "").strip().rstrip(".,;")
     text = re.sub(r"\s+", " ", text)
+    text = _strip_address_schedule_tail(text)
     return text
 
 
@@ -435,6 +466,12 @@ def _extract_locations(text: str) -> Tuple[str, str, bool, bool]:
         pickup = _clean_address(street_match.group(1))
         delivery = _clean_address(street_match.group(2))
         return pickup, delivery, not _has_full_street_address(pickup), not _has_full_street_address(delivery)
+
+    if not pickup and not delivery:
+        to_match = STANDALONE_TO_RE.search(text or "")
+        if to_match:
+            delivery = _clean_address(to_match.group(1))
+            return "", delivery, False, not _has_full_street_address(delivery)
 
     sms_pickup, sms_delivery = sms_inbound_parser._extract_locations(text)
     if sms_pickup or sms_delivery:

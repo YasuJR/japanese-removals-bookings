@@ -1,14 +1,15 @@
-<section class="invoice-panel">
+<section class="invoice-panel" id="new-booking-invoice-panel"
+         data-calculate-url="{{ url_for('invoice_preview_calculate') }}">
   <h3>Invoice</h3>
 
   <dl class="invoice-summary">
     <div class="invoice-summary-row">
       <dt>Rate</dt>
-      <dd>{{ invoice_summary.hourly_rate|format_aud }}/hr × {{ invoice_summary.hours }}h{% if invoice_summary.gst_enabled %} <span class="muted">(incl. GST)</span>{% endif %}</dd>
+      <dd id="new-live-rate-summary">{{ invoice_summary.hourly_rate|format_aud }}/hr × {{ invoice_summary.hours }}h{% if invoice_summary.gst_enabled %} <span class="muted">(incl. GST)</span>{% endif %}</dd>
     </div>
     <div class="invoice-summary-row">
       <dt>Callout</dt>
-      <dd>{{ invoice_summary.callout_fee|format_aud }}{% if invoice_summary.gst_enabled %} <span class="muted">(incl. GST)</span>{% endif %}</dd>
+      <dd id="new-live-callout-summary">{{ invoice_summary.callout_fee|format_aud }}{% if invoice_summary.gst_enabled %} <span class="muted">(incl. GST)</span>{% endif %}</dd>
     </div>
     {% for item in invoice_summary.extra_charges %}
     <div class="invoice-summary-row">
@@ -17,18 +18,27 @@
     </div>
     {% endfor %}
     {% if invoice_summary.gst_enabled %}
-    <div class="invoice-summary-row">
+    <div class="invoice-summary-row" id="new-live-net-row">
       <dt>Net sales (ex GST)</dt>
-      <dd>{{ invoice_summary.net_sales|format_aud }}</dd>
+      <dd id="new-live-net-sales">{{ invoice_summary.net_sales|format_aud }}</dd>
     </div>
-    <div class="invoice-summary-row">
+    <div class="invoice-summary-row" id="new-live-gst-row">
       <dt>GST</dt>
-      <dd>{{ invoice_summary.gst_amount|format_aud }} (10%)</dd>
+      <dd id="new-live-gst-amount">{{ invoice_summary.gst_amount|format_aud }} (10%)</dd>
+    </div>
+    {% else %}
+    <div class="invoice-summary-row" id="new-live-net-row" hidden>
+      <dt>Net sales (ex GST)</dt>
+      <dd id="new-live-net-sales">{{ invoice_summary.net_sales|format_aud }}</dd>
+    </div>
+    <div class="invoice-summary-row" id="new-live-gst-row" hidden>
+      <dt>GST</dt>
+      <dd id="new-live-gst-amount">{{ invoice_summary.gst_amount|format_aud }} (10%)</dd>
     </div>
     {% endif %}
     <div class="invoice-summary-row invoice-summary-total">
       <dt>Total{% if invoice_summary.gst_enabled %} (incl. GST){% endif %}</dt>
-      <dd>{{ invoice_summary.total|format_aud }}</dd>
+      <dd id="new-live-total-summary">{{ invoice_summary.total|format_aud }}</dd>
     </div>
 
     {% if payment_options is defined and payment_options %}
@@ -78,7 +88,7 @@
   <div class="invoice-fields form-grid">
     <label>
       Hourly rate ($)
-      <input type="number" name="hourly_rate" min="0" step="0.01"
+      <input type="number" name="hourly_rate" id="hourly_rate" min="0" step="0.01"
              value="{{ form.get('hourly_rate', company_settings.default_hourly_rate) }}">
     </label>
     <label>
@@ -144,3 +154,6 @@
   {% endif %}
   {% endif %}
 </section>
+
+<script src="{{ url_for('static', filename='mover_pricing.js') }}"></script>
+<script src="{{ url_for('static', filename='new_booking_pricing.js') }}"></script>
