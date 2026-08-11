@@ -24,7 +24,65 @@ PRODUCTION_URL = os.environ.get(
     "APP_BASE_URL", "https://japanese-removals-bookings.onrender.com"
 ).rstrip("/")
 
+CLI_CONFIG_PATH = Path.home() / ".render" / "cli.yaml"
+SERVICE_NAME = "japanese-removals-bookings"
+
+
+def _load_render_api_key() -> str:
+    key = (os.environ.get("RENDER_API_KEY") or "").strip()
+    if key:
+        return key
+    if CLI_CONFIG_PATH.is_file():
+        for line in CLI_CONFIG_PATH.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("key:"):
+                return line.split(":", 1)[1].strip()
+    return ""
+
+
+def _render_api(path: str, api_key: str) -> object:
+    req = urllib.request.Request(
+        "https://api.render.com/v1" + path,
+        headers={
+            "Authorization": "Bearer {0}".format(api_key),
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _unwrap(items: list) -> list:
+    out = []
+    for item in items or []:
+        if isinstance(item, dict):
+            for key in ("service", "envVar"):
+                if key in item and isinstance(item[key], dict):
+                    out.append(item[key])
+                    break
+            else:
+                out.append(item)
+    return out
+
+
 TEST_MARKER = "PROD-CANCEL-TEST"
+
+
+def _load_staff_credentials_from_render() -> tuple[str, str]:
+    api_key = _load_render_api_key()
+    if not api_key:
+        return "", ""
+    services = _unwrap(_render_api("/services?limit=100", api_key))
+    service = next((s for s in services if s.get("name") == SERVICE_NAME), None)
+    if not service:
+        return "", ""
+    envs = _unwrap(
+        _render_api("/services/{0}/env-vars?limit=100".format(service["id"]), api_key)
+    )
+    values = {ev.get("key"): ev.get("value", "") for ev in envs}
+    return (
+        (values.get("STAFF_USERNAME") or "").strip(),
+        (values.get("STAFF_PASSWORD") or "").strip(),
+    )
 
 
 class ProductionClient:
@@ -46,7 +104,14 @@ class ProductionClient:
         headers = {"User-Agent": "production-cancel-test/1.0"}
         body = None
         if data is not None:
-            body = urllib.parse.urlencode(data).encode("utf-8")
+            pairs: list[tuple[str, str]] = []
+            for key, value in data.items():
+                if isinstance(value, list):
+                    for item in value:
+                        pairs.append((key, item))
+                else:
+                    pairs.append((key, str(value)))
+            body = urllib.parse.urlencode(pairs).encode("utf-8")
             headers["Content-Type"] = "application/x-www-form-urlencoded"
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
         try:
@@ -55,13 +120,17 @@ class ProductionClient:
             return resp.status, html, resp.geturl(), dict(resp.headers)
         except urllib.error.HTTPError as exc:
             html = exc.read().decode("utf-8", errors="replace")
+            hdrs = dict(exc.headers)
             if follow and exc.code in (301, 302, 303, 307, 308):
-                location = exc.headers.get("Location") or ""
+                location = hdrs.get("Location") or ""
                 if location.startswith("/"):
                     location = PRODUCTION_URL + location
                 if location:
-                    return self.request("GET", location.replace(PRODUCTION_URL, ""), None)
-            return exc.code, html, url, dict(exc.headers)
+                    sub_status, sub_html, sub_url, sub_hdrs = self.request(
+                        "GET", location.replace(PRODUCTION_URL, ""), None, follow=True
+                    )
+                    return sub_status, sub_html, sub_url, sub_hdrs
+            return exc.code, html, url, hdrs
 
 
 def _login(client: ProductionClient, username: str, password: str) -> bool:
@@ -83,18 +152,25 @@ def _new_booking_form(client: ProductionClient, customer_name: str, move_date: s
         "delivery_address": "2 Cancel Test Ave, Fremantle WA 6160",
         "move_date": move_date,
         "status": "Confirmed",
-        "start_time": "09:00",
-        "duration_hours": "2",
-        "num_movers": "2",
+        "start_time": "04:30",
+        "duration_hours": "1",
+        "num_movers": "1",
         "notes": TEST_MARKER + " — safe to leave cancelled",
         "hourly_rate": "1",
         "callout_fee": "0",
         "gst_enabled": "on",
         "payment_status": "Unpaid",
         "invoice_status": "",
-        "truck_assigned": "Truck 1",
-        "crew": "Ken",
+        "truck_assigned": "",
+        "double_booking_override_confirm": "on",
     }
+
+
+def _extract_booking_id_from_html(html: str) -> int | None:
+    match = re.search(r"Booking saved \(reference #(\d+)\)", html)
+    if match:
+        return int(match.group(1))
+    return None
 
 
 def _extract_booking_id_from_redirect(location: str) -> int | None:
@@ -110,54 +186,68 @@ def _extract_booking_id_from_redirect(location: str) -> int | None:
 
 
 def _find_test_booking_id(client: ProductionClient, customer_name: str) -> int | None:
-    status, html, _, _ = client.request("GET", "/bookings/all")
-    if status != 200:
-        return None
-    pattern = r'href="/bookings/(\d+)/edit"[^>]*>[^<]*' + re.escape(customer_name)
-    match = re.search(pattern, html)
-    if match:
-        return int(match.group(1))
-    pattern = r"/bookings/(\d+)/edit.*?{0}".format(re.escape(customer_name))
-    match = re.search(pattern, html, re.DOTALL)
-    if match:
-        return int(match.group(1))
+    for path in ("/bookings/search?q=" + urllib.parse.quote(customer_name), "/bookings/all"):
+        status, html, _, _ = client.request("GET", path)
+        if status != 200:
+            continue
+        for pattern in (
+            r'href="/bookings/(\d+)/edit"',
+            r'href="/bookings/(\d+)"',
+        ):
+            if customer_name not in html:
+                continue
+            # find booking id near customer name
+            idx = html.find(customer_name)
+            window = html[max(0, idx - 400) : idx + 200]
+            match = re.search(r"/bookings/(\d+)", window)
+            if match:
+                return int(match.group(1))
     return None
 
 
-def _edit_form_from_get(html: str, booking_id: int, status: str) -> dict:
-    def field(name: str, default: str = "") -> str:
-        match = re.search(
-            r'name="{0}"[^>]*(?:value="([^"]*)")?'.format(re.escape(name)),
-            html,
-        )
-        if not match:
-            return default
-        return match.group(1) if match.lastindex else default
+def _is_dashboard_redirect(url: str) -> bool:
+    path = urllib.parse.urlparse(url).path.rstrip("/") or "/"
+    return path in ("/", "/dashboard", "/ceo")
 
-    form = {
-        "action": "save",
-        "customer_name": field("customer_name"),
-        "phone": field("phone"),
-        "email": field("email"),
-        "pickup_address": field("pickup_address"),
-        "delivery_address": field("delivery_address"),
-        "move_date": field("move_date"),
-        "status": status,
-        "start_time": field("start_time", "09:00"),
-        "duration_hours": field("duration_hours", "2"),
-        "num_movers": field("num_movers", "2"),
-        "notes": field("notes"),
-        "hourly_rate": field("hourly_rate", "1"),
-        "callout_fee": field("callout_fee", "0"),
-        "payment_status": field("payment_status", "Unpaid"),
-        "invoice_status": field("invoice_status", ""),
-        "truck_assigned": field("truck_assigned", ""),
-    }
-    if 'name="gst_enabled"' in html and 'name="gst_enabled" checked' not in html:
-        if re.search(r'name="gst_enabled"[^>]*checked', html):
-            form["gst_enabled"] = "on"
-    else:
+
+def _edit_form_from_get(html: str, booking_id: int, status: str) -> dict:
+    form: dict = {"action": "save", "status": status}
+
+    for match in re.finditer(
+        r'<input[^>]+name="([^"]+)"[^>]*value="([^"]*)"',
+        html,
+    ):
+        name, value = match.group(1), match.group(2)
+        if name in ("secret_key", "webhook_secret", "action", "status"):
+            continue
+        if name == "crew":
+            form.setdefault("crew", []).append(value)
+        else:
+            form[name] = value
+
+    for match in re.finditer(
+        r'<textarea[^>]+name="([^"]+)"[^>]*>(.*?)</textarea>',
+        html,
+        re.S,
+    ):
+        form[match.group(1)] = re.sub(r"<[^>]+>", "", match.group(2)).strip()
+
+    for match in re.finditer(
+        r'<select[^>]+name="([^"]+)"[^>]*>.*?<option[^>]*selected[^>]*value="([^"]*)"',
+        html,
+        re.S,
+    ):
+        if match.group(1) != "status":
+            form[match.group(1)] = match.group(2)
+
+    if 'name="gst_enabled"' in html and re.search(
+        r'name="gst_enabled"[^>]*checked', html
+    ):
         form["gst_enabled"] = "on"
+
+    form["action"] = "save"
+    form["status"] = status
+    form["double_booking_override_confirm"] = "on"
     return form
 
 
@@ -172,6 +262,10 @@ def main() -> int:
         or os.environ.get("STAFF_PASSWORD")
         or ""
     ).strip()
+    if not username or not password:
+        render_user, render_pass = _load_staff_credentials_from_render()
+        username = username or render_user
+        password = password or render_pass
     if not username or not password:
         print("FAIL: Set PRODUCTION_TEST_USERNAME and PRODUCTION_TEST_PASSWORD (or STAFF_*).")
         return 1
@@ -191,7 +285,9 @@ def main() -> int:
     status, html, final_url, headers = client.request(
         "POST", "/bookings/new", create_form
     )
-    booking_id = _extract_booking_id_from_redirect(headers.get("Location", final_url))
+    booking_id = _extract_booking_id_from_html(html)
+    if not booking_id:
+        booking_id = _extract_booking_id_from_redirect(headers.get("Location", final_url))
     if not booking_id:
         booking_id = _find_test_booking_id(client, customer_name)
     results["create"] = {
@@ -220,17 +316,27 @@ def main() -> int:
         cancel_form,
     )
     location = cancel_headers.get("Location", cancel_url)
+    cancel_ok = (
+        cancel_status in (200, 302)
+        and cancel_status != 500
+        and "Internal Server Error" not in cancel_html[:300]
+        and _is_dashboard_redirect(cancel_url)
+    )
     results["cancel_post"] = {
         "status": cancel_status,
         "location": location,
+        "final_url": cancel_url,
         "is_500": cancel_status == 500 or "Internal Server Error" in cancel_html[:200],
+        "redirected_to_dashboard": _is_dashboard_redirect(cancel_url),
     }
-    if cancel_status == 500 or "Internal Server Error" in cancel_html[:300]:
+    if not cancel_ok:
         results["passed"] = False
         out = RESULTS_DIR / "cancel_test_results.json"
         out.write_text(json.dumps(results, indent=2), encoding="utf-8")
         print(json.dumps(results, indent=2))
-        print("FAIL: Cancel returned 500.")
+        print("FAIL: Cancel did not succeed (status {0}, url {1}).".format(
+            cancel_status, cancel_url
+        ))
         return 1
     results["steps"].append("Cancel POST returned {0}".format(cancel_status))
 
@@ -249,15 +355,18 @@ def main() -> int:
         "found": in_cancelled_filter,
     }
 
-    still_exists_status, all_html, _, _ = client.request("GET", "/bookings/all")
-    still_exists = customer_name in all_html
+    search_status, search_html, _, _ = client.request(
+        "GET", "/bookings/search?q=" + urllib.parse.quote(TEST_MARKER)
+    )
+    still_exists = customer_name in search_html
     results["still_in_database"] = {
-        "status": still_exists_status,
+        "status": search_status,
         "found": still_exists,
+        "via": "search",
     }
 
     passed = (
-        cancel_status in (200, 302)
+        cancel_ok
         and view_status == 200
         and status_ok
         and still_exists

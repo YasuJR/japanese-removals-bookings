@@ -35,7 +35,7 @@
       <div><dt>Notes</dt><dd>{{ b.notes }}</dd></div>
       {% endif %}
       {% if show_saved %}
-      <div><dt>Saved</dt><dd>{{ b.created_at[:10] }}</dd></div>
+      <div><dt>Saved</dt><dd>{{ (b.created_at|string)[:10] }}</dd></div>
       {% endif %}
     </dl>
     {% with phone=b.phone %}
@@ -106,7 +106,7 @@
           {% endwith %}
         </td>
         <td class="notes-cell">{{ b.notes or '—' }}</td>
-        {% if show_saved %}<td class="nowrap muted">{{ b.created_at[:10] }}</td>{% endif %}
+        {% if show_saved %}<td class="nowrap muted">{{ (b.created_at|string)[:10] }}</td>{% endif %}
         <td class="actions-cell nowrap">
           <a class="btn-secondary btn-sm" href="{{ url_for('edit_booking', booking_id=b.id) }}">Edit</a>
         </td>

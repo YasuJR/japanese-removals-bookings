@@ -167,6 +167,57 @@ def test_driver_links_to_daily_checklist():
     return True
 
 
+def test_all_bookings_renders_postgres_created_at():
+    """PostgreSQL returns created_at as datetime; All bookings must not 500."""
+    from datetime import datetime
+
+    class FakeRow:
+        def __init__(self, data):
+            self._data = data
+
+        def __getitem__(self, key):
+            return self._data[key]
+
+        def keys(self):
+            return self._data.keys()
+
+        def get(self, key, default=None):
+            return self._data.get(key, default)
+
+    fake = FakeRow(
+        {
+            "id": 999,
+            "customer_name": "Postgres Created At Test",
+            "move_date": "2026-12-01",
+            "start_time": "09:00",
+            "finish_time": "11:00",
+            "phone": "0400000000",
+            "email": "",
+            "pickup_address": "1 Test St",
+            "delivery_address": "2 Test Ave",
+            "num_movers": 2,
+            "notes": "",
+            "payment_status": "Unpaid",
+            "status": "Confirmed",
+            "crew": "",
+            "created_at": datetime(2026, 8, 11, 10, 30, 0),
+        }
+    )
+
+    original = db.list_all
+    db.list_all = lambda: [fake]
+    try:
+        client = _admin_client()
+        resp = client.get("/bookings/all")
+        html = resp.get_data(as_text=True)
+        assert resp.status_code == 200, resp.status_code
+        assert "Postgres Created At Test" in html
+        assert "2026-08-11" in html
+    finally:
+        db.list_all = original
+    return True
+
+
 def test_all_moved_routes_still_load():
     client = _admin_client()
     for path, _name in ROUTE_CHECKS:
@@ -206,6 +257,7 @@ def main() -> int:
         test_settings_admin_area_links,
         test_search_links_to_all_bookings,
         test_driver_links_to_daily_checklist,
+        test_all_bookings_renders_postgres_created_at,
         test_all_moved_routes_still_load,
         test_crew_page_has_schedule_and_management,
         test_existing_bookings_unchanged,
