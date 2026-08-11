@@ -141,6 +141,10 @@ def after_booking_updated(
 
     if pending_to_confirmed:
         messages.extend(confirmed_automation.run_on_pending_to_confirmed(booking))
+    elif job_status.display(booking) == "Cancelled":
+        cal_msg = google_calendar.cancel_booking_calendar_event(booking)
+        if cal_msg:
+            messages.append(cal_msg)
     elif job_status.display(booking) != "Pending":
         cal_msg = google_calendar.sync_booking_to_calendar(booking)
         if cal_msg:

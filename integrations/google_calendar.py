@@ -64,7 +64,10 @@ def complete_oauth(redirect_uri: str, authorization_response: str) -> bool:
 def _calendar_service():
     from googleapiclient.discovery import build
 
-    creds = _get_credentials()
+    try:
+        creds = _get_credentials()
+    except Exception:
+        return None
     if not creds:
         return None
     return build("calendar", "v3", credentials=creds, cache_discovery=False)
@@ -168,21 +171,28 @@ def sync_booking_to_calendar(booking: Dict[str, Any]) -> Optional[str]:
 
 
 def delete_calendar_event(booking: Dict[str, Any]) -> Optional[str]:
-    if not is_connected():
+    if not is_configured():
         return None
     event_id = booking.get("google_calendar_event_id")
     if not event_id:
         return None
+    if not is_connected():
+        return "Google Calendar not connected — calendar event was not removed."
     service = _calendar_service()
     if service is None:
-        return None
+        return "Google Calendar login expired — calendar event was not removed."
     try:
         service.events().delete(
             calendarId=config.GOOGLE_CALENDAR_ID, eventId=event_id
         ).execute()
         return "Removed from Google Calendar."
-    except Exception:
-        return None
+    except Exception as exc:
+        return "Calendar removal failed: {0}".format(exc)
+
+
+def cancel_booking_calendar_event(booking: Dict[str, Any]) -> Optional[str]:
+    """Remove a linked calendar event when a booking is cancelled."""
+    return delete_calendar_event(booking)
 
 
 def verify_connection() -> Tuple[bool, str, Dict[str, Any]]:

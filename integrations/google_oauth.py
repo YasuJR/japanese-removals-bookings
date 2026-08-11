@@ -153,10 +153,13 @@ def get_credentials():
         return creds
 
     if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-        token_path.parent.mkdir(parents=True, exist_ok=True)
-        token_path.write_text(creds.to_json())
-        return creds
+        try:
+            creds.refresh(Request())
+            token_path.parent.mkdir(parents=True, exist_ok=True)
+            token_path.write_text(creds.to_json())
+            return creds
+        except Exception:
+            return None
 
     return None
 
