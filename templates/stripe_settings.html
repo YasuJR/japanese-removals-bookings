@@ -29,6 +29,11 @@
     <div class="form-grid">
       <label>
         Publishable key
+        {% if stripe_form.publishable_key_from_env %}
+        <span class="status-pill pending xero-secret-status">Using publishable key from Render env</span>
+        {% elif stripe_form.stored_publishable_invalid %}
+        <span class="status-pill off xero-secret-status">Old invalid key removed — using env or enter pk_live_…</span>
+        {% endif %}
         <input type="text" name="publishable_key" autocomplete="off"
                value="{{ stripe_form.publishable_key }}"
                placeholder="pk_live_… or pk_test_…">

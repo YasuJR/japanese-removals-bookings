@@ -30,6 +30,7 @@ def main() -> int:
     sk = stripe_config.get_secret_key()
     wh = stripe_config.get_webhook_secret()
     form = stripe_config.settings_for_form()
+    pk_source = stripe_config.publishable_key_source()
 
     pk_ok = stripe_config.publishable_key_valid(pk)
     sk_ok = stripe_config.secret_key_valid(sk)
@@ -39,10 +40,12 @@ def main() -> int:
         _check(
             "1. Stripe publishable key",
             pk_ok,
-            "Valid pk_* key configured"
+            "Valid pk_* key configured (source: {0})".format(pk_source)
             if pk_ok
-            else "Invalid or missing — must start with pk_live_ or pk_test_ (got {0}…, len {1})".format(
-                pk[:8] if pk else "(empty)", len(pk)
+            else "Invalid or missing — must start with pk_live_ or pk_test_ (effective prefix {0}…, source {1}, stored_invalid={2})".format(
+                pk[:8] if pk else "(empty)",
+                pk_source,
+                form.get("stored_publishable_invalid"),
             ),
         )
     )

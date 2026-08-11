@@ -507,7 +507,7 @@ def _flash_integration_messages(messages) -> None:
 def health_check():
     import db_backend
 
-    return {
+    payload = {
         "status": "ok",
         "production": config.PRODUCTION,
         "git_commit": os.environ.get("RENDER_GIT_COMMIT", "")[:12],
@@ -516,7 +516,12 @@ def health_check():
         "stripe_storage": "database"
         if config.PRODUCTION and db_backend.is_postgres()
         else "file",
-    }, 200
+    }
+    try:
+        payload["stripe"] = stripe_config.public_status()
+    except Exception:
+        payload["stripe"] = {"checkout_ready": False}
+    return payload, 200
 
 
 @app.route("/quote", methods=["GET", "POST"], endpoint="website_quote")

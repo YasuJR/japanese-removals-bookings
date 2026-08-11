@@ -95,8 +95,31 @@ def _merged() -> Dict[str, Any]:
     }
 
 
+def _stored_publishable_key() -> str:
+    return _field_str(read_stored_settings().get("publishable_key"))
+
+
+def publishable_key_source() -> str:
+    """Effective publishable key origin: storage, env, or none."""
+    stored = _stored_publishable_key()
+    env = _field_str(config.STRIPE_PUBLISHABLE_KEY)
+    if publishable_key_valid(stored):
+        return "storage"
+    if publishable_key_valid(env):
+        return "env"
+    return "none"
+
+
+def publishable_key_prefix() -> str:
+    """First 8 characters of the effective key (safe for logs)."""
+    pk = get_publishable_key()
+    if not pk:
+        return ""
+    return pk[:8]
+
+
 def get_publishable_key() -> str:
-    stored = _merged()["publishable_key"]
+    stored = _stored_publishable_key()
     env = _field_str(config.STRIPE_PUBLISHABLE_KEY)
     if publishable_key_valid(stored):
         return stored
@@ -231,8 +254,27 @@ def seed_from_env() -> None:
     write_stored_settings(existing)
 
 
+def sanitize_stored_settings() -> bool:
+    """Drop invalid stored keys (e.g. mk_ typos) so Render env vars take effect."""
+    existing = dict(read_stored_settings())
+    if not existing:
+        return False
+    changed = False
+    stored_pk = _field_str(existing.get("publishable_key"))
+    if stored_pk and not publishable_key_valid(stored_pk):
+        if publishable_key_valid(config.STRIPE_PUBLISHABLE_KEY):
+            existing["publishable_key"] = _field_str(config.STRIPE_PUBLISHABLE_KEY)
+        else:
+            del existing["publishable_key"]
+        changed = True
+    if changed:
+        write_stored_settings(existing)
+    return changed
+
+
 def merge_env_overrides() -> None:
-    """Fill missing stored fields from valid env vars without wiping saved values."""
+    """Sync valid env vars into storage; replace invalid stored overrides."""
+    sanitize_stored_settings()
     existing = dict(read_stored_settings())
     if not existing:
         seed_from_env()
@@ -240,7 +282,8 @@ def merge_env_overrides() -> None:
     changed = False
     if publishable_key_valid(config.STRIPE_PUBLISHABLE_KEY):
         pk = _field_str(config.STRIPE_PUBLISHABLE_KEY)
-        if pk != _field_str(existing.get("publishable_key")):
+        stored_pk = _field_str(existing.get("publishable_key"))
+        if not publishable_key_valid(stored_pk) or pk != stored_pk:
             existing["publishable_key"] = pk
             changed = True
     if secret_key_valid(config.STRIPE_SECRET_KEY):
@@ -311,18 +354,37 @@ def save_settings(
     }
 
 
+def public_status() -> Dict[str, Any]:
+    """Non-secret Stripe config summary for health checks."""
+    stored_pk = _stored_publishable_key()
+    return {
+        "publishable_key_valid": publishable_key_valid(),
+        "publishable_key_prefix": publishable_key_prefix(),
+        "publishable_key_source": publishable_key_source(),
+        "stored_publishable_invalid": bool(stored_pk)
+        and not publishable_key_valid(stored_pk),
+        "checkout_ready": checkout_ready(),
+        "storage": "database" if _use_db_storage() else "file",
+    }
+
+
 def settings_for_form() -> Dict[str, Any]:
     merged = _merged()
     stored = read_stored_settings()
     stored_secret = _field_str(stored.get("secret_key"))
     stored_webhook = _field_str(stored.get("webhook_secret"))
+    stored_pk = _stored_publishable_key()
     env_secret = secret_key_valid(config.STRIPE_SECRET_KEY)
     env_webhook = webhook_secret_valid(config.STRIPE_WEBHOOK_SECRET)
+    env_pk = publishable_key_valid(config.STRIPE_PUBLISHABLE_KEY)
     secret_valid = secret_key_valid()
     storage_label = "database" if _use_db_storage() else "file"
     return {
         "stripe_enabled": merged["stripe_enabled"],
         "publishable_key": get_publishable_key(),
+        "publishable_key_from_env": env_pk and publishable_key_source() == "env",
+        "stored_publishable_invalid": bool(stored_pk)
+        and not publishable_key_valid(stored_pk),
         "has_secret": has_stored_secret(),
         "secret_saved_in_storage": secret_valid and bool(stored_secret),
         "secret_saved_in_file": bool(_field_str(_read_file().get("secret_key"))),

@@ -72,11 +72,15 @@ def bootstrap_stripe_settings() -> None:
                 logger.info("Loaded Stripe settings from STRIPE_SETTINGS_JSON.")
                 return
 
+    stripe_config.sanitize_stored_settings()
     stored = stripe_config.read_stored_settings()
     has_secret = stripe_config.secret_key_valid(stored.get("secret_key"))
     if has_secret:
         stripe_config.merge_env_overrides()
-        logger.info("Stripe settings loaded from persistent storage.")
+        logger.info(
+            "Stripe settings loaded from persistent storage (pk source: %s).",
+            stripe_config.publishable_key_source(),
+        )
         return
 
     stripe_config.seed_from_env()
