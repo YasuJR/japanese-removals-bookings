@@ -319,17 +319,18 @@ def _xero_invoice_url_for_row(row) -> str:
 def _booking_form_defaults() -> dict:
     defaults = company_config.booking_form_defaults()
     return {
-        "phone": defaults["phone"],
-        "email": defaults["email"],
+        "phone": "",
+        "email": "",
         "hourly_rate": defaults["hourly_rate"],
         "callout_fee": defaults["callout_fee"],
         "gst_enabled": defaults["gst_enabled"],
         "crew": defaults["crew"],
         "extra_charges": [],
         "start_time": DEFAULT_START_TIME,
-        "finish_time": DEFAULT_FINISH_TIME,
-        "duration_hours": str(int(DEFAULT_DURATION_HOURS)),
+        "finish_time": "",
+        "duration_hours": "",
         "num_movers": "2",
+        "status": "Confirmed",
     }
 
 

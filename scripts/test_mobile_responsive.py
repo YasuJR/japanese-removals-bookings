@@ -72,12 +72,25 @@ def test_new_booking_page_renders_mobile_friendly():
         sess["user_id"] = uid
         sess["username"] = "mobile-test"
 
-    for path in ("/bookings/new", "/dashboard", "/bookings/upcoming", "/calendar"):
+    new_booking_resp = client.get("/bookings/new")
+    assert new_booking_resp.status_code == 200
+    new_booking = new_booking_resp.get_data(as_text=True)
+    assert "mobile.css" in new_booking
+    assert "mobile-bottom-nav" in new_booking
+    assert re.search(r'name="phone"[^>]*value=""', new_booking)
+    assert re.search(r'name="email"[^>]*value=""', new_booking)
+    assert re.search(r'name="duration_hours"[^>]*value=""', new_booking)
+    assert re.search(
+        r'<option value="Confirmed"[\s\S]*?\bselected\b',
+        new_booking,
+    )
+
+    for path in ("/dashboard", "/bookings/upcoming", "/calendar"):
         resp = client.get(path)
         assert resp.status_code == 200, path
         body = resp.get_data(as_text=True)
         assert "mobile.css" in body, path
-        assert "nav-toggle" in body, path
+        assert "mobile-bottom-nav" in body, path
     return True
 
 

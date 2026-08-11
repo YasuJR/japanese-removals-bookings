@@ -2,6 +2,7 @@
 """Tests for automatic hourly rate and callout pricing based on number of movers."""
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -228,6 +229,68 @@ def test_new_booking_page_simplified_layout():
     return True
 
 
+def _form_field_value(html: str, name: str) -> str:
+    match = re.search(r'name="' + re.escape(name) + r'"[^>]*value="([^"]*)"', html)
+    return match.group(1) if match else ""
+
+
+def test_new_booking_form_defaults():
+    db.init_db()
+    uid = db.create_staff_user(
+        "new-booking-defaults-{0}".format(os.getpid()),
+        auth.hash_password("test"),
+        "New Booking Defaults",
+    )
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = uid
+        sess["username"] = "new-booking-defaults"
+
+    html = client.get("/bookings/new").get_data(as_text=True)
+    assert _form_field_value(html, "phone") == ""
+    assert _form_field_value(html, "email") == ""
+    assert _form_field_value(html, "duration_hours") == ""
+    assert _form_field_value(html, "finish_time") == ""
+    assert re.search(
+        r'<option value="Confirmed"[\s\S]*?\bselected\b',
+        html,
+    )
+    assert re.search(r'id="finish_live_text"[\s\S]*?—', html)
+    return True
+
+
+def test_new_booking_analyse_still_prefills_contact_fields():
+    db.init_db()
+    uid = db.create_staff_user(
+        "new-booking-analyse-defaults-{0}".format(os.getpid()),
+        auth.hash_password("test"),
+        "New Booking Analyse Defaults",
+    )
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = uid
+        sess["username"] = "new-booking-analyse-defaults"
+
+    paste = """Hi Yasu, this is John Smith
+0412 345 678
+john@example.com
+10 ABC St, Cannington
+moving to 25 XYZ Rd, Innaloo"""
+    resp = client.post(
+        "/bookings/new",
+        data={"action": "analyse_paste", "paste_text": paste},
+    )
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert _form_field_value(html, "phone") == "0412 345 678"
+    assert _form_field_value(html, "email") == "john@example.com"
+    assert re.search(
+        r'<option value="Confirmed"[\s\S]*?\bselected\b',
+        html,
+    )
+    return True
+
+
 def test_edit_booking_page_includes_mover_pricing_script():
     db.init_db()
     booking_id = db.create_booking(
@@ -280,6 +343,8 @@ def main():
         test_preview_calculate_endpoint_returns_updated_total_for_two_movers,
         test_new_booking_page_includes_mover_pricing_scripts,
         test_new_booking_page_simplified_layout,
+        test_new_booking_form_defaults,
+        test_new_booking_analyse_still_prefills_contact_fields,
         test_edit_booking_page_includes_mover_pricing_script,
     ]
     failed = 0

@@ -65,6 +65,7 @@
     var startVal = startEl.value;
     var durationVal = parseFloat(durationEl.value, 10);
     if (!startVal || isNaN(durationVal) || durationVal <= 0) {
+      finishEl.value = "";
       if (finishText) {
         finishText.textContent = "—";
       }
