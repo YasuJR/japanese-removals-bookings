@@ -331,6 +331,36 @@
     width: 100%;
   }
 
+  .booking-details-page {
+    max-width: none;
+  }
+
+  .booking-details-grid > div {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+    padding: 0.65rem 0.75rem;
+    background: var(--cream);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .booking-details-grid dt {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .booking-details-footer-actions .touch-action-btn {
+    width: 100%;
+    min-height: var(--touch);
+  }
+
+  .touch-action-details {
+    background: var(--white);
+    color: var(--navy);
+    border: 1px solid var(--border);
+  }
+
   .dashboard-job-cards {
     display: flex;
     flex-direction: column;

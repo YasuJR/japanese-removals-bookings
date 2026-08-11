@@ -702,6 +702,93 @@ body {
   flex: 1;
 }
 
+.booking-details-page {
+  max-width: 42rem;
+}
+
+.booking-details-head {
+  margin-bottom: 1rem;
+}
+
+.booking-details-head .booking-card-badges {
+  margin-top: 0.75rem;
+}
+
+.booking-details-actions {
+  margin: 1rem 0 1.25rem;
+}
+
+.booking-details-section {
+  margin-bottom: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.booking-details-section h3 {
+  margin: 0 0 0.85rem;
+  font-size: 1rem;
+  color: var(--navy);
+}
+
+.booking-details-grid {
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.booking-details-grid > div {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.booking-details-grid dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.booking-details-grid dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.booking-details-notes dd,
+.booking-details-extras dd {
+  white-space: pre-wrap;
+}
+
+.booking-details-extra-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.booking-details-total dd {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.booking-details-footer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.dashboard-actions-cell {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.dashboard-actions-cell .btn-sm {
+  white-space: nowrap;
+}
+
 .booking-card-badges {
   display: flex;
   flex-wrap: wrap;

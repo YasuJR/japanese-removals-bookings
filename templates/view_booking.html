@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Booking #{{ booking.id }} — {{ booking.customer_name }}{% endblock %}
+
+{% block content %}
+<section class="panel booking-details-page">
+  <header class="booking-details-head">
+    <h2>Booking #{{ booking.id }}</h2>
+    <p class="hint">{{ booking.customer_name }} · {{ booking.move_date|format_display_date }}</p>
+    <div class="booking-card-badges">
+      {% with status=booking|booking_job_status %}
+      {% include '_status_badge.html' %}
+      {% endwith %}
+      {% with payment_status=invoice_summary.payment_status %}
+      {% include '_payment_badge.html' %}
+      {% endwith %}
+      {% include '_double_booking_badge.html' %}
+    </div>
+  </header>
+
+  <div class="mobile-quick-actions booking-details-actions">
+    {% with phone=booking.phone %}
+    {% include '_contact_actions.html' %}
+    {% endwith %}
+    {% with pickup=booking.pickup_address, delivery=booking.delivery_address %}
+    {% include '_map_buttons.html' %}
+    {% endwith %}
+  </div>
+
+  <section class="booking-details-section">
+    <h3>Customer &amp; job</h3>
+    <dl class="booking-details-grid">
+      <div><dt>Customer name</dt><dd>{{ booking.customer_name }}</dd></div>
+      <div><dt>Phone number</dt><dd>{% with phone=booking.phone %}{% include '_phone_link.html' %}{% endwith %}</dd></div>
+      <div><dt>Email</dt><dd>{% if booking.email %}<a href="mailto:{{ booking.email }}">{{ booking.email }}</a>{% else %}Not provided{% endif %}</dd></div>
+      <div><dt>Pickup address</dt><dd>{{ booking.pickup_address or '—' }}</dd></div>
+      <div><dt>Delivery address</dt><dd>{{ booking.delivery_address or '—' }}</dd></div>
+      <div><dt>Move date</dt><dd>{% with date_str=booking.move_date %}{% include '_date_badge.html' %}{% endwith %}</dd></div>
+      <div><dt>Start time</dt><dd>{{ booking|booking_start_time }}</dd></div>
+      <div><dt>Finish time</dt><dd>{{ booking|booking_finish_time }}</dd></div>
+      <div><dt>Duration</dt><dd>{{ duration_label }}</dd></div>
+      <div><dt>Number of movers</dt><dd>{{ booking.num_movers }}</dd></div>
+      <div><dt>Crew</dt><dd>{{ booking|booking_crew }}</dd></div>
+      <div><dt>Truck assigned</dt><dd>{{ booking.truck_assigned or 'Not assigned' }}</dd></div>
+      <div><dt>Job status</dt><dd>{{ booking|booking_job_status }}</dd></div>
+      <div class="booking-details-notes"><dt>Notes</dt><dd>{{ booking.notes or '—' }}</dd></div>
+    </dl>
+  </section>
+
+  <section class="booking-details-section">
+    <h3>Pricing &amp; invoice</h3>
+    <dl class="booking-details-grid invoice-summary">
+      <div><dt>Hourly rate</dt><dd>{{ invoice_summary.hourly_rate|format_aud }}/hr</dd></div>
+      <div><dt>Callout fee</dt><dd>{{ invoice_summary.callout_fee|format_aud }}</dd></div>
+      {% if invoice_summary.extra_charges %}
+      <div class="booking-details-extras">
+        <dt>Extra charges</dt>
+        <dd>
+          <ul class="booking-details-extra-list">
+            {% for item in invoice_summary.extra_charges %}
+            <li>{{ item.description }} — {{ item.quantity }} × {{ item.unit_price|format_aud }}</li>
+            {% endfor %}
+          </ul>
+        </dd>
+      </div>
+      {% else %}
+      <div><dt>Extra charges</dt><dd>None</dd></div>
+      {% endif %}
+      <div><dt>GST</dt>
+        <dd>
+          {% if invoice_summary.gst_enabled %}
+          {{ invoice_summary.gst_amount|format_aud }} (10%)
+          {% else %}
+          Not applicable
+          {% endif %}
+        </dd>
+      </div>
+      <div class="booking-details-total"><dt>Total invoice amount</dt><dd>{{ invoice_summary.total|format_aud }}{% if invoice_summary.gst_enabled %} <span class="muted">(incl. GST)</span>{% endif %}</dd></div>
+      <div><dt>Payment status</dt><dd>{% with payment_status=invoice_summary.payment_status %}{% include '_payment_badge.html' %}{% endwith %}</dd></div>
+      <div><dt>Invoice status</dt><dd>{{ invoice_summary.invoice_status }}</dd></div>
+    </dl>
+  </section>
+
+  <div class="booking-details-footer-actions">
+    <a class="btn-primary touch-action-btn touch-action-edit" href="{{ url_for('edit_booking', booking_id=booking.id) }}">Edit Booking</a>
+    <a class="btn-secondary touch-action-btn" href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+  </div>
+</section>
+{% endblock %}

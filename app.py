@@ -1690,6 +1690,31 @@ def all_bookings():
     )
 
 
+def _view_booking_extras(row) -> dict:
+    from crew_schedule_data import booking_duration_hours, format_hours_label
+
+    booking = services.booking_to_dict(row)
+    return {
+        "duration_label": format_hours_label(booking_duration_hours(booking)),
+        "invoice_summary": _invoice_summary_for_row(row),
+        **_double_booking_context(booking),
+    }
+
+
+@app.route("/bookings/<int:booking_id>", endpoint="view_booking")
+@auth.login_required
+def view_booking(booking_id):
+    row = db.get_booking(booking_id)
+    if row is None:
+        flash("Booking not found.", "error")
+        return redirect(url_for("all_bookings"))
+    return render_template(
+        "view_booking.html",
+        booking=row,
+        **_view_booking_extras(row),
+    )
+
+
 @app.route("/bookings/<int:booking_id>/edit", methods=["GET", "POST"])
 @auth.login_required
 def edit_booking(booking_id):
