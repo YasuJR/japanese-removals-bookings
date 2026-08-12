@@ -150,6 +150,14 @@
       </tbody>
     </table>
   </div>
+  <p class="dashboard-jobs-footer hint">
+    {% if has_more_jobs %}
+    Showing {{ jobs|length }} of {{ jobs_total }} jobs.
+    <a href="{{ load_more_url }}" class="btn-secondary btn-sm">Load more</a>
+    {% else %}
+    Showing all {{ jobs_total }} job{% if jobs_total != 1 %}s{% endif %}.
+    {% endif %}
+  </p>
   {% else %}
   <p class="empty">No jobs match this filter.</p>
   {% endif %}

@@ -63,7 +63,7 @@ def _sample_booking_id():
 def test_dashboard_jobs_table_has_details_and_edit_buttons():
     client = _login_client()
     booking_id = _sample_booking_id()
-    html = client.get("/dashboard").get_data(as_text=True)
+    html = client.get("/dashboard?filter=upcoming&jobs_limit=500").get_data(as_text=True)
     assert "Details Test Customer" in html
     assert 'href="/bookings/{0}"'.format(booking_id) in html
     assert ">Details</a>" in html

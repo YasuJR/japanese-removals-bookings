@@ -1,9 +1,12 @@
 """Summary stats for the staff dashboard."""
 
 from datetime import date, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import database as db
+
+DASHBOARD_JOBS_INITIAL = 40
+DASHBOARD_JOBS_PAGE_SIZE = 40
 
 
 def week_range(today: date) -> tuple:
@@ -43,3 +46,37 @@ def dashboard_jobs(filter_name: str, today: date = None) -> list:
     if today is None:
         today = date.today()
     return db.list_for_dashboard(filter_name, today.isoformat())
+
+
+def parse_jobs_limit(raw_limit: Any, jobs_total: int) -> int:
+    """Return how many dashboard job rows to render (default 40, capped at total)."""
+    if jobs_total <= 0:
+        return 0
+    default = min(DASHBOARD_JOBS_INITIAL, jobs_total)
+    text = str(raw_limit or "").strip()
+    if not text:
+        return default
+    try:
+        limit = int(text)
+    except (TypeError, ValueError):
+        return default
+    return max(1, min(limit, jobs_total))
+
+
+def paginate_dashboard_jobs(
+    jobs: List[Any],
+    jobs_limit: int,
+) -> Tuple[List[Any], int, bool, int]:
+    """
+    Slice sorted dashboard jobs for HTML rendering.
+
+    Returns (visible_jobs, jobs_total, has_more, next_jobs_limit).
+    """
+    jobs_total = len(jobs)
+    if jobs_total == 0:
+        return [], 0, False, 0
+    limit = max(1, min(jobs_limit, jobs_total))
+    visible = jobs[:limit]
+    has_more = limit < jobs_total
+    next_limit = min(limit + DASHBOARD_JOBS_PAGE_SIZE, jobs_total)
+    return visible, jobs_total, has_more, next_limit

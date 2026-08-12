@@ -67,7 +67,12 @@ from ceo_dashboard_data import build_ceo_dashboard
 from daily_checklist_data import build_daily_checklist
 from quote_form import parse_quote_form
 from integrations import website_quote, sms_inbound
-from dashboard_data import build_dashboard, dashboard_jobs
+from dashboard_data import (
+    build_dashboard,
+    dashboard_jobs,
+    paginate_dashboard_jobs,
+    parse_jobs_limit,
+)
 import calendar_data
 from display_dates import format_display_date, get_weekday_class
 import automation
@@ -1315,7 +1320,11 @@ def dashboard():
     if active_filter not in valid_filters:
         active_filter = "all"
     jobs = dashboard_jobs(active_filter, today)
-    job_dicts = [dict(row) for row in jobs]
+    jobs_limit = parse_jobs_limit(request.args.get("jobs_limit"), len(jobs))
+    visible_jobs, jobs_total, has_more_jobs, next_jobs_limit = paginate_dashboard_jobs(
+        jobs, jobs_limit
+    )
+    job_dicts = [dict(row) for row in visible_jobs]
     conflict_badges = double_booking.badges_for_bookings(job_dicts)
     enriched_jobs = []
     for row in job_dicts:
@@ -1337,11 +1346,25 @@ def dashboard():
         status_filter=profit_status,
         paid_only=profit_paid_only,
     )
+    load_more_url = None
+    if has_more_jobs:
+        load_more_url = url_for(
+            "dashboard",
+            filter=active_filter,
+            jobs_limit=next_jobs_limit,
+            profit_month=profit_month,
+            profit_status=profit_status,
+            profit_paid_only=1 if profit_paid_only else None,
+        )
     return render_template(
         "dashboard.html",
         dash=dash,
         today=dash["today"],
         jobs=enriched_jobs,
+        jobs_total=jobs_total,
+        jobs_limit=jobs_limit,
+        has_more_jobs=has_more_jobs,
+        load_more_url=load_more_url,
         active_filter=active_filter,
         monthly_profit=monthly_profit,
         profit_month=profit_month,
