@@ -1,5 +1,6 @@
 """Phase 14 — double booking detection (warning + optional override)."""
 
+from collections import defaultdict
 from datetime import date, datetime, time
 from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
@@ -68,6 +69,8 @@ def _times_overlap(a: Dict[str, Any], b: Dict[str, Any]) -> bool:
 def find_conflicts(
     booking: Dict[str, Any],
     exclude_booking_id: Optional[int] = None,
+    *,
+    day_rows: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """Return blocking bookings on the same date that overlap in time."""
     move_date = (booking.get("move_date") or "").strip()
@@ -80,9 +83,11 @@ def find_conflicts(
     elif "id" not in candidate:
         candidate["id"] = -1
 
+    if day_rows is None:
+        day_rows = [dict(row) for row in db.list_by_date(move_date)]
+
     conflicts: List[Dict[str, Any]] = []
-    for row in db.list_by_date(move_date):
-        other = dict(row)
+    for other in day_rows:
         other_id = int(other["id"])
         if exclude_booking_id is not None and other_id == exclude_booking_id:
             continue
@@ -128,7 +133,11 @@ def booking_payload_from_form(
     return payload
 
 
-def badge_for_booking(booking: Dict[str, Any]) -> Optional[str]:
+def badge_for_booking(
+    booking: Dict[str, Any],
+    *,
+    day_rows: Optional[List[Dict[str, Any]]] = None,
+) -> Optional[str]:
     """
     Return badge key: conflict | clear | override, or None when not applicable.
     Pending bookings never show availability badges.
@@ -140,10 +149,39 @@ def badge_for_booking(booking: Dict[str, Any]) -> Optional[str]:
         return None
     if (booking.get("double_booking_override_at") or "").strip():
         return "override"
-    conflicts = find_conflicts(booking, exclude_booking_id=int(booking["id"]))
+    conflicts = find_conflicts(
+        booking,
+        exclude_booking_id=int(booking["id"]),
+        day_rows=day_rows,
+    )
     if conflicts:
         return "conflict"
     return "clear"
+
+
+def badges_for_bookings(bookings: List[Dict[str, Any]]) -> Dict[int, Optional[str]]:
+    """Compute availability badges for many bookings with one batched date-range query."""
+    by_date: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for booking in bookings:
+        move_date = (booking.get("move_date") or "").strip()[:10]
+        if move_date and booking.get("id"):
+            by_date[move_date].append(dict(booking))
+
+    if not by_date:
+        return {}
+
+    day_cache = db.list_by_move_dates_grouped(
+        [booking for group in by_date.values() for booking in group]
+    )
+    badges: Dict[int, Optional[str]] = {}
+    for move_date, group in by_date.items():
+        day_rows = day_cache.get(move_date, [])
+        for booking in group:
+            badges[int(booking["id"])] = badge_for_booking(
+                booking,
+                day_rows=day_rows,
+            )
+    return badges
 
 
 def ui_context(

@@ -156,8 +156,11 @@ app.jinja_env.filters["urlencode"] = lambda value: quote(str(value or ""), safe=
 
 @app.context_processor
 def inject_template_globals():
+    cached = getattr(g, "_template_globals", None)
+    if cached is not None:
+        return cached
     user = g.get("user")
-    return {
+    cached = {
         "crew_options": active_crew_names() or CREW_OPTIONS,
         "truck_options": active_truck_names(),
         "job_status_options": job_status.OPTIONS,
@@ -167,6 +170,8 @@ def inject_template_globals():
         "company_settings": company_config.get_settings(),
         "is_admin": auth.is_admin_user(user),
     }
+    g._template_globals = cached
+    return cached
 
 
 app.secret_key = config.SECRET_KEY
@@ -206,10 +211,10 @@ CSV_HEADERS = [
 ]
 
 
-def _invoice_summary_for_row(row) -> dict:
+def _invoice_summary_for_row(row, *, live_xero: bool = False) -> dict:
     booking = services.booking_to_dict(row)
     summary = invoice.invoice_summary(booking)
-    if xero.is_real_invoice_id(booking.get("xero_invoice_id")):
+    if live_xero and xero.is_real_invoice_id(booking.get("xero_invoice_id")):
         live_status = xero.resolve_invoice_status(booking)
         if live_status:
             summary["invoice_status"] = live_status
@@ -222,6 +227,13 @@ def before_request() -> None:
         return
     db.init_db()
     auth.load_logged_in_user()
+
+
+@app.teardown_request
+def teardown_db_connection(exc):
+    import db_backend
+
+    db_backend.close_request_connection(exc)
 
 
 def _integration_status() -> dict:
@@ -263,7 +275,7 @@ def _edit_booking_extras(row) -> dict:
     linked = xero.is_real_invoice_id(booking.get("xero_invoice_id"))
     job = job_status.display(booking)
     review_row = db.get_review_request_for_booking(int(booking["id"]))
-    invoice_status = xero.resolve_invoice_status(booking) if linked else ""
+    invoice_status = (booking.get("invoice_status") or "").strip() if linked else ""
     return {
         "invoice_summary": _invoice_summary_for_row(row),
         "xero_invoice_url": _xero_invoice_url_for_row(row),
@@ -1303,10 +1315,12 @@ def dashboard():
     if active_filter not in valid_filters:
         active_filter = "all"
     jobs = dashboard_jobs(active_filter, today)
+    job_dicts = [dict(row) for row in jobs]
+    conflict_badges = double_booking.badges_for_bookings(job_dicts)
     enriched_jobs = []
-    for row in jobs:
+    for row in job_dicts:
         item = dict(row)
-        item["double_booking_badge"] = double_booking.badge_for_booking(item)
+        item["double_booking_badge"] = conflict_badges.get(int(item["id"]))
         enriched_jobs.append(item)
     profit_month = request.args.get(
         "profit_month", today.strftime("%Y-%m")

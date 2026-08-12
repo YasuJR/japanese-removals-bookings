@@ -144,6 +144,7 @@ def build_outstanding_dashboard(
     invoiced = [
         dict(row) for row in db.list_all() if has_invoice(dict(row))
     ]
+    db.attach_extra_charges(invoiced)
 
     unpaid_rows = [b for b in invoiced if not _is_paid(b)]
     overdue_rows = [b for b in unpaid_rows if _is_overdue(b, today)]

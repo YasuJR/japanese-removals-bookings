@@ -46,9 +46,7 @@ def _rows_for_period(start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
         for r in db.list_between_dates(start_iso, end_iso)
         if _is_countable(dict(r))
     ]
-    for row in rows:
-        if row.get("id"):
-            row["extra_charges"] = db.list_extra_charges(int(row["id"]))
+    db.attach_extra_charges(rows)
     return rows
 
 
@@ -212,13 +210,12 @@ def _payments_section(today: date) -> Dict[str, Any]:
         for b in invoiced
         if _is_paid(b) and (b.get("paid_at") or "").strip()[:10] == today_iso
     ]
+    db.attach_extra_charges(unpaid)
     total_outstanding = 0.0
     for booking in unpaid:
-        booking["extra_charges"] = db.list_extra_charges(int(booking["id"]))
         total_outstanding += invoice.calculate_invoice_totals(booking)["total"]
 
     def _payment_row(booking: Dict[str, Any]) -> Dict[str, Any]:
-        booking["extra_charges"] = db.list_extra_charges(int(booking["id"]))
         totals = invoice.calculate_invoice_totals(booking)
         overdue_days = days_overdue(booking, today)
         return {
@@ -322,10 +319,11 @@ def _alerts_section(
             {"code": code, "label": label, "booking_id": booking_id or None}
         )
 
+    conflict_badges = double_booking.badges_for_bookings(today_rows + tomorrow_rows)
     for row in today_rows + tomorrow_rows:
         booking = dict(row)
         bid = int(booking["id"])
-        if double_booking.badge_for_booking(booking) == "conflict":
+        if conflict_badges.get(bid) == "conflict":
             _add("double_booking", "Double booking", bid)
         phone = (booking.get("phone") or "").strip()
         if not phone or not tel_href(phone):
@@ -370,11 +368,31 @@ def build_ceo_dashboard(
     tomorrow_iso = (today + timedelta(days=1)).isoformat()
     week_start, week_end = week_range(today)
     month_start, month_end = month_range(today)
+    week_start_iso = week_start.isoformat()
+    week_end_iso = week_end.isoformat()
+    month_start_iso = month_start.isoformat()
+    month_end_iso = month_end.isoformat()
 
-    today_rows = _rows_for_period(today_iso, today_iso)
-    tomorrow_rows = _rows_for_period(tomorrow_iso, tomorrow_iso)
-    week_rows = _rows_for_period(week_start.isoformat(), week_end.isoformat())
-    month_rows = _rows_for_period(month_start.isoformat(), month_end.isoformat())
+    range_start = min(today_iso, tomorrow_iso, week_start_iso, month_start_iso)
+    range_end = max(today_iso, tomorrow_iso, week_end_iso, month_end_iso)
+    period_rows = [
+        dict(r)
+        for r in db.list_between_dates(range_start, range_end)
+        if _is_countable(dict(r))
+    ]
+    db.attach_extra_charges(period_rows)
+
+    def _filter_rows(start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
+        return [
+            row
+            for row in period_rows
+            if start_iso <= (row.get("move_date") or "")[:10] <= end_iso
+        ]
+
+    today_rows = _filter_rows(today_iso, today_iso)
+    tomorrow_rows = _filter_rows(tomorrow_iso, tomorrow_iso)
+    week_rows = _filter_rows(week_start_iso, week_end_iso)
+    month_rows = _filter_rows(month_start_iso, month_end_iso)
 
     return {
         "today": today_iso,

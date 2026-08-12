@@ -197,8 +197,11 @@ def build_monthly_profit_summary(
     total_costs = 0.0
     estimated_profit = 0.0
     margins: List[float] = []
+    charges_map = db.list_extra_charges_for_bookings(
+        [int(row["id"]) for row in rows if row.get("id")]
+    )
     for row in rows:
-        row["extra_charges"] = db.list_extra_charges(int(row["id"]))
+        row["extra_charges"] = charges_map.get(int(row["id"]), [])
         metrics = calculate_booking_profit(row)
         revenue += metrics["revenue"]
         gst_amount += metrics["gst_amount"]

@@ -49,13 +49,21 @@ def _time_to_minutes(hm: str) -> int:
         return 8 * 60
 
 
-def calendar_event(booking: Dict[str, Any]) -> Dict[str, Any]:
+def calendar_event(
+    booking: Dict[str, Any],
+    *,
+    conflict_badge: Optional[str] = None,
+) -> Dict[str, Any]:
     """Serialize one booking for the calendar UI."""
     b = _booking_dict(booking)
     bid = int(b["id"])
     status = job_status.display(b)
     payment = invoice.normalize_payment_status(b.get("payment_status"))
-    badge = double_booking.badge_for_booking(b)
+    badge = (
+        conflict_badge
+        if conflict_badge is not None
+        else double_booking.badge_for_booking(b)
+    )
     start_hm = effective_start_hm(b)
     finish_hm = display_finish_time(b)
     crew_list = crew_from_storage(b.get("crew"))
@@ -158,9 +166,15 @@ def load_events(
     payment_filter: str = "all",
 ) -> List[Dict[str, Any]]:
     rows = db.list_between_dates(start.isoformat(), end.isoformat())
+    booking_dicts = [_booking_dict(row) for row in rows]
+    conflict_badges = double_booking.badges_for_bookings(booking_dicts)
     events = []
-    for row in rows:
-        ev = calendar_event(_booking_dict(row))
+    for row, booking in zip(rows, booking_dicts):
+        bid = int(booking["id"])
+        ev = calendar_event(
+            booking,
+            conflict_badge=conflict_badges.get(bid),
+        )
         if _passes_filters(
             ev,
             status_filter=status_filter,

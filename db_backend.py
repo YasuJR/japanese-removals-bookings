@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
@@ -11,6 +12,9 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
 import config
 
 Params = Optional[Union[Sequence[Any], Dict[str, Any]]]
+
+# Non-Flask scripts/tests: thread-local fallback when Flask request context is absent.
+_thread_local = threading.local()
 
 
 def is_postgres() -> bool:
@@ -166,11 +170,54 @@ class CompatConnection:
                 self.commit()
             except Exception:
                 pass
+        else:
+            try:
+                self._conn.rollback()
+            except Exception:
+                pass
         self.close()
         return False
 
 
-def get_connection() -> CompatConnection:
+class RequestScopedConnection:
+    """Reuse one connection for the duration of a Flask request."""
+
+    __slots__ = ("_conn",)
+
+    def __init__(self, conn: CompatConnection):
+        self._conn = conn
+
+    @property
+    def _is_postgres(self) -> bool:
+        return self._conn._is_postgres
+
+    def execute(self, sql: str, params: Params = ()):
+        return self._conn.execute(sql, params)
+
+    def commit(self) -> None:
+        self._conn.commit()
+
+    def close(self) -> None:
+        """No-op — the request teardown closes the underlying connection."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type is not None:
+            try:
+                self._conn._conn.rollback()
+            except Exception:
+                pass
+        else:
+            try:
+                self._conn.commit()
+            except Exception:
+                pass
+        return False
+
+
+def _open_connection() -> CompatConnection:
     if is_postgres():
         import psycopg2
 
@@ -184,6 +231,75 @@ def get_connection() -> CompatConnection:
     raw = sqlite3.connect(db_path)
     raw.row_factory = sqlite3.Row
     return CompatConnection(raw, False)
+
+
+def _flask_request_conn() -> Optional[CompatConnection]:
+    try:
+        from flask import g, has_request_context
+    except ImportError:
+        return None
+    if not has_request_context():
+        return None
+    conn = getattr(g, "_db_connection", None)
+    if conn is None:
+        conn = _open_connection()
+        g._db_connection = conn
+    return conn
+
+
+def close_request_connection(error: Optional[BaseException] = None) -> None:
+    """Close the request-scoped connection (Flask teardown)."""
+    conn = None
+    try:
+        from flask import g, has_request_context
+    except ImportError:
+        has_request_context = lambda: False  # type: ignore[assignment]
+        g = None  # type: ignore[assignment]
+    if has_request_context():
+        conn = getattr(g, "_db_connection", None)
+        if conn is not None:
+            try:
+                delattr(g, "_db_connection")
+            except AttributeError:
+                g._db_connection = None  # type: ignore[union-attr]
+    else:
+        conn = getattr(_thread_local, "connection", None)
+        if conn is not None:
+            _thread_local.connection = None
+
+    if conn is None:
+        return
+    try:
+        if error is not None:
+            conn._conn.rollback()
+        else:
+            conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.close()
+    except Exception:
+        pass
+
+
+def get_connection() -> Union[CompatConnection, RequestScopedConnection]:
+    flask_conn = _flask_request_conn()
+    if flask_conn is not None:
+        return RequestScopedConnection(flask_conn)
+    return _open_connection()
+
+
+def get_connection_for_tests():
+    """Return a persistent connection for non-Flask test/benchmark harnesses."""
+    conn = getattr(_thread_local, "connection", None)
+    if conn is None:
+        conn = _open_connection()
+        _thread_local.connection = conn
+    return RequestScopedConnection(conn)
+
+
+def close_test_connection() -> None:
+    close_request_connection()
 
 
 def table_columns(conn: CompatConnection, table_name: str) -> set:

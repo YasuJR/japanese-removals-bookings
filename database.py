@@ -243,9 +243,19 @@ def allocate_invoice_number() -> int:
 
 
 _INIT_DB_LOCK_KEY = 824739161
+_DB_INITIALIZED = False
+
+
+def reset_init_db_for_tests() -> None:
+    """Allow tests to force schema initialization again."""
+    global _DB_INITIALIZED
+    _DB_INITIALIZED = False
 
 
 def init_db() -> None:
+    global _DB_INITIALIZED
+    if _DB_INITIALIZED:
+        return
     if db_backend.is_postgres():
         with get_connection() as conn:
             conn.execute("SELECT pg_advisory_lock(?)", (_INIT_DB_LOCK_KEY,))
@@ -256,8 +266,10 @@ def init_db() -> None:
                 _ensure_staff_columns(conn)
                 _ensure_invoice_sequence(conn)
                 _seed_crew_and_trucks(conn)
+                _ensure_indexes(conn)
             finally:
                 conn.execute("SELECT pg_advisory_unlock(?)", (_INIT_DB_LOCK_KEY,))
+        _DB_INITIALIZED = True
         return
     with get_connection() as conn:
         conn.execute(
@@ -423,7 +435,21 @@ def init_db() -> None:
         _ensure_staff_columns(conn)
         _ensure_invoice_sequence(conn)
         _seed_crew_and_trucks(conn)
+        _ensure_indexes(conn)
         conn.commit()
+    _DB_INITIALIZED = True
+
+
+def _ensure_indexes(conn) -> None:
+    for sql in (
+        "CREATE INDEX IF NOT EXISTS idx_bookings_move_date ON bookings(move_date)",
+        "CREATE INDEX IF NOT EXISTS idx_bookings_status ON bookings(status)",
+        (
+            "CREATE INDEX IF NOT EXISTS idx_booking_extra_charges_booking_id "
+            "ON booking_extra_charges(booking_id)"
+        ),
+    ):
+        conn.execute(sql)
 
 
 INTEGRATION_SETTING_STRIPE = "stripe"
@@ -1153,6 +1179,37 @@ def list_by_date(move_date: str) -> List[sqlite3.Row]:
     return list(rows)
 
 
+def list_by_move_dates_grouped(
+    bookings: List[Dict[str, Any]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Load bookings grouped by move_date for conflict checks.
+
+    Uses one range query covering all dates present in ``bookings`` so callers
+    do not need one query per distinct move date.
+    """
+    from collections import defaultdict
+
+    dates = sorted(
+        {
+            (item.get("move_date") or "").strip()[:10]
+            for item in bookings
+            if (item.get("move_date") or "").strip()
+        }
+    )
+    if not dates:
+        return {}
+
+    rows = list_between_dates(dates[0], dates[-1])
+    grouped: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        item = dict(row)
+        key = (item.get("move_date") or "").strip()[:10]
+        if key:
+            grouped[key].append(item)
+    return dict(grouped)
+
+
 def list_between_dates(start_date: str, end_date: str) -> List[sqlite3.Row]:
     with get_connection() as conn:
         if db_backend.is_postgres():
@@ -1350,6 +1407,41 @@ def list_extra_charges(booking_id: int) -> List[Dict[str, Any]]:
             (booking_id,),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def list_extra_charges_for_bookings(
+    booking_ids: List[int],
+) -> Dict[int, List[Dict[str, Any]]]:
+    ids = sorted({int(bid) for bid in booking_ids if bid})
+    if not ids:
+        return {}
+    placeholders = ",".join("?" * len(ids))
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, booking_id, description, quantity, unit_price, sort_order
+            FROM booking_extra_charges
+            WHERE booking_id IN ({0})
+            ORDER BY booking_id ASC, sort_order ASC, id ASC
+            """.format(
+                placeholders
+            ),
+            ids,
+        ).fetchall()
+    grouped: Dict[int, List[Dict[str, Any]]] = {bid: [] for bid in ids}
+    for row in rows:
+        item = dict(row)
+        grouped[int(item["booking_id"])].append(item)
+    return grouped
+
+
+def attach_extra_charges(rows: List[Dict[str, Any]]) -> None:
+    """Attach extra_charges lists to booking dicts in one batched query."""
+    ids = [int(row["id"]) for row in rows if row.get("id")]
+    charges_map = list_extra_charges_for_bookings(ids)
+    for row in rows:
+        bid = int(row["id"]) if row.get("id") else 0
+        row["extra_charges"] = charges_map.get(bid, [])
 
 
 def replace_extra_charges(booking_id: int, items: List[Dict[str, Any]]) -> None:
