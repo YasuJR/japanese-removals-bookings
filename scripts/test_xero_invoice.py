@@ -46,7 +46,7 @@ def main():
     assert "Bank Details" not in desc
     assert "0481 089 573" not in desc
     assert "Moving Labour" in desc
-    assert "5.0 hrs" in desc
+    assert "5 hrs" in desc
     assert "Crew:" not in desc
     assert "Callout fee" in payload["LineItems"][1]["Description"]
     assert header[0] == "Japanese Removals"

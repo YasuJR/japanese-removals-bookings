@@ -7,7 +7,11 @@ import config
 import database as db
 import booking_profit
 import invoice_numbering
-from booking_times import effective_duration_hours
+from booking_times import (
+    effective_duration_hours,
+    format_time_12h,
+    normalize_time_input,
+)
 from extra_charges import charge_line_total, charges_gross_total
 from integrations import company_config
 
@@ -132,6 +136,34 @@ def calculate_from_form_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
 def format_aud(amount: float) -> str:
     return "${0:,.2f}".format(amount)
+
+
+def _format_labour_hours(hours: float) -> str:
+    rounded = round(float(hours), 2)
+    if rounded == int(rounded):
+        return str(int(rounded))
+    text = "{0:.2f}".format(rounded)
+    return text.rstrip("0").rstrip(".")
+
+
+def format_moving_labour_description(
+    booking: Dict[str, Any], totals: Dict[str, Any]
+) -> str:
+    """
+    Moving Labour line for invoice preview, PDF, and Xero.
+
+    Uses stored start/finish times when both are set — never derives finish from duration.
+    """
+    hours_text = _format_labour_hours(totals["hours"])
+    rate = format_aud(totals["hourly_rate"])
+    start = normalize_time_input(booking.get("start_time"))
+    finish = normalize_time_input(booking.get("finish_time"))
+    if start and finish:
+        time_range = "{0} - {1}".format(format_time_12h(start), format_time_12h(finish))
+        return "Moving Labour — {0} — {1} hrs @ {2}/hr".format(
+            time_range, hours_text, rate
+        )
+    return "Moving Labour — {0} hrs @ {1}/hr".format(hours_text, rate)
 
 
 def normalize_payment_status(value: Any) -> str:

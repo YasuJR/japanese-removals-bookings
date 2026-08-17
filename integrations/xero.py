@@ -386,15 +386,7 @@ def _build_labour_description(
     booking: Dict[str, Any], totals: Dict[str, Any]
 ) -> str:
     """Service details only — no company or bank information."""
-    hours = totals["hours"]
-    hourly_rate = totals["hourly_rate"]
-    return "\n".join(
-        [
-            "Moving Labour",
-            "{0:.1f} hrs".format(hours),
-            "{0}/hr".format(invoice.format_aud(hourly_rate)),
-        ]
-    )
+    return invoice.format_moving_labour_description(booking, totals)
 
 
 def _line_items_for_invoice(

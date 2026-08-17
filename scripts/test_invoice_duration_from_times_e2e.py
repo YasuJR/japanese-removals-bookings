@@ -121,6 +121,89 @@ def test_preview_calculate_endpoint_matches():
     return True
 
 
+def test_moving_labour_description_includes_start_and_finish_times():
+    booking = {
+        "start_time": "14:30",
+        "finish_time": "18:00",
+        "duration_hours": "5",
+        "hourly_rate": 180.0,
+        "callout_fee": 90.0,
+        "gst_enabled": 1,
+        "extra_charges": [],
+    }
+    totals = invoice.calculate_invoice_totals(booking)
+    assert totals["hours"] == 3.5
+    expected = "Moving Labour — 2:30 PM - 6:00 PM — 3.5 hrs @ $180.00/hr"
+    assert invoice.format_moving_labour_description(booking, totals) == expected
+    return True
+
+
+def test_moving_labour_description_uses_stored_times_not_duration_finish():
+    booking = {
+        "start_time": "14:30",
+        "finish_time": "18:00",
+        "duration_hours": "10",
+        "hourly_rate": 180.0,
+        "callout_fee": 0.0,
+        "gst_enabled": 1,
+        "extra_charges": [],
+    }
+    totals = invoice.calculate_invoice_totals(booking)
+    description = invoice.format_moving_labour_description(booking, totals)
+    assert "2:30 PM - 6:00 PM" in description
+    assert "3.5 hrs" in description
+    assert "8:00 PM" not in description
+    return True
+
+
+def test_invoice_preview_pdf_and_xero_show_start_finish_times():
+    db.init_db()
+    booking_id = db.create_booking(
+        "Labour Times Invoice Test",
+        "0412000990",
+        "labour-times@example.com",
+        "1 Time St, Perth WA",
+        "2 Time Ave, Fremantle WA",
+        "2026-09-26",
+        2,
+        "labour times test",
+        hourly_rate=180.0,
+        callout_fee=90.0,
+        gst_enabled=1,
+        start_time="14:30",
+        finish_time="18:00",
+        duration_hours="5",
+        payment_status=invoice.PAYMENT_STATUS_UNPAID,
+    )
+    row = dict(db.get_booking(booking_id))
+    row["extra_charges"] = db.list_extra_charges(booking_id)
+    expected = "Moving Labour — 2:30 PM - 6:00 PM — 3.5 hrs @ $180.00/hr"
+
+    doc = invoice_pdf.build_invoice_document(row)
+    assert doc["line_items"][0]["description_html"] == expected
+
+    from integrations import xero
+
+    payload, totals, *_ = xero._draft_invoice_payload(row)
+    assert payload["LineItems"][0]["Description"] == expected
+    assert totals["hours"] == 3.5
+    assert "Crew" not in payload["LineItems"][0]["Description"]
+
+    uid = db.create_staff_user(
+        "invoice-labour-times-{0}".format(os.getpid()),
+        auth.hash_password("test"),
+        "Invoice Labour Times",
+    )
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = uid
+    html = client.get("/bookings/{0}/invoice/preview".format(booking_id)).get_data(
+        as_text=True
+    )
+    assert expected in html
+    return True
+
+
 def test_invoice_preview_and_pdf_match():
     db.init_db()
     booking_id = db.create_booking(
@@ -148,6 +231,7 @@ def test_invoice_preview_and_pdf_match():
     assert totals["hours"] == 5.75
     assert round(totals["hourly_rate"] * totals["hours"], 2) == 1035.0
     assert totals["labour_gross"] == 1125.0
+    assert "8:15 AM - 2:00 PM" in doc["line_items"][0]["description_html"]
     assert "5.75 hrs" in doc["line_items"][0]["description_html"]
 
     uid = db.create_staff_user(
@@ -161,6 +245,7 @@ def test_invoice_preview_and_pdf_match():
     html = client.get("/bookings/{0}/invoice/preview".format(booking_id)).get_data(
         as_text=True
     )
+    assert "8:15 AM - 2:00 PM" in html
     assert "5.75 hrs" in html
     assert "$1,035.00" in html
     assert "$1,125.00" in html or invoice.format_aud(totals["total"]) in html
@@ -308,6 +393,9 @@ def main():
         test_invoice_totals_use_start_finish_not_stored_duration,
         test_calculate_from_form_data_ignores_stale_duration,
         test_preview_calculate_endpoint_matches,
+        test_moving_labour_description_includes_start_and_finish_times,
+        test_moving_labour_description_uses_stored_times_not_duration_finish,
+        test_invoice_preview_pdf_and_xero_show_start_finish_times,
         test_invoice_preview_and_pdf_match,
         test_edit_form_duration_matches_invoice,
         test_edit_form_duration_step_accepts_quarter_hours,
