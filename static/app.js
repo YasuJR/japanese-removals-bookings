@@ -50,6 +50,9 @@
   if (!startEl || !durationEl || !finishEl) {
     return;
   }
+  if (finishEl.type !== "hidden") {
+    return;
+  }
 
   function pad2(n) {
     return n < 10 ? "0" + n : String(n);

@@ -107,6 +107,7 @@ def test_invoice_total_recalculates_for_three_movers():
             num_movers="3",
             hourly_rate="235",
             duration_hours="2",
+            finish_time="10:00",
             callout_fee="117.50",
         )
     )

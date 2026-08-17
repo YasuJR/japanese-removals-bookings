@@ -104,10 +104,12 @@ def resolve_finish_time(
     start_time: str,
     finish_time: str,
     duration_hours: Optional[float],
-) -> Tuple[str, str, list]:
+) -> Tuple[str, str, str, list]:
     """
     Return (start_norm, finish_norm, duration_storage, errors).
     duration_storage is '' or string like '3' / '3.5'.
+    When both duration and an explicit finish time are supplied, the finish
+    time wins and duration is derived from start/finish.
     """
     errors = []
     start_norm = normalize_time_input(start_time)
@@ -117,7 +119,23 @@ def resolve_finish_time(
         base_start = start_norm or DEFAULT_START_TIME
         if not start_norm:
             start_norm = DEFAULT_START_TIME
-        finish_norm = finish_from_duration(base_start, duration_hours)
+        derived_finish = finish_from_duration(base_start, duration_hours)
+        if finish_norm and finish_norm != derived_finish:
+            start_t = parse_hhmm(start_norm)
+            finish_t = parse_hhmm(finish_norm)
+            if start_t and finish_t:
+                if finish_t <= start_t:
+                    errors.append("Finish time must be after start time.")
+                    return start_norm, finish_norm, "", errors
+                delta = datetime.combine(date.min, finish_t) - datetime.combine(
+                    date.min, start_t
+                )
+                hours = round(delta.total_seconds() / 3600, 2)
+                duration_storage = (
+                    str(int(hours)) if hours == int(hours) else str(hours)
+                )
+                return start_norm, finish_norm, duration_storage, errors
+        finish_norm = derived_finish
         duration_storage = (
             str(int(duration_hours))
             if duration_hours == int(duration_hours)

@@ -16,7 +16,6 @@
     var durationEl = pricingInput("pricing_duration_hours");
     var startEl = document.getElementById("start_time");
     var finishEl = document.getElementById("finish_time");
-    var finishText = document.getElementById("finish_live_text");
     if (!durationEl || !startEl || !finishEl) return;
 
     var hours = parseFloat(durationEl.value);
@@ -30,9 +29,26 @@
     var finishVal =
       String(fh).padStart(2, "0") + ":" + String(fm).padStart(2, "0");
     finishEl.value = finishVal;
-    if (finishText) {
-      finishText.textContent = finishVal;
-    }
+  }
+
+  function syncFinishToDuration() {
+    var durationEl = pricingInput("pricing_duration_hours");
+    var startEl = document.getElementById("start_time");
+    var finishEl = document.getElementById("finish_time");
+    if (!durationEl || !startEl || !finishEl || finishEl.type !== "time") return;
+    if (!startEl.value || !finishEl.value) return;
+
+    var startParts = startEl.value.split(":");
+    var finishParts = finishEl.value.split(":");
+    var startMins =
+      parseInt(startParts[0], 10) * 60 + parseInt(startParts[1] || "0", 10);
+    var finishMins =
+      parseInt(finishParts[0], 10) * 60 + parseInt(finishParts[1] || "0", 10);
+    if (finishMins <= startMins) return;
+
+    var hours = Math.round(((finishMins - startMins) / 60) * 100) / 100;
+    durationEl.value =
+      hours % 1 === 0 ? String(hours) : hours.toFixed(2);
   }
 
   function scheduleRecalc() {
@@ -163,6 +179,18 @@
   if (startEl) {
     startEl.addEventListener("input", scheduleRecalc);
     startEl.addEventListener("change", scheduleRecalc);
+  }
+
+  var finishEl = document.getElementById("finish_time");
+  if (finishEl && finishEl.type === "time") {
+    finishEl.addEventListener("input", function () {
+      syncFinishToDuration();
+      scheduleRecalc();
+    });
+    finishEl.addEventListener("change", function () {
+      syncFinishToDuration();
+      scheduleRecalc();
+    });
   }
 
   bindSteppers();

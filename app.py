@@ -54,8 +54,10 @@ from booking_times import (
     DEFAULT_START_TIME,
     display_finish_time,
     display_start_time,
+    effective_finish_hm,
     format_time_12h,
     inferred_duration_hours,
+    normalize_time_input,
 )
 from crew import CREW_OPTIONS, active_crew_names, crew_from_storage, display_crew
 from resource_conflicts import find_resource_conflict_warnings
@@ -2001,7 +2003,8 @@ def edit_booking(booking_id):
             for msg in errors + db_errors:
                 flash(msg, "error")
             row = db.get_booking(booking_id)
-            ctx = _double_booking_context(data, booking_id=booking_id)
+            extras = _edit_booking_extras(row)
+            extras.update(_double_booking_context(data, booking_id=booking_id))
             return render_template(
                 "edit_booking.html",
                 booking=row,
@@ -2009,8 +2012,7 @@ def edit_booking(booking_id):
                 status=_integration_status(),
                 crew_warnings=crew_warnings,
                 pricing_panel_mode=True,
-                **_edit_booking_extras(row),
-                **ctx,
+                **extras,
             )
         if ok:
             _flash_crew_warnings(crew_warnings)
@@ -2032,7 +2034,8 @@ def edit_booking(booking_id):
         "delivery_address": row["delivery_address"],
         "move_date": row["move_date"],
         "start_time": row["start_time"] or DEFAULT_START_TIME,
-        "finish_time": row["finish_time"] or DEFAULT_FINISH_TIME,
+        "finish_time": normalize_time_input(row["finish_time"])
+        or effective_finish_hm(_row_to_dict(row)),
         "duration_hours": _form_duration_from_row(row),
         "crew": crew_from_storage(_row_to_dict(row).get("crew")),
         "num_movers": row["num_movers"],

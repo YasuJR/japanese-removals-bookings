@@ -35,16 +35,15 @@
     <input type="time" name="start_time" id="start_time"
            value="{{ form.get('start_time', '08:00') }}">
   </label>
-  {% if not pricing_panel_mode %}
+  {% if new_booking_mode %}
   <label>
     Duration (hours)
     <input type="number" name="duration_hours" id="duration_hours"
            min="0.5" max="24" step="0.5"
            placeholder="e.g. 3"
-           value="{{ form.get('duration_hours', '' if new_booking_mode else '10') }}">
+           value="{{ form.get('duration_hours', '') }}">
     <span class="field-hint">Finish time updates automatically below</span>
   </label>
-  {% endif %}
   <div class="finish-live-box">
     <span class="finish-live-label">Finish time</span>
     <p class="finish-live" id="finish_live_display" aria-live="polite">
@@ -53,6 +52,26 @@
     <input type="hidden" name="finish_time" id="finish_time"
            value="{{ form.get('finish_time', '') }}">
   </div>
+  {% elif not pricing_panel_mode %}
+  <label>
+    Duration (hours)
+    <input type="number" name="duration_hours" id="duration_hours"
+           min="0.5" max="24" step="0.5"
+           placeholder="e.g. 3"
+           value="{{ form.get('duration_hours', '10') }}">
+  </label>
+  <label>
+    Finish time
+    <input type="time" name="finish_time" id="finish_time"
+           value="{{ form.get('finish_time', '') }}">
+  </label>
+  {% else %}
+  <label>
+    Finish time
+    <input type="time" name="finish_time" id="finish_time"
+           value="{{ form.get('finish_time', '') }}">
+  </label>
+  {% endif %}
   <label>
     Number of movers *
     <input type="number" name="num_movers" id="num_movers" min="1" max="20" required

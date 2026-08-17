@@ -106,7 +106,7 @@ def test_blocks_without_contact():
 
 def test_hourly_rate_recalc():
     data, errors = parse_booking_form(
-        _form_dict(hourly_rate="200", duration_hours="2", callout_fee="90")
+        _form_dict(hourly_rate="200", duration_hours="2", finish_time="10:00", callout_fee="90")
     )
     assert not errors
     totals = invoice.calculate_from_form_data(data)
