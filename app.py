@@ -173,6 +173,7 @@ def inject_template_globals():
         "job_status_options": job_status.OPTIONS,
         "dashboard_filters": job_status.DASHBOARD_FILTERS,
         "dashboard_status_options": job_status.DASHBOARD_INLINE_STATUS_OPTIONS,
+        "dashboard_payment_options": invoice.DASHBOARD_INLINE_PAYMENT_OPTIONS,
         "crew_schedule_ranges": RANGE_OPTIONS,
         "invoice_filters": INVOICE_FILTERS,
         "company_settings": company_config.get_settings(),
@@ -1410,6 +1411,36 @@ def dashboard():
         profit_status=profit_status,
         profit_paid_only=profit_paid_only,
         profit_status_filters=booking_profit.PROFIT_STATUS_FILTERS,
+    )
+
+
+@app.route("/bookings/<int:booking_id>/payment", methods=["POST"])
+@auth.login_required
+def update_booking_payment_inline(booking_id):
+    row = db.get_booking(booking_id)
+    if row is None:
+        return jsonify({"error": "Booking not found."}), 404
+
+    payload = request.get_json(silent=True) or {}
+    new_status = invoice.validate_dashboard_inline_payment(
+        payload.get("payment_status")
+        or payload.get("status")
+        or request.form.get("payment_status")
+    )
+    if not new_status:
+        return jsonify({"error": "Invalid payment status."}), 400
+
+    booking = services.booking_to_dict(row)
+    current = invoice.normalize_payment_status(booking.get("payment_status"))
+    if new_status != current:
+        invoice.apply_payment_status(booking_id, new_status)
+
+    return jsonify(
+        {
+            "ok": True,
+            "payment_status": new_status,
+            "css_class": invoice.payment_status_css(new_status),
+        }
     )
 
 

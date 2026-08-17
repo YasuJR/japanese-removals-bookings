@@ -1,0 +1,11 @@
+{% set current = b.payment_status or 'Unpaid' %}
+<div class="dashboard-payment-picker" data-booking-id="{{ b.id }}" data-current-payment="{{ current }}">
+  <button type="button"
+          class="status-pill status-payment-{{ current|payment_status_css }} dashboard-payment-trigger"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          aria-label="Change payment for {{ b.customer_name }}">
+    <span class="dashboard-payment-label">{{ current }}</span>
+    <span class="dashboard-payment-chevron" aria-hidden="true">▾</span>
+  </button>
+</div>

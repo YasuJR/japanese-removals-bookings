@@ -1,60 +1,44 @@
 (function () {
-  var pickers = document.querySelectorAll(".dashboard-status-picker");
-  var portal = document.getElementById("dashboard-status-portal");
+  var pickers = document.querySelectorAll(".dashboard-payment-picker");
+  var portal = document.getElementById("dashboard-payment-portal");
   if (!pickers.length || !portal) return;
 
-  var menu = portal.querySelector(".dashboard-status-menu");
-  var backdrop = portal.querySelector(".dashboard-status-backdrop");
-  var optionsJson = document.getElementById("dashboard-status-options-json");
+  var menu = portal.querySelector(".dashboard-payment-menu");
+  var backdrop = portal.querySelector(".dashboard-payment-backdrop");
+  var optionsJson = document.getElementById("dashboard-payment-options-json");
   if (!menu || !backdrop || !optionsJson) return;
 
-  var statusOptions = [];
+  var paymentOptions = [];
   try {
-    statusOptions = JSON.parse(optionsJson.textContent || "[]");
+    paymentOptions = JSON.parse(optionsJson.textContent || "[]");
   } catch (err) {
     return;
   }
 
   var openPicker = null;
-  var cssClassMap = {
-    Quote: "quote",
-    Confirmed: "confirmed",
-    Invoiced: "invoiced",
-    Completed: "completed",
-    Cancelled: "cancelled",
-    Pending: "pending",
-    "On Route": "on-route",
-    "In Progress": "in-progress",
-    Paid: "paid",
-  };
 
-  function statusClasses() {
+  function paymentClasses() {
     return [
-      "status-pending",
-      "status-quote",
-      "status-confirmed",
-      "status-on-route",
-      "status-in-progress",
-      "status-completed",
-      "status-invoiced",
-      "status-paid",
-      "status-cancelled",
+      "status-payment-paid",
+      "status-payment-unpaid",
+      "status-payment-part-paid",
+      "status-payment-overdue",
     ];
   }
 
-  function buildMenu(currentStatus) {
+  function buildMenu(currentPayment) {
     menu.innerHTML = "";
-    statusOptions.forEach(function (option) {
+    paymentOptions.forEach(function (option) {
       var btn = document.createElement("button");
       btn.type = "button";
       btn.className =
-        "dashboard-status-option status-badge status-" +
-        (cssClassMap[option] || "quote");
-      btn.setAttribute("data-status", option);
+        "dashboard-payment-option status-pill status-payment-" +
+        option.toLowerCase().replace(/\s+/g, "-");
+      btn.setAttribute("data-payment-status", option);
       btn.setAttribute("role", "option");
       btn.setAttribute(
         "aria-selected",
-        option === currentStatus ? "true" : "false"
+        option === currentPayment ? "true" : "false"
       );
       btn.textContent = option;
       menu.appendChild(btn);
@@ -68,19 +52,19 @@
     menu.style.left = "";
     menu.style.minWidth = "";
     if (openPicker) {
-      var trigger = openPicker.querySelector(".dashboard-status-trigger");
+      var trigger = openPicker.querySelector(".dashboard-payment-trigger");
       if (trigger) trigger.setAttribute("aria-expanded", "false");
     }
     openPicker = null;
   }
 
-  window.dashboardStatusClose = closePortal;
+  window.dashboardPaymentClose = closePortal;
 
   function positionMenu(trigger) {
     var rect = trigger.getBoundingClientRect();
     var top = rect.bottom + 4;
     var left = rect.left;
-    var minWidth = Math.max(rect.width, 168);
+    var minWidth = Math.max(rect.width, 148);
 
     menu.style.top = top + "px";
     menu.style.left = left + "px";
@@ -98,11 +82,11 @@
   }
 
   function openPortal(picker, trigger) {
-    if (window.dashboardPaymentClose) window.dashboardPaymentClose();
-    var currentStatus =
-      picker.getAttribute("data-current-status") ||
-      picker.querySelector(".dashboard-status-label").textContent;
-    buildMenu(currentStatus);
+    if (window.dashboardStatusClose) window.dashboardStatusClose();
+    var currentPayment =
+      picker.getAttribute("data-current-payment") ||
+      picker.querySelector(".dashboard-payment-label").textContent;
+    buildMenu(currentPayment);
     openPicker = picker;
     portal.hidden = false;
     portal.setAttribute("aria-hidden", "false");
@@ -110,47 +94,47 @@
     positionMenu(trigger);
   }
 
-  function applyStatus(picker, status, cssClass) {
-    var trigger = picker.querySelector(".dashboard-status-trigger");
-    var label = picker.querySelector(".dashboard-status-label");
+  function applyPayment(picker, paymentStatus, cssClass) {
+    var trigger = picker.querySelector(".dashboard-payment-trigger");
+    var label = picker.querySelector(".dashboard-payment-label");
     if (!trigger || !label) return;
-    statusClasses().forEach(function (cls) {
+    paymentClasses().forEach(function (cls) {
       trigger.classList.remove(cls);
     });
-    trigger.classList.add("status-" + cssClass);
-    label.textContent = status;
-    picker.setAttribute("data-current-status", status);
+    trigger.classList.add("status-payment-" + cssClass);
+    label.textContent = paymentStatus;
+    picker.setAttribute("data-current-payment", paymentStatus);
   }
 
-  function saveStatus(picker, status) {
+  function savePayment(picker, paymentStatus) {
     var bookingId = picker.getAttribute("data-booking-id");
-    var trigger = picker.querySelector(".dashboard-status-trigger");
+    var trigger = picker.querySelector(".dashboard-payment-trigger");
     if (!bookingId || !trigger) return;
 
     trigger.disabled = true;
     picker.classList.add("is-saving");
 
-    fetch("/bookings/" + bookingId + "/status", {
+    fetch("/bookings/" + bookingId + "/payment", {
       method: "POST",
       credentials: "same-origin",
       headers: {
         "Content-Type": "application/json",
         "X-Requested-With": "XMLHttpRequest",
       },
-      body: JSON.stringify({ status: status }),
+      body: JSON.stringify({ payment_status: paymentStatus }),
     })
       .then(function (res) {
         return res.json().then(function (data) {
-          if (!res.ok) throw new Error(data.error || "Could not update status");
+          if (!res.ok) throw new Error(data.error || "Could not update payment");
           return data;
         });
       })
       .then(function (data) {
-        applyStatus(picker, data.status, data.css_class);
+        applyPayment(picker, data.payment_status, data.css_class);
         closePortal();
       })
       .catch(function (err) {
-        window.alert(err.message || "Could not update status.");
+        window.alert(err.message || "Could not update payment.");
       })
       .finally(function () {
         trigger.disabled = false;
@@ -159,7 +143,7 @@
   }
 
   pickers.forEach(function (picker) {
-    var trigger = picker.querySelector(".dashboard-status-trigger");
+    var trigger = picker.querySelector(".dashboard-payment-trigger");
     if (!trigger) return;
 
     trigger.addEventListener("click", function (event) {
@@ -175,12 +159,12 @@
   });
 
   menu.addEventListener("click", function (event) {
-    var option = event.target.closest(".dashboard-status-option");
+    var option = event.target.closest(".dashboard-payment-option");
     if (!option || !openPicker) return;
     event.stopPropagation();
-    var nextStatus = option.getAttribute("data-status");
+    var nextStatus = option.getAttribute("data-payment-status");
     if (!nextStatus) return;
-    saveStatus(openPicker, nextStatus);
+    savePayment(openPicker, nextStatus);
   });
 
   backdrop.addEventListener("click", function (event) {

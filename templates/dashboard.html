@@ -127,8 +127,8 @@
             {% include '_double_booking_badge.html' %}
             {% endwith %}
           </td>
-          <td class="nowrap">
-            {% with payment_status=b.payment_status or 'Unpaid' %}{% include '_payment_badge.html' %}{% endwith %}
+          <td class="nowrap dashboard-payment-cell">
+            {% include '_dashboard_payment_picker.html' %}
           </td>
           <td class="date-cell">
             {% with date_str=b.move_date %}
@@ -167,4 +167,10 @@
 </div>
 <script type="application/json" id="dashboard-status-options-json">{{ dashboard_status_options|tojson }}</script>
 <script src="{{ url_for('static', filename='dashboard_status.js') }}"></script>
+<div id="dashboard-payment-portal" class="dashboard-payment-portal" hidden aria-hidden="true">
+  <div class="dashboard-payment-backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div class="dashboard-payment-menu" role="listbox" aria-label="Payment options"></div>
+</div>
+<script type="application/json" id="dashboard-payment-options-json">{{ dashboard_payment_options|tojson }}</script>
+<script src="{{ url_for('static', filename='dashboard_payment.js') }}"></script>
 {% endblock %}

@@ -24,6 +24,12 @@ PAYMENT_STATUS_OPTIONS = (
     PAYMENT_STATUS_OVERDUE,
 )
 
+# Quick payment changes from the Dashboard jobs table.
+DASHBOARD_INLINE_PAYMENT_OPTIONS = (
+    PAYMENT_STATUS_UNPAID,
+    PAYMENT_STATUS_PAID,
+)
+
 
 def _duration_hours(booking: Dict[str, Any]) -> float:
     return effective_duration_hours(booking, default=1.0)
@@ -133,6 +139,17 @@ def normalize_payment_status(value: Any) -> str:
     if text in PAYMENT_STATUS_OPTIONS:
         return text
     return PAYMENT_STATUS_UNPAID
+
+
+def payment_status_css(value: Any) -> str:
+    return normalize_payment_status(value).lower().replace(" ", "-")
+
+
+def validate_dashboard_inline_payment(value: Any) -> str:
+    text = str(value or "").strip()
+    if text in DASHBOARD_INLINE_PAYMENT_OPTIONS:
+        return text
+    return ""
 
 
 def apply_payment_status(
