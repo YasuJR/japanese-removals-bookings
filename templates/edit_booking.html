@@ -64,7 +64,7 @@
     {% if booking.xero_payment_id %}
     <span class="status-pill ok">Xero payment linked</span>
     {% endif %}
-    {% if customer_pay_url and payment_options.can_pay_now %}
+    {% if customer_pay_url and payment_options.can_pay_now and payment_options.card_payments_visible %}
     <span class="nowrap">Customer pay link: <a href="{{ customer_pay_url }}" target="_blank" rel="noopener">Pay Now</a></span>
     {% endif %}
   </div>
@@ -80,7 +80,7 @@
     {% with pickup=pickup_addr, delivery=delivery_addr %}
     {% include '_map_buttons.html' %}
     {% endwith %}
-    {% if customer_pay_url and payment_options.can_pay_now %}
+    {% if customer_pay_url and payment_options.can_pay_now and payment_options.card_payments_visible %}
     <a class="touch-action-btn touch-action-pay btn-primary" href="{{ customer_pay_url }}" target="_blank" rel="noopener">Pay link</a>
     {% endif %}
   </div>

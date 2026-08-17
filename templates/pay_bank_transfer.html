@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pay by bank transfer — {{ company_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='invoice.css') }}">
+</head>
+<body class="public-page invoice-preview-page">
+  <main class="panel public-panel">
+    <h2>Pay by bank transfer</h2>
+    {% if invoice_number %}
+    <p>Invoice <strong>{{ invoice_number }}</strong>{% if total_display %} — total <strong>{{ total_display }}</strong>{% endif %}</p>
+    {% elif total_display %}
+    <p>Amount due: <strong>{{ total_display }}</strong></p>
+    {% endif %}
+    <p class="muted">Card payments are temporarily unavailable. Please pay by bank transfer using the details below.</p>
+
+    <section class="invoice-payment-box">
+      <h3>PAYMENT DETAILS</h3>
+      <dl class="invoice-payment-grid">
+        <dt>Bank Name:</dt>
+        <dd>{{ bank.bank_name }}</dd>
+        <dt>Account Name:</dt>
+        <dd>{{ bank.account_name }}</dd>
+        <dt>BSB:</dt>
+        <dd>{{ bank.bsb }}</dd>
+        <dt>Account Number:</dt>
+        <dd>{{ bank.account_number }}</dd>
+        {% if bank.payment_reference %}
+        <dt>Payment Reference:</dt>
+        <dd>{{ bank.payment_reference }}</dd>
+        {% endif %}
+      </dl>
+    </section>
+
+    <p class="muted">Use the payment reference so we can match your payment to this invoice.</p>
+  </main>
+</body>
+</html>

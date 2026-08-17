@@ -58,6 +58,7 @@ def payment_options_for_booking(
     pct = calc["surcharge_percent"]
     pay_now_url = customer_payment_url(booking)
     stripe_ready = stripe_config.is_ready()
+    card_visible = stripe_config.invoice_card_payments_enabled()
     unpaid = (booking.get("payment_status") or "").strip() != invoice.PAYMENT_STATUS_PAID
     return {
         "bank_total": calc["base_total"],
@@ -69,10 +70,11 @@ def payment_options_for_booking(
         "surcharge_percent": pct,
         "surcharge_percent_display": "{0:.1f}".format(pct).rstrip("0").rstrip("."),
         "stripe_enabled": stripe_ready,
+        "card_payments_visible": card_visible,
         "compliance_note": COMPLIANCE_NOTE,
-        "can_checkout": stripe_ready and unpaid,
-        "pay_now_url": pay_now_url,
-        "can_pay_now": bool(pay_now_url) and stripe_ready and unpaid,
+        "can_checkout": card_visible and stripe_ready and unpaid,
+        "pay_now_url": pay_now_url if card_visible else "",
+        "can_pay_now": card_visible and bool(pay_now_url) and stripe_ready and unpaid,
     }
 
 
@@ -112,6 +114,9 @@ def create_checkout_session(
     cancel_url: str,
     require_email: bool = False,
 ) -> Tuple[bool, str, Optional[str]]:
+    if not stripe_config.invoice_card_payments_enabled():
+        return False, "Card payments are temporarily unavailable — please pay by bank transfer.", None
+
     if not is_ready():
         return False, "Stripe is not enabled — configure keys in Settings → Stripe.", None
 

@@ -123,6 +123,14 @@ def _bank_details(booking: Dict[str, Any], settings: Dict[str, Any]) -> Dict[str
     }
 
 
+def _payment_reference(booking: Dict[str, Any]) -> str:
+    invoice_number = invoice_numbering.display_invoice_number(booking)
+    if invoice_number and invoice_number != "—":
+        return invoice_number
+    booking_id = booking.get("id")
+    return str(booking_id) if booking_id else ""
+
+
 def _labour_description(booking: Dict[str, Any], totals: Dict[str, Any]) -> str:
     hours = totals["hours"]
     rate = invoice.format_aud(totals["hourly_rate"])
@@ -204,7 +212,10 @@ def build_invoice_document(booking: Dict[str, Any]) -> Dict[str, Any]:
         "due_date": _format_display_date(due_date),
         "invoice_status": (booking.get("invoice_status") or "DRAFT").upper(),
         "line_items": _line_items(booking, totals),
-        "bank": _bank_details(booking, settings),
+        "bank": {
+            **_bank_details(booking, settings),
+            "payment_reference": _payment_reference(booking),
+        },
         "logo_url": xero_branding.invoice_logo_url(),
         "logo_path": str(logo_file) if logo_file.is_file() else "",
         "show_company_name": False,
@@ -448,6 +459,14 @@ def _payment_details_table(
             Paragraph(bank["account_number"], styles["payment_value"]),
         ],
     ]
+    reference = (bank.get("payment_reference") or "").strip()
+    if reference:
+        payment_rows.append(
+            [
+                Paragraph("<b>Payment Reference:</b>", styles["payment_label"]),
+                Paragraph(reference, styles["payment_value"]),
+            ]
+        )
     payment_table = Table(payment_rows, colWidths=[label_w, value_w])
     payment_table.setStyle(
         TableStyle(
@@ -473,9 +492,8 @@ def _payment_options_table(
     styles: Dict[str, ParagraphStyle],
     box_width: float,
 ) -> Table:
-    pct = options.get("surcharge_percent_display") or "0"
     rows = [
-        [Paragraph("PAYMENT OPTIONS", styles["payment_title"]), ""],
+        [Paragraph("PAYMENT METHOD", styles["payment_title"]), ""],
         [
             Paragraph("<b>Bank Transfer</b>", styles["payment_label"]),
             Paragraph(
@@ -485,42 +503,46 @@ def _payment_options_table(
                 styles["payment_value"],
             ),
         ],
-        [
-            Paragraph("<b>Credit Card</b>", styles["payment_label"]),
-            Paragraph(
-                "Total: {0}<br/>Includes {1}% card processing fee".format(
-                    options.get("card_total_display", ""),
-                    pct,
-                ),
-                styles["payment_value"],
-            ),
-        ],
-        [
-            Paragraph(
-                "<i>{0}</i>".format(options.get("compliance_note", "")),
-                styles["payment_value"],
-            ),
-            "",
-        ],
     ]
+    if options.get("card_payments_visible"):
+        pct = options.get("surcharge_percent_display") or "0"
+        rows.extend(
+            [
+                [
+                    Paragraph("<b>Credit Card</b>", styles["payment_label"]),
+                    Paragraph(
+                        "Total: {0}<br/>Includes {1}% card processing fee".format(
+                            options.get("card_total_display", ""),
+                            pct,
+                        ),
+                        styles["payment_value"],
+                    ),
+                ],
+                [
+                    Paragraph(
+                        "<i>{0}</i>".format(options.get("compliance_note", "")),
+                        styles["payment_value"],
+                    ),
+                    "",
+                ],
+            ]
+        )
     label_w = box_width * 0.38
     value_w = box_width - label_w
     table = Table(rows, colWidths=[label_w, value_w])
-    table.setStyle(
-        TableStyle(
-            [
-                ("SPAN", (0, 0), (1, 0)),
-                ("SPAN", (0, 3), (1, 3)),
-                ("BACKGROUND", (0, 0), (-1, -1), JR_GREEN_LIGHT),
-                ("BOX", (0, 0), (-1, -1), 1, JR_GREEN_TABLE),
-                ("LEFTPADDING", (0, 0), (-1, -1), 18),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 18),
-                ("TOPPADDING", (0, 1), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 1), (-1, -1), 6),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ]
-        )
-    )
+    style_commands = [
+        ("SPAN", (0, 0), (1, 0)),
+        ("BACKGROUND", (0, 0), (-1, -1), JR_GREEN_LIGHT),
+        ("BOX", (0, 0), (-1, -1), 1, JR_GREEN_TABLE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 18),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 18),
+        ("TOPPADDING", (0, 1), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 6),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]
+    if options.get("card_payments_visible"):
+        style_commands.insert(1, ("SPAN", (0, 3), (1, 3)))
+    table.setStyle(TableStyle(style_commands))
     return table
 
 

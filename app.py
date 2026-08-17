@@ -1115,6 +1115,40 @@ def review_done(token):
 @app.route("/pay/<token>")
 def customer_pay(token):
     """Public Pay Now link from invoice PDF — redirects to Stripe Checkout."""
+    row = db.get_booking_by_payment_token(token)
+    if not row:
+        return render_template(
+            "pay_result.html",
+            success=False,
+            title="Not found",
+            message="Payment link not found.",
+            company_name=config.COMPANY_NAME,
+        ), 404
+
+    booking = services.booking_to_dict(row)
+    if (booking.get("payment_status") or "").strip() == invoice.PAYMENT_STATUS_PAID:
+        return render_template(
+            "pay_result.html",
+            success=True,
+            title="Already paid",
+            message="This invoice has already been paid. Thank you.",
+            company_name=config.COMPANY_NAME,
+            booking=booking,
+        )
+
+    if not stripe_config.invoice_card_payments_enabled():
+        from integrations.invoice_pdf import build_invoice_document
+
+        doc = build_invoice_document(invoice.resolve_booking_invoice(booking))
+        totals = doc["totals"]
+        return render_template(
+            "pay_bank_transfer.html",
+            company_name=config.COMPANY_NAME,
+            bank=doc["bank"],
+            invoice_number=doc["invoice_number"],
+            total_display=invoice.format_aud(totals["total"]),
+        )
+
     success_url = (
         url_for("customer_pay_success", token=token, _external=True)
         + "?session_id={CHECKOUT_SESSION_ID}"
@@ -1167,10 +1201,12 @@ def customer_pay_cancel(token):
         "pay_result.html",
         success=False,
         title="Payment cancelled",
-        message="No payment was taken. You can use the Pay Now link on your invoice to try again.",
+        message="No payment was taken. Please pay by bank transfer using the details on your invoice.",
         company_name=config.COMPANY_NAME,
         invoice_number=invoice_number,
-        pay_url=services.prepare_booking_payment_link(int(row["id"])) if row else "",
+        pay_url=services.prepare_booking_payment_link(int(row["id"]))
+        if row and stripe_config.invoice_card_payments_enabled()
+        else "",
     )
 
 

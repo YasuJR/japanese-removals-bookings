@@ -122,6 +122,7 @@
       <dt>Bank transfer</dt>
       <dd id="live-bank-total">{{ payment_options.bank_total_display }}</dd>
     </div>
+    {% if payment_options.card_payments_visible %}
     <div class="invoice-totals-row invoice-totals-highlight">
       <dt>Credit card</dt>
       <dd>
@@ -129,6 +130,7 @@
         <span class="muted invoice-surcharge-note" id="live-surcharge-note">+{{ payment_options.surcharge_percent_display }}% surcharge</span>
       </dd>
     </div>
+    {% endif %}
   </dl>
 
   <div class="invoice-update-actions">
@@ -151,7 +153,7 @@
       data-company-phone="{{ company_settings.company_phone }}">
       Send Invoice
     </button>
-    {% if customer_pay_url and payment_options.can_pay_now %}
+    {% if customer_pay_url and payment_options.can_pay_now and payment_options.card_payments_visible %}
     <a class="btn-secondary" href="{{ customer_pay_url }}" target="_blank" rel="noopener">Open Pay Link</a>
     {% endif %}
   </div>

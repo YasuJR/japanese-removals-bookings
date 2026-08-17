@@ -183,6 +183,8 @@ PROFIT_WORKERS_COMP_PCT = float(_env("PROFIT_WORKERS_COMP_PCT", "6") or "6")
 PROFIT_MERCHANT_FEE_PCT = float(_env("PROFIT_MERCHANT_FEE_PCT", "1.5") or "1.5")
 
 # Stripe
+# Customer invoice card/Stripe checkout (UI only — set True to re-enable Pay Now).
+INVOICE_CARD_PAYMENTS_ENABLED = _env_bool("INVOICE_CARD_PAYMENTS_ENABLED", False)
 STRIPE_ENABLED = _env_bool("STRIPE_ENABLED")
 STRIPE_PUBLISHABLE_KEY = _env("STRIPE_PUBLISHABLE_KEY")
 STRIPE_SECRET_KEY = _env("STRIPE_SECRET_KEY")

@@ -158,7 +158,7 @@ def _email_body(
         "",
         "Invoice total: {0}".format(total_display),
     ]
-    if pay_url:
+    if pay_url and stripe_service.payment_options_for_booking(booking)["card_payments_visible"]:
         lines.extend(
             [
                 "",
@@ -193,7 +193,7 @@ def _sms_body(
         "{0}: Your invoice #{1} is ready.".format(config.COMPANY_NAME, invoice_number),
         "Total {0}.".format(total_display),
     ]
-    if pay_url:
+    if pay_url and stripe_service.payment_options_for_booking(booking)["card_payments_visible"]:
         parts.append("Pay now: {0}".format(pay_url))
     return " ".join(parts)
 

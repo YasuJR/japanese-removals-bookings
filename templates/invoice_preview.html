@@ -91,13 +91,14 @@
       <div class="invoice-bottom-split">
         {% if inv.payment_options %}
         <section class="invoice-payment-options-box">
-          <h3>PAYMENT OPTIONS</h3>
+          <h3>{% if inv.payment_options.card_payments_visible %}PAYMENT OPTIONS{% else %}PAYMENT METHOD{% endif %}</h3>
           <dl class="invoice-payment-options">
             <dt>Bank Transfer</dt>
             <dd>
               Total: {{ inv.payment_options.bank_total_display }}<br>
               <span class="muted">No processing fee</span>
             </dd>
+            {% if inv.payment_options.card_payments_visible %}
             <dt>Credit Card</dt>
             <dd>
               Total: {{ inv.payment_options.card_total_display }}<br>
@@ -106,7 +107,9 @@
               <br><span class="muted">Card surcharge: {{ inv.payment_options.surcharge_display }}</span>
               {% endif %}
             </dd>
+            {% endif %}
           </dl>
+          {% if inv.payment_options.card_payments_visible %}
           <p class="invoice-compliance-note">{{ inv.payment_options.compliance_note }}</p>
           {% if inv.payment_options.can_pay_now and inv.payment_options.pay_now_url %}
           <p class="invoice-stripe-form">
@@ -118,6 +121,7 @@
           <form method="post" action="{{ url_for('stripe_checkout', booking_id=booking_id) }}" class="invoice-stripe-form">
             <button type="submit" class="btn-primary btn-sm">Pay by Credit Card (staff)</button>
           </form>
+          {% endif %}
           {% endif %}
         </section>
         {% endif %}
@@ -133,6 +137,10 @@
             <dd>{{ inv.bank.bsb }}</dd>
             <dt>Account Number:</dt>
             <dd>{{ inv.bank.account_number }}</dd>
+            {% if inv.bank.payment_reference %}
+            <dt>Payment Reference:</dt>
+            <dd>{{ inv.bank.payment_reference }}</dd>
+            {% endif %}
           </dl>
         </section>
       </div>

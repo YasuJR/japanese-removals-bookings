@@ -203,6 +203,11 @@ def checkout_ready() -> bool:
     return secret_key_valid()
 
 
+def invoice_card_payments_enabled() -> bool:
+    """Whether customer invoices may offer card/Stripe checkout (temporary UI gate)."""
+    return bool(config.INVOICE_CARD_PAYMENTS_ENABLED)
+
+
 def surcharge_percent() -> float:
     value = _merged()["card_surcharge_percent"]
     try:
