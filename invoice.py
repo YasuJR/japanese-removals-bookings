@@ -7,7 +7,7 @@ import config
 import database as db
 import booking_profit
 import invoice_numbering
-from booking_times import inferred_duration_hours, parse_duration_hours
+from booking_times import effective_duration_hours
 from extra_charges import charge_line_total, charges_gross_total
 from integrations import company_config
 
@@ -26,13 +26,7 @@ PAYMENT_STATUS_OPTIONS = (
 
 
 def _duration_hours(booking: Dict[str, Any]) -> float:
-    stored = parse_duration_hours(booking.get("duration_hours"))
-    if stored is not None:
-        return stored
-    inferred = inferred_duration_hours(booking)
-    if inferred is not None:
-        return inferred
-    return 1.0
+    return effective_duration_hours(booking, default=1.0)
 
 
 def _money(value: float) -> float:

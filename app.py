@@ -55,8 +55,8 @@ from booking_times import (
     display_finish_time,
     display_start_time,
     effective_finish_hm,
+    effective_duration_hours,
     format_time_12h,
-    inferred_duration_hours,
     normalize_time_input,
 )
 from crew import CREW_OPTIONS, active_crew_names, crew_from_storage, display_crew
@@ -96,15 +96,12 @@ def _row_to_dict(row):
 
 def _form_duration_from_row(row) -> str:
     booking = _row_to_dict(row)
-    stored = str(booking.get("duration_hours") or "").strip()
-    if stored:
-        return stored
-    inferred = inferred_duration_hours(booking)
-    if inferred is None:
+    hours = effective_duration_hours(booking, default=0.0)
+    if hours <= 0:
         return ""
-    if inferred == int(inferred):
-        return str(int(inferred))
-    return str(inferred)
+    if hours == int(hours):
+        return str(int(hours))
+    return str(hours)
 
 
 app.jinja_env.filters["booking_start_time"] = lambda row: display_start_time(

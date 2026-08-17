@@ -98,6 +98,7 @@ def test_finish_time_change_updates_duration_and_invoice():
         "invoice_status": "",
         "status": "Completed",
         "action": "save",
+        "double_booking_override_confirm": "on",
     }
     resp = client.post("/bookings/{0}/edit".format(booking_id), data=form, follow_redirects=False)
     assert resp.status_code in (302, 303), resp.status_code

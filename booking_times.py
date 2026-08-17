@@ -69,9 +69,20 @@ def parse_duration_hours(value: Any) -> Optional[float]:
 
 
 def inferred_duration_hours(booking: Dict[str, Any]) -> Optional[float]:
-    """Hours between stored start and finish, for edit form prefill."""
-    start_t = parse_hhmm(effective_start_hm(booking))
-    finish_t = parse_hhmm(effective_finish_hm(booking))
+    """Hours between start and finish using effective times when needed."""
+    return duration_hours_from_times(
+        effective_start_hm(booking), effective_finish_hm(booking)
+    )
+
+
+def duration_hours_from_times(start_time: Any, finish_time: Any) -> Optional[float]:
+    """Hours between explicit start/finish times (HH:MM). Source of truth for invoicing."""
+    start_norm = normalize_time_input(start_time)
+    finish_norm = normalize_time_input(finish_time)
+    if not start_norm or not finish_norm:
+        return None
+    start_t = parse_hhmm(start_norm)
+    finish_t = parse_hhmm(finish_norm)
     if not start_t or not finish_t:
         return None
     start_dt = datetime.combine(date.min, start_t)
@@ -80,6 +91,24 @@ def inferred_duration_hours(booking: Dict[str, Any]) -> Optional[float]:
         return None
     delta = finish_dt - start_dt
     return round(delta.total_seconds() / 3600, 2)
+
+
+def effective_duration_hours(booking: Dict[str, Any], *, default: float = 1.0) -> float:
+    """
+    Invoice duration: prefer explicit start/finish times, then stored duration.
+    """
+    from_times = duration_hours_from_times(
+        booking.get("start_time"), booking.get("finish_time")
+    )
+    if from_times is not None:
+        return from_times
+    stored = parse_duration_hours(booking.get("duration_hours"))
+    if stored is not None:
+        return stored
+    inferred = inferred_duration_hours(booking)
+    if inferred is not None:
+        return inferred
+    return default
 
 
 def format_time_12h(hm: str) -> str:

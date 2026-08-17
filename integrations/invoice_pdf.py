@@ -129,13 +129,21 @@ def _payment_reference(booking: Dict[str, Any]) -> str:
     return displayed if displayed and displayed != "—" else ""
 
 
+def _format_labour_hours(hours: float) -> str:
+    rounded = round(float(hours), 2)
+    if rounded == int(rounded):
+        return str(int(rounded))
+    text = "{0:.2f}".format(rounded)
+    return text.rstrip("0").rstrip(".")
+
+
 def _labour_description(booking: Dict[str, Any], totals: Dict[str, Any]) -> str:
     hours = totals["hours"]
     rate = invoice.format_aud(totals["hourly_rate"])
     crew = display_crew(booking)
     return "<br/>".join(
         [
-            "Moving Labour — {0:.1f} hrs @ {1}/hr".format(hours, rate),
+            "Moving Labour — {0} hrs @ {1}/hr".format(_format_labour_hours(hours), rate),
             "Crew: {0}".format(crew),
         ]
     )
