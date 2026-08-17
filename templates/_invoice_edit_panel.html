@@ -44,11 +44,11 @@
     <div class="pricing-row">
       <label class="pricing-label" for="pricing_duration_hours">Duration (hours)</label>
       <div class="pricing-input-group">
-        <button type="button" class="stepper-btn" data-step-target="duration_hours" data-step="-0.5" aria-label="Decrease duration">−</button>
+        <button type="button" class="stepper-btn" data-step-target="duration_hours" data-step="-0.25" aria-label="Decrease duration">−</button>
         <input type="number" name="duration_hours" id="pricing_duration_hours" class="pricing-input"
-               min="0.5" max="24" step="0.5"
+               min="0.5" max="24" step="0.25"
                value="{{ form.get('duration_hours', '1') }}">
-        <button type="button" class="stepper-btn" data-step-target="duration_hours" data-step="0.5" aria-label="Increase duration">+</button>
+        <button type="button" class="stepper-btn" data-step-target="duration_hours" data-step="0.25" aria-label="Increase duration">+</button>
       </div>
     </div>
 

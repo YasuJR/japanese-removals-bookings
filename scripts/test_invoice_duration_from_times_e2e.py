@@ -203,6 +203,104 @@ def test_edit_form_duration_matches_invoice():
     return True
 
 
+def test_edit_form_duration_step_accepts_quarter_hours():
+    db.init_db()
+    booking_id = db.create_booking(
+        "Duration Step Test",
+        "0412000777",
+        "step-duration@example.com",
+        "1 Step St, Perth WA",
+        "2 Step Ave, Fremantle WA",
+        "2026-09-24",
+        2,
+        "duration step test",
+        hourly_rate=180.0,
+        callout_fee=90.0,
+        gst_enabled=1,
+        start_time="08:15",
+        finish_time="14:00",
+        duration_hours="5",
+        payment_status=invoice.PAYMENT_STATUS_UNPAID,
+    )
+    uid = db.create_staff_user(
+        "invoice-duration-step-{0}".format(os.getpid()),
+        auth.hash_password("test"),
+        "Invoice Duration Step",
+    )
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = uid
+    html = client.get("/bookings/{0}/edit".format(booking_id)).get_data(as_text=True)
+    assert 'id="pricing_duration_hours" step="0.25"' in html.replace("'", '"') or re.search(
+        r'id="pricing_duration_hours"[^>]+step="0\.25"',
+        html,
+    ), "Expected duration input step=0.25"
+    assert re.search(
+        r'data-step-target="duration_hours"[^>]+data-step="0\.25"',
+        html,
+    ), "Expected duration stepper increment of 0.25"
+    return True
+
+
+def test_save_with_575_duration_succeeds():
+    db.init_db()
+    booking_id = db.create_booking(
+        "Save Duration Test",
+        "0412000888",
+        "save-duration@example.com",
+        "1 Save St, Perth WA",
+        "2 Save Ave, Fremantle WA",
+        "2026-09-25",
+        2,
+        "save duration test",
+        hourly_rate=180.0,
+        callout_fee=90.0,
+        gst_enabled=1,
+        start_time="08:15",
+        finish_time="14:00",
+        duration_hours="5",
+        payment_status=invoice.PAYMENT_STATUS_UNPAID,
+    )
+    uid = db.create_staff_user(
+        "invoice-duration-save-{0}".format(os.getpid()),
+        auth.hash_password("test"),
+        "Invoice Duration Save",
+    )
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = uid
+    form = {
+        "customer_name": "Save Duration Test",
+        "phone": "0412000888",
+        "email": "save-duration@example.com",
+        "pickup_address": "1 Save St, Perth WA",
+        "delivery_address": "2 Save Ave, Fremantle WA",
+        "move_date": "2026-09-25",
+        "num_movers": "2",
+        "notes": "save duration test",
+        "start_time": "08:15",
+        "finish_time": "14:00",
+        "duration_hours": "5.75",
+        "hourly_rate": "180",
+        "callout_fee": "90",
+        "gst_enabled": "on",
+        "payment_status": "Unpaid",
+        "invoice_status": "",
+        "status": "Confirmed",
+        "action": "save",
+        "double_booking_override_confirm": "on",
+    }
+    resp = client.post(
+        "/bookings/{0}/edit".format(booking_id), data=form, follow_redirects=False
+    )
+    assert resp.status_code in (302, 303), resp.status_code
+    row = dict(db.get_booking(booking_id))
+    totals = invoice.calculate_invoice_totals(row)
+    assert totals["hours"] == 5.75
+    assert round(totals["hourly_rate"] * totals["hours"], 2) == 1035.0
+    return True
+
+
 def main():
     tests = [
         test_duration_hours_from_times_example,
@@ -212,6 +310,8 @@ def main():
         test_preview_calculate_endpoint_matches,
         test_invoice_preview_and_pdf_match,
         test_edit_form_duration_matches_invoice,
+        test_edit_form_duration_step_accepts_quarter_hours,
+        test_save_with_575_duration_succeeds,
     ]
     passed = 0
     for test in tests:

@@ -12,6 +12,14 @@
     return document.getElementById(id);
   }
 
+  function formatDurationValue(hours) {
+    var snapped = Math.round(hours / 0.25) * 0.25;
+    if (snapped % 1 === 0) {
+      return String(snapped);
+    }
+    return snapped.toFixed(2);
+  }
+
   function syncDurationToFinishTime() {
     var durationEl = pricingInput("pricing_duration_hours");
     var startEl = document.getElementById("start_time");
@@ -47,8 +55,7 @@
     if (finishMins <= startMins) return;
 
     var hours = Math.round(((finishMins - startMins) / 60) * 100) / 100;
-    durationEl.value =
-      hours % 1 === 0 ? String(hours) : hours.toFixed(2);
+    durationEl.value = formatDurationValue(hours);
   }
 
   function scheduleRecalc() {
@@ -123,9 +130,10 @@
         var val = parseFloat(input.value) || 0;
         var next = Math.max(parseFloat(input.min || "0"), val + step);
         if (input.max) next = Math.min(parseFloat(input.max), next);
-        input.value = String(
-          target === "duration_hours" ? next.toFixed(1) : next.toFixed(2)
-        );
+        input.value =
+          target === "duration_hours"
+            ? formatDurationValue(next)
+            : next.toFixed(2);
         input.dispatchEvent(new Event("input", { bubbles: true }));
       });
     });

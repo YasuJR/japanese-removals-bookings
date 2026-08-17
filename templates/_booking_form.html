@@ -39,7 +39,7 @@
   <label>
     Duration (hours)
     <input type="number" name="duration_hours" id="duration_hours"
-           min="0.5" max="24" step="0.5"
+           min="0.5" max="24" step="0.25"
            placeholder="e.g. 3"
            value="{{ form.get('duration_hours', '') }}">
     <span class="field-hint">Finish time updates automatically below</span>
@@ -56,7 +56,7 @@
   <label>
     Duration (hours)
     <input type="number" name="duration_hours" id="duration_hours"
-           min="0.5" max="24" step="0.5"
+           min="0.5" max="24" step="0.25"
            placeholder="e.g. 3"
            value="{{ form.get('duration_hours', '10') }}">
   </label>
