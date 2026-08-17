@@ -96,16 +96,21 @@
         {% endfor %}
       </nav>
     </div>
-    <form method="post"
-          action="{{ url_for('dashboard', filter=active_filter, jobs_limit=jobs_limit, profit_month=profit_month, profit_status=profit_status, profit_paid_only=1 if profit_paid_only else none) }}"
-          class="dashboard-sync-form">
-      <input type="hidden" name="action" value="sync_xero_payments">
-      <button type="submit"
-              class="btn-secondary btn-sm"
-              {% if not status.xero_ready %}disabled title="Connect Xero in Settings first"{% endif %}>
-        Sync Xero Payments
-      </button>
-    </form>
+    <div class="dashboard-sync-panel">
+      <form method="post"
+            action="{{ url_for('dashboard', filter=active_filter, jobs_limit=jobs_limit, profit_month=profit_month, profit_status=profit_status, profit_paid_only=1 if profit_paid_only else none) }}"
+            class="dashboard-sync-form">
+        <input type="hidden" name="action" value="sync_xero_payments">
+        <button type="submit"
+                class="btn-secondary btn-sm"
+                {% if not status.xero_ready %}disabled title="Connect Xero in Settings first"{% endif %}>
+          Sync Xero Payments
+        </button>
+      </form>
+      {% if xero_payment_last_sync %}
+      <p class="dashboard-sync-meta hint">Last Xero Sync: {{ xero_payment_last_sync }}</p>
+      {% endif %}
+    </div>
   </div>
 
   {% if jobs %}

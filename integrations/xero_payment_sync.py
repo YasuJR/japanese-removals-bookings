@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 
 import automation
+import config
 import database as db
 import invoice
 import invoice_numbering
 from integrations import xero
+
+logger = logging.getLogger(__name__)
+
+SYNC_STATE_KEY = "xero_payment_sync"
 
 
 def invoice_reference_number(booking: Dict[str, Any]) -> Optional[int]:
@@ -80,10 +88,7 @@ def fetch_xero_invoice_for_booking(
         if not invoice_numbers_match(booking, inv):
             local_display = invoice_numbering.display_invoice_number(booking)
             xero_number = (inv.get("InvoiceNumber") or "").strip()
-            return None, "Invoice number mismatch ({0} vs {1}).".format(
-                local_display,
-                xero_number or "—",
-            )
+            return None, "{0} mismatch".format(local_display)
         return inv, None
 
     for candidate in _invoice_lookup_candidates(booking):
@@ -104,18 +109,65 @@ def _booking_eligible_for_sync(booking: Dict[str, Any]) -> bool:
     return invoice_reference_number(booking) is not None
 
 
+def _booking_invoice_label(booking: Dict[str, Any]) -> str:
+    return invoice_numbering.display_invoice_number(booking)
+
+
+def load_sync_state() -> Dict[str, Any]:
+    return dict(db.get_integration_settings(SYNC_STATE_KEY) or {})
+
+
+def save_sync_state(data: Dict[str, Any]) -> None:
+    db.save_integration_settings(SYNC_STATE_KEY, data)
+
+
+def format_sync_timestamp(iso_value: str) -> str:
+    """Display e.g. 17 Aug 2026 4:15 PM in app timezone."""
+    text = (iso_value or "").strip()
+    if not text:
+        return ""
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return text
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+    local = dt.astimezone(ZoneInfo(config.TIMEZONE))
+    hour = local.strftime("%I").lstrip("0") or "12"
+    return "{0} {1} {2} {3}:{4} {5}".format(
+        local.day,
+        local.strftime("%b"),
+        local.year,
+        hour,
+        local.strftime("%M"),
+        local.strftime("%p"),
+    )
+
+
+def dashboard_last_sync_display() -> str:
+    state = load_sync_state()
+    iso_value = (state.get("last_success_at") or "").strip()
+    if not iso_value:
+        return ""
+    formatted = format_sync_timestamp(iso_value)
+    return formatted
+
+
 def sync_booking_payment_from_xero(booking: Dict[str, Any]) -> Dict[str, Any]:
     """
     One-way sync: Xero fully paid → booking payment_status Paid.
     Never downgrades a manually marked Paid booking to Unpaid.
     """
     booking_id = int(booking["id"])
+    invoice_label = _booking_invoice_label(booking)
     result: Dict[str, Any] = {
         "booking_id": booking_id,
+        "invoice_label": invoice_label,
         "ok": True,
         "updated": False,
         "skipped": False,
         "message": "",
+        "log_lines": [],
     }
 
     if not xero.is_ready():
@@ -133,11 +185,17 @@ def sync_booking_payment_from_xero(booking: Dict[str, Any]) -> Dict[str, Any]:
     if fetch_error:
         result["ok"] = False
         result["message"] = fetch_error
+        if "mismatch" in fetch_error.lower():
+            result["log_lines"].append(fetch_error)
+        else:
+            result["log_lines"].append("{0}: {1}".format(invoice_label, fetch_error))
         return result
     if not inv:
         result["skipped"] = True
         result["message"] = "No matching Xero invoice."
         return result
+
+    result["log_lines"].append("{0} matched".format(invoice_label))
 
     if not is_xero_invoice_fully_paid(inv):
         result["skipped"] = True
@@ -156,9 +214,11 @@ def sync_booking_payment_from_xero(booking: Dict[str, Any]) -> Dict[str, Any]:
         invoice.PAYMENT_STATUS_PAID,
         paid_at=paid_at,
     )
-    display_number = invoice_numbering.display_invoice_number(booking)
     result["updated"] = True
-    result["message"] = "{0} marked Paid from Xero.".format(display_number)
+    result["message"] = "{0} marked Paid from Xero.".format(invoice_label)
+    result["log_lines"].append(
+        "{0} changed UNPAID -> PAID".format(invoice_label)
+    )
     automation.log_event(
         automation.AUTOMATION_XERO_PAYMENT_SYNC,
         automation.STATUS_SUCCESS,
@@ -168,12 +228,14 @@ def sync_booking_payment_from_xero(booking: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def sync_xero_payments() -> Dict[str, Any]:
+def sync_xero_payments(*, source: str = "manual") -> Dict[str, Any]:
     """
     Pull paid Xero invoices and mark matching bookings as Paid.
 
-    Intended for Dashboard manual sync and future cron (Render every 5–15 minutes).
+    Used by Dashboard manual sync and Render cron (every 15 minutes).
     """
+    started_at = datetime.now(ZoneInfo("UTC")).isoformat()
+    log_lines: List[str] = ["Xero payment sync started"]
     summary: Dict[str, Any] = {
         "ok": False,
         "message": "",
@@ -181,10 +243,26 @@ def sync_xero_payments() -> Dict[str, Any]:
         "checked": 0,
         "skipped": 0,
         "errors": [],
+        "log_lines": log_lines,
+        "source": source,
     }
 
     if not xero.is_ready():
-        summary["message"] = "Connect Xero in Settings first."
+        message = "Connect Xero in Settings first."
+        log_lines.append("Xero API authentication failed — connect Xero in Settings")
+        log_lines.append("Xero payment sync completed")
+        summary["message"] = message
+        save_sync_state(
+            {
+                "last_run_at": started_at,
+                "last_source": source,
+                "last_ok": False,
+                "last_message": message,
+                "last_log_lines": log_lines,
+            }
+        )
+        for line in log_lines:
+            logger.info(line)
         return summary
 
     updated = 0
@@ -200,18 +278,27 @@ def sync_xero_payments() -> Dict[str, Any]:
         try:
             outcome = sync_booking_payment_from_xero(booking)
         except Exception as exc:
+            invoice_label = _booking_invoice_label(booking)
+            error_message = str(exc) or "Unexpected error."
+            if "auth" in error_message.lower():
+                error_message = "Xero API authentication failed"
             errors.append(
                 {
                     "booking_id": booking.get("id"),
-                    "message": str(exc) or "Unexpected error.",
+                    "invoice_label": invoice_label,
+                    "message": error_message,
                 }
             )
+            log_lines.append("{0}: {1}".format(invoice_label, error_message))
             continue
+
+        log_lines.extend(outcome.get("log_lines") or [])
 
         if not outcome.get("ok"):
             errors.append(
                 {
                     "booking_id": outcome.get("booking_id"),
+                    "invoice_label": outcome.get("invoice_label"),
                     "message": outcome.get("message") or "Sync failed.",
                 }
             )
@@ -226,6 +313,8 @@ def sync_xero_payments() -> Dict[str, Any]:
     summary["skipped"] = skipped
     summary["errors"] = errors
 
+    log_lines.append("{0} invoices checked".format(checked))
+    log_lines.append("{0} booking(s) updated".format(updated))
     if errors:
         summary["message"] = "Synced {0} payment(s); {1} error(s).".format(
             updated,
@@ -250,5 +339,23 @@ def sync_xero_payments() -> Dict[str, Any]:
             automation.STATUS_SUCCESS,
             summary["message"],
         )
+
+    log_lines.append("Xero payment sync completed")
+    finished_at = datetime.now(ZoneInfo("UTC")).isoformat()
+    state = {
+        "last_run_at": finished_at,
+        "last_source": source,
+        "last_ok": True,
+        "last_message": summary["message"],
+        "last_updated": updated,
+        "last_checked": checked,
+        "last_log_lines": log_lines,
+    }
+    if not errors:
+        state["last_success_at"] = finished_at
+    save_sync_state(state)
+
+    for line in log_lines:
+        logger.info(line)
 
     return summary

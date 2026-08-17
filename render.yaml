@@ -88,3 +88,55 @@ services:
         sync: false
       - key: EMAIL_ENABLED
         value: "true"
+
+  - type: cron
+    name: xero-payment-sync
+    runtime: python
+    plan: starter
+    region: oregon
+    repo: https://github.com/YasuJR/japanese-removals-bookings
+    branch: main
+    schedule: "*/15 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/run_xero_payment_sync.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: PRODUCTION
+        value: "true"
+      - key: RENDER
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: japanese-removals-db
+          property: connectionString
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: japanese-removals-bookings
+          envVarKey: SECRET_KEY
+      - key: XERO_CLIENT_ID
+        fromService:
+          type: web
+          name: japanese-removals-bookings
+          envVarKey: XERO_CLIENT_ID
+      - key: XERO_CLIENT_SECRET
+        fromService:
+          type: web
+          name: japanese-removals-bookings
+          envVarKey: XERO_CLIENT_SECRET
+      - key: XERO_TENANT_ID
+        fromService:
+          type: web
+          name: japanese-removals-bookings
+          envVarKey: XERO_TENANT_ID
+      - key: XERO_TOKEN_JSON
+        fromService:
+          type: web
+          name: japanese-removals-bookings
+          envVarKey: XERO_TOKEN_JSON
+      - key: XERO_REDIRECT_URI
+        fromService:
+          type: web
+          name: japanese-removals-bookings
+          envVarKey: XERO_REDIRECT_URI

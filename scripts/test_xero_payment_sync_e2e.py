@@ -221,6 +221,86 @@ def test_manual_paid_not_reverted_when_xero_unpaid():
     return True
 
 
+def test_cron_entrypoint_uses_same_sync():
+    booking_id = _create_booking("Cron Xero Sync Paid", invoice_number="22")
+    inv = _sample_xero_invoice("22")
+
+    with patch("integrations.xero.is_ready", return_value=True), patch(
+        "integrations.xero_payment_sync.fetch_xero_invoice_for_booking",
+        return_value=(inv, None),
+    ), patch("integrations.xero.persist_invoice_from_xero"):
+        import scripts.run_xero_payment_sync as cron_script
+
+        code = cron_script.main()
+
+    assert code == 0
+    row = dict(db.get_booking(booking_id))
+    assert row["payment_status"] == "Paid"
+    state = xero_payment_sync.load_sync_state()
+    assert state.get("last_source") == "cron"
+    assert state.get("last_success_at")
+    return True
+
+
+def test_repeat_sync_is_idempotent():
+    booking_id = _create_booking("Repeat Sync Paid", invoice_number="22")
+    inv = _sample_xero_invoice("22")
+
+    with patch("integrations.xero.is_ready", return_value=True), patch(
+        "integrations.xero_payment_sync.fetch_xero_invoice_for_booking",
+        return_value=(inv, None),
+    ), patch("integrations.xero.persist_invoice_from_xero"):
+        first = xero_payment_sync.sync_xero_payments(source="manual")
+        second = xero_payment_sync.sync_xero_payments(source="manual")
+
+    assert first["updated"] == 1
+    assert second["updated"] == 0
+    assert dict(db.get_booking(booking_id))["payment_status"] == "Paid"
+    return True
+
+
+def test_sync_logs_include_expected_lines():
+    booking_id = _create_booking("Sync Logs Paid", invoice_number="22")
+    inv = _sample_xero_invoice("INV22")
+
+    with patch("integrations.xero.is_ready", return_value=True), patch(
+        "integrations.xero_payment_sync.fetch_xero_invoice_for_booking",
+        return_value=(inv, None),
+    ), patch("integrations.xero.persist_invoice_from_xero"):
+        result = xero_payment_sync.sync_xero_payments(source="manual")
+
+    lines = "\n".join(result.get("log_lines") or [])
+    assert "Xero payment sync started" in lines
+    assert "INV22 matched" in lines
+    assert "INV22 changed UNPAID -> PAID" in lines
+    assert "1 invoices checked" in lines
+    assert "1 booking(s) updated" in lines
+    assert "Xero payment sync completed" in lines
+    assert dict(db.get_booking(booking_id))["payment_status"] == "Paid"
+    return True
+
+
+def test_dashboard_shows_last_sync_after_manual_sync():
+    booking_id = _create_booking("Dashboard Last Sync", invoice_number="22")
+    inv = _sample_xero_invoice("22")
+    client = _login_client()
+
+    with patch("integrations.xero.is_ready", return_value=True), patch(
+        "integrations.xero_payment_sync.fetch_xero_invoice_for_booking",
+        return_value=(inv, None),
+    ), patch("integrations.xero.persist_invoice_from_xero"):
+        client.post(
+            "/dashboard?filter=all",
+            data={"action": "sync_xero_payments"},
+            follow_redirects=True,
+        )
+
+    html = client.get("/dashboard?filter=all").get_data(as_text=True)
+    assert "Last Xero Sync:" in html
+    assert dict(db.get_booking(booking_id))["payment_status"] == "Paid"
+    return True
+
+
 def main():
     tests = [
         test_fully_paid_xero_invoice_marks_booking_paid,
@@ -231,6 +311,10 @@ def main():
         test_dashboard_renders_sync_button,
         test_dashboard_sync_action_updates_paid_booking,
         test_manual_paid_not_reverted_when_xero_unpaid,
+        test_cron_entrypoint_uses_same_sync,
+        test_repeat_sync_is_idempotent,
+        test_sync_logs_include_expected_lines,
+        test_dashboard_shows_last_sync_after_manual_sync,
     ]
     passed = 0
     for test in tests:

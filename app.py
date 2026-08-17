@@ -47,7 +47,7 @@ from outstanding_invoices_data import INVOICE_FILTERS, build_outstanding_dashboa
 from executive_dashboard_data import build_executive_dashboard
 from profit_data import PROFIT_CSV_HEADERS, build_profit_dashboard, profit_csv_rows
 import booking_profit
-from integrations import payment_reminder_automation
+from integrations import payment_reminder_automation, xero_payment_sync
 from booking_times import (
     DEFAULT_DURATION_HOURS,
     DEFAULT_FINISH_TIME,
@@ -1439,6 +1439,7 @@ def dashboard():
         profit_paid_only=profit_paid_only,
         profit_status_filters=booking_profit.PROFIT_STATUS_FILTERS,
         status=_integration_status(),
+        xero_payment_last_sync=xero_payment_sync.dashboard_last_sync_display(),
     )
 
 
