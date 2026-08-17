@@ -399,7 +399,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 14mm 6mm;
+    margin: 12mm 6mm;
   }
 
   .invoice-preview-page {
@@ -426,6 +426,70 @@
 
   .invoice-contact-line {
     white-space: normal;
+  }
+
+  :root {
+    --section-gap: 0.85rem;
+    --bill-gap: 0.85rem;
+    --totals-top-gap: 0.85rem;
+  }
+
+  .invoice-brand {
+    margin-bottom: var(--section-gap);
+  }
+
+  .invoice-accent-line,
+  .invoice-accent-line-subtle,
+  .invoice-table-divider {
+    margin-top: 0.65rem;
+    margin-bottom: 0.65rem;
+  }
+
+  .invoice-title-block {
+    margin-bottom: var(--section-gap);
+  }
+
+  .invoice-bill-section {
+    margin-bottom: var(--bill-gap);
+  }
+
+  .invoice-lines th,
+  .invoice-lines td {
+    padding: 0.55rem 0.65rem;
+  }
+
+  .invoice-total-bar {
+    margin-top: 0.75rem;
+    margin-bottom: 0.85rem;
+    padding: 0.65rem 0.85rem;
+    font-size: 24px;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  .invoice-bottom,
+  .invoice-bottom-split,
+  .invoice-payment-box,
+  .invoice-payment-options-box {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .invoice-bottom-split {
+    margin-top: 0;
+    page-break-before: avoid;
+    break-before: avoid;
+  }
+
+  .invoice-payment-box,
+  .invoice-payment-options-box {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .invoice-footer {
+    margin-top: 1rem;
+    page-break-before: avoid;
+    break-before: avoid;
   }
 }
 

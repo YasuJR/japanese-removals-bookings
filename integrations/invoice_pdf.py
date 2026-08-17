@@ -23,6 +23,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import (
     HRFlowable,
     Image,
+    KeepTogether,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -41,14 +42,14 @@ JR_BORDER_SUBTLE = JR_SECONDARY
 
 PAGE_WIDTH, PAGE_HEIGHT = A4
 MARGIN_H = 6 * mm
-MARGIN_V = 14 * mm
+MARGIN_V = 12 * mm
 CONTENT_WIDTH = PAGE_WIDTH - (2 * MARGIN_H)
-LOGO_WIDTH = 65 * mm
-LOGO_GAP = 4 * mm
-SECTION_GAP = 6 * mm
-BILL_GAP = 7 * mm
-TOTAL_GAP = 10 * mm
-TOTALS_TOP_GAP = 8 * mm
+LOGO_WIDTH = 58 * mm
+LOGO_GAP = 3 * mm
+SECTION_GAP = 4 * mm
+BILL_GAP = 4 * mm
+TOTAL_GAP = 5 * mm
+TOTALS_TOP_GAP = 4 * mm
 SUBTOTAL_BLOCK_W = 98 * mm
 FOOTER_TAGLINE = "Trusted Service | Smart Solutions | Stress-Free Relocations"
 
@@ -134,11 +135,8 @@ def _labour_description(booking: Dict[str, Any], totals: Dict[str, Any]) -> str:
     crew = display_crew(booking)
     return "<br/>".join(
         [
-            "Moving Labour",
-            "{0:.1f} hrs".format(hours),
-            "{0}/hr".format(rate),
-            "Crew:",
-            crew,
+            "Moving Labour — {0:.1f} hrs @ {1}/hr".format(hours, rate),
+            "Crew: {0}".format(crew),
         ]
     )
 
@@ -247,8 +245,8 @@ def _styles():
             "InvoiceTitle",
             parent=base["Heading1"],
             fontName="Helvetica-Bold",
-            fontSize=35,
-            leading=36,
+            fontSize=32,
+            leading=34,
             textColor=JR_PRIMARY,
             alignment=TA_LEFT,
             spaceAfter=0,
@@ -312,15 +310,15 @@ def _styles():
             parent=base["Normal"],
             fontName="Helvetica",
             fontSize=9.5,
-            leading=13,
+            leading=12,
             textColor=JR_TEXT,
         ),
         "payment_title": ParagraphStyle(
             "PaymentTitle",
             parent=base["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=11,
-            leading=13,
+            fontSize=10.5,
+            leading=12,
             textColor=JR_PRIMARY,
         ),
         "payment_label": ParagraphStyle(
@@ -328,7 +326,7 @@ def _styles():
             parent=base["Normal"],
             fontName="Helvetica-Bold",
             fontSize=9,
-            leading=15,
+            leading=12,
             textColor=JR_PRIMARY,
         ),
         "payment_value": ParagraphStyle(
@@ -336,7 +334,7 @@ def _styles():
             parent=base["Normal"],
             fontName="Helvetica",
             fontSize=9.5,
-            leading=15,
+            leading=12,
             textColor=JR_TEXT,
         ),
         "footer": ParagraphStyle(
@@ -352,8 +350,8 @@ def _styles():
             "TotalBarLabel",
             parent=base["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=26,
-            leading=28,
+            fontSize=24,
+            leading=26,
             textColor=JR_WHITE,
             alignment=TA_LEFT,
         ),
@@ -361,8 +359,8 @@ def _styles():
             "TotalBarAmount",
             parent=base["Normal"],
             fontName="Helvetica-Bold",
-            fontSize=26,
-            leading=28,
+            fontSize=24,
+            leading=26,
             textColor=JR_WHITE,
             alignment=TA_RIGHT,
         ),
@@ -476,17 +474,18 @@ def _payment_details_table(
         ("SPAN", (0, 0), (1, 0)),
         ("BACKGROUND", (0, 0), (-1, -1), JR_GREEN_LIGHT),
         ("BOX", (0, 0), (-1, -1), 1, JR_GREEN_TABLE),
-        ("LEFTPADDING", (0, 0), (-1, -1), 18),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 18),
-        ("TOPPADDING", (0, 1), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 1), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (1, 0), 14),
-        ("BOTTOMPADDING", (0, 0), (1, 0), 10),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+        ("TOPPADDING", (0, 1), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (1, 0), 10),
+        ("BOTTOMPADDING", (0, 0), (1, 0), 6),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
     ]
     if reference:
         style_commands.insert(1, ("SPAN", (0, len(payment_rows) - 1), (1, len(payment_rows) - 1)))
     payment_table.setStyle(TableStyle(style_commands))
+    payment_table.splitByRow = 0
     return payment_table
 
 
@@ -537,15 +536,16 @@ def _payment_options_table(
         ("SPAN", (0, 0), (1, 0)),
         ("BACKGROUND", (0, 0), (-1, -1), JR_GREEN_LIGHT),
         ("BOX", (0, 0), (-1, -1), 1, JR_GREEN_TABLE),
-        ("LEFTPADDING", (0, 0), (-1, -1), 18),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 18),
-        ("TOPPADDING", (0, 1), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 1), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+        ("TOPPADDING", (0, 1), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
     ]
     if options.get("card_payments_visible"):
         style_commands.insert(1, ("SPAN", (0, 3), (1, 3)))
     table.setStyle(TableStyle(style_commands))
+    table.splitByRow = 0
     return table
 
 
@@ -684,8 +684,8 @@ def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
                 ("TEXTCOLOR", (0, 0), (-1, 0), JR_WHITE),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("FONTSIZE", (0, 0), (-1, 0), 10.5),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
-                ("TOPPADDING", (0, 0), (-1, 0), 12),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
+                ("TOPPADDING", (0, 0), (-1, 0), 10),
                 ("LINEBELOW", (0, 0), (-1, 0), 1, JR_GREEN_TABLE),
                 ("LINEBELOW", (0, 1), (-1, -2), 0.25, JR_BORDER_SUBTLE),
                 ("LINEBELOW", (0, -1), (-1, -1), 0.75, JR_GREEN_TABLE),
@@ -693,17 +693,25 @@ def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 8),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 1), (-1, -1), 11),
-                ("BOTTOMPADDING", (0, 1), (-1, -1), 11),
+                ("TOPPADDING", (0, 1), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 1), (-1, -1), 8),
                 ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
             ]
         )
     )
     story.append(line_table)
-    story.append(Spacer(1, TOTALS_TOP_GAP))
-    story.append(HRFlowable(width="100%", thickness=0.5, color=JR_BORDER_SUBTLE, spaceAfter=TOTALS_TOP_GAP))
 
-    # --- Totals (subtotal/GST right-aligned, then full-width TOTAL AUD bar) ---
+    # --- Totals, payment, footer — kept together when they fit on one page ---
+    bottom_story: List[Any] = [
+        Spacer(1, TOTALS_TOP_GAP),
+        HRFlowable(
+            width="100%",
+            thickness=0.5,
+            color=JR_BORDER_SUBTLE,
+            spaceAfter=TOTALS_TOP_GAP,
+        ),
+    ]
+
     totals = doc_data["totals"]
     subtotal_rows: List[List[str]] = []
     if totals["gst_enabled"]:
@@ -739,8 +747,8 @@ def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
                 ]
             )
         )
-        story.append(subtotal_table)
-        story.append(Spacer(1, TOTAL_GAP))
+        bottom_story.append(subtotal_table)
+        bottom_story.append(Spacer(1, TOTAL_GAP))
 
     total_label = "TOTAL AUD"
     if totals["gst_enabled"]:
@@ -760,15 +768,15 @@ def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
             [
                 ("BACKGROUND", (0, 0), (-1, -1), JR_GREEN_TABLE),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 14),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
-                ("LEFTPADDING", (0, 0), (-1, -1), 14),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+                ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
             ]
         )
     )
-    story.append(total_bar)
-    story.append(Spacer(1, SECTION_GAP))
+    bottom_story.append(total_bar)
+    bottom_story.append(Spacer(1, SECTION_GAP))
 
     payment_width = SUBTOTAL_BLOCK_W
     options_table = _payment_options_table(
@@ -794,18 +802,31 @@ def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
             ]
         )
     )
-    story.append(payment_row)
+    payment_row.splitByRow = 0
+    bottom_story.append(payment_row)
+
     pay_now_table = _pay_now_button_table(
         doc_data.get("payment_options") or {},
         styles,
         CONTENT_WIDTH,
     )
     if pay_now_table:
-        story.append(Spacer(1, SECTION_GAP))
-        story.append(pay_now_table)
-    story.append(Spacer(1, SECTION_GAP * 3))
-    story.append(HRFlowable(width="100%", thickness=0.4, color=JR_BORDER_SUBTLE, spaceAfter=SECTION_GAP))
-    story.append(Paragraph(doc_data["footer_tagline"], styles["footer"]))
+        bottom_story.append(Spacer(1, SECTION_GAP))
+        bottom_story.append(pay_now_table)
+
+    bottom_story.extend(
+        [
+            Spacer(1, SECTION_GAP),
+            HRFlowable(
+                width="100%",
+                thickness=0.4,
+                color=JR_BORDER_SUBTLE,
+                spaceAfter=SECTION_GAP,
+            ),
+            Paragraph(doc_data["footer_tagline"], styles["footer"]),
+        ]
+    )
+    story.append(KeepTogether(bottom_story))
 
     doc.build(story)
     return buffer.getvalue()
