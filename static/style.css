@@ -1569,10 +1569,13 @@ body {
 .dashboard-status-picker {
   position: relative;
   display: inline-block;
+  vertical-align: middle;
 }
 
 .dashboard-status-cell {
   vertical-align: middle;
+  overflow: visible;
+  white-space: nowrap;
 }
 
 .dashboard-status-trigger {
@@ -1582,9 +1585,8 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.3rem;
-  min-height: 44px;
-  padding: 0.35rem 0.7rem;
+  gap: 0.25rem;
+  padding: 0.2rem 0.55rem;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
@@ -1594,25 +1596,43 @@ body {
 }
 
 .dashboard-status-chevron {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   line-height: 1;
-  opacity: 0.9;
+  opacity: 0.85;
 }
 
-.dashboard-status-menu {
+.dashboard-status-portal[hidden] {
+  display: none !important;
+}
+
+.dashboard-status-portal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  pointer-events: none;
+}
+
+.dashboard-status-backdrop {
   position: absolute;
-  z-index: 120;
-  top: calc(100% + 0.25rem);
-  left: 0;
-  min-width: 12rem;
+  inset: 0;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.dashboard-status-portal .dashboard-status-menu {
+  position: fixed;
+  z-index: 301;
+  min-width: 10.5rem;
+  max-width: calc(100vw - 1rem);
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
-  padding: 0.4rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 0.35rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.25rem;
+  pointer-events: auto;
 }
 
 .dashboard-status-option {
@@ -1621,9 +1641,9 @@ body {
   text-align: left;
   width: 100%;
   min-height: 44px;
-  padding: 0.55rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   border-radius: 8px;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
 
 .dashboard-status-option[aria-selected="true"] {

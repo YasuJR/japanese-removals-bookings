@@ -1,5 +1,5 @@
 {% set current = b|booking_job_status %}
-<div class="dashboard-status-picker" data-booking-id="{{ b.id }}">
+<div class="dashboard-status-picker" data-booking-id="{{ b.id }}" data-current-status="{{ current }}">
   <button type="button"
           class="status-badge status-{{ current|job_status_css }} dashboard-status-trigger"
           aria-haspopup="listbox"
@@ -8,15 +8,4 @@
     <span class="dashboard-status-label">{{ current }}</span>
     <span class="dashboard-status-chevron" aria-hidden="true">▾</span>
   </button>
-  <div class="dashboard-status-menu" hidden role="listbox" aria-label="Status options">
-    {% for option in dashboard_status_options %}
-    <button type="button"
-            class="dashboard-status-option status-badge status-{{ option|job_status_css }}"
-            data-status="{{ option }}"
-            role="option"
-            aria-selected="{{ 'true' if option == current else 'false' }}">
-      {{ option }}
-    </button>
-    {% endfor %}
-  </div>
 </div>

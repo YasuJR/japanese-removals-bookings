@@ -160,5 +160,11 @@
   <p class="empty">No jobs match this filter.</p>
   {% endif %}
 </section>
+
+<div id="dashboard-status-portal" class="dashboard-status-portal" hidden aria-hidden="true">
+  <div class="dashboard-status-backdrop" tabindex="-1" aria-hidden="true"></div>
+  <div class="dashboard-status-menu" role="listbox" aria-label="Status options"></div>
+</div>
+<script type="application/json" id="dashboard-status-options-json">{{ dashboard_status_options|tojson }}</script>
 <script src="{{ url_for('static', filename='dashboard_status.js') }}"></script>
 {% endblock %}

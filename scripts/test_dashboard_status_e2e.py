@@ -51,9 +51,12 @@ def test_dashboard_renders_status_picker():
     html = client.get("/dashboard?filter=all&jobs_limit=500").get_data(as_text=True)
     assert 'class="dashboard-status-picker"' in html
     assert 'data-booking-id="{0}"'.format(booking_id) in html
+    assert 'id="dashboard-status-portal"' in html
+    assert 'id="dashboard-status-options-json"' in html
     assert "dashboard_status.js" in html
+    assert html.count('class="dashboard-status-option"') == 0
     for option in job_status.DASHBOARD_INLINE_STATUS_OPTIONS:
-        assert 'data-status="{0}"'.format(option) in html
+        assert option in html
     return True
 
 
@@ -113,9 +116,22 @@ def test_dashboard_shows_updated_status_after_reload():
     return True
 
 
+def test_dashboard_rows_do_not_embed_status_menus():
+    db.init_db()
+    for idx in range(3):
+        _create_booking(status="Confirmed", move_date="2098-01-{0:02d}".format(idx + 1))
+    client = _login_client()
+    html = client.get("/dashboard?filter=all&jobs_limit=500").get_data(as_text=True)
+    assert html.count("dashboard-status-picker") >= 3
+    assert html.count('class="dashboard-status-menu"') == 1
+    assert html.count('class="dashboard-status-option"') == 0
+    return True
+
+
 def main():
     tests = [
         test_dashboard_renders_status_picker,
+        test_dashboard_rows_do_not_embed_status_menus,
         test_inline_status_update_persists,
         test_invalid_status_rejected,
         test_dashboard_shows_updated_status_after_reload,
