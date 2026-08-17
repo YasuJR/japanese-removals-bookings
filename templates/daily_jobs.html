@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Daily Jobs — {{ daily.date_heading }}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='daily_jobs.css') }}">
+
+<section class="panel daily-jobs-page">
+  <p class="daily-jobs-back">
+    <a class="btn-secondary btn-sm" href="{{ back_to_calendar_url }}">← Back to Calendar</a>
+  </p>
+
+  <header class="daily-jobs-header">
+    <p class="daily-jobs-date">{{ daily.date_heading }}</p>
+    <h1 class="daily-jobs-title">Daily Jobs</h1>
+  </header>
+
+  <section class="daily-jobs-summary" aria-label="Daily summary">
+    <div class="daily-jobs-summary-item">
+      <span class="daily-jobs-summary-label">Total Jobs</span>
+      <strong class="daily-jobs-summary-value">{{ daily.summary.total_jobs }}</strong>
+    </div>
+    <div class="daily-jobs-summary-item">
+      <span class="daily-jobs-summary-label">Crew</span>
+      <strong class="daily-jobs-summary-value">{{ daily.summary.crew_display }}</strong>
+    </div>
+    <div class="daily-jobs-summary-item">
+      <span class="daily-jobs-summary-label">Earliest Start</span>
+      <strong class="daily-jobs-summary-value">{{ daily.summary.earliest_start }}</strong>
+    </div>
+    <div class="daily-jobs-summary-item">
+      <span class="daily-jobs-summary-label">Latest Finish</span>
+      <strong class="daily-jobs-summary-value">{{ daily.summary.latest_finish }}</strong>
+    </div>
+  </section>
+
+  {% if daily.jobs %}
+  <div class="daily-jobs-list">
+    {% for job in daily.jobs %}
+    <article class="daily-job-card">
+      <a class="daily-job-card-link" href="{{ url_for('view_booking', booking_id=job.id) }}">
+        <p class="daily-job-label">{{ job.job_label }}</p>
+        <p class="daily-job-time">{{ job.time_range }}</p>
+        <h2 class="daily-job-customer">{{ job.customer_name }}</h2>
+        <p class="daily-job-meta">{{ job.num_movers }} mover{% if job.num_movers != 1 %}s{% endif %}</p>
+        <p class="daily-job-row"><span class="daily-job-field">Crew:</span> {{ job.crew_display }}</p>
+        <p class="daily-job-row"><span class="daily-job-field">Pickup:</span> {{ job.pickup_address or '—' }}</p>
+        <p class="daily-job-row"><span class="daily-job-field">Delivery:</span> {{ job.delivery_address or '—' }}</p>
+        <p class="daily-job-row">
+          <span class="daily-job-field">Phone:</span>
+          {% if job.phone and job.phone|tel_href %}
+          {{ job.phone }}
+          {% elif job.phone %}
+          {{ job.phone }}
+          {% else %}
+          —
+          {% endif %}
+        </p>
+        <p class="daily-job-row">
+          <span class="daily-job-field">Status:</span> {{ job.status|upper }}
+        </p>
+        <p class="daily-job-row daily-job-notes{% if not job.notes %} muted{% endif %}">
+          <span class="daily-job-field">Notes:</span> {{ job.notes or '—' }}
+        </p>
+      </a>
+      <div class="daily-job-actions">
+        {% with phone=job.phone %}{% include '_contact_actions.html' %}{% endwith %}
+        {% with pickup=job.pickup_address, delivery=job.delivery_address %}{% include '_map_buttons.html' %}{% endwith %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty muted">No bookings on this day.</p>
+  {% endif %}
+</section>
+{% endblock %}

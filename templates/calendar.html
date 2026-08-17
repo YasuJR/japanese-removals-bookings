@@ -102,7 +102,7 @@
       {% endfor %}
     </div>
     {% for day in cal.week_days %}
-    <div class="calendar-week-col{% if day.is_today %} calendar-day-today{% endif %}">
+    <div class="calendar-week-col{% if day.is_today %} calendar-day-today{% endif %}" data-date="{{ day.date }}">
       <div class="calendar-week-col-head">
         {{ day.label }}
         {% if day.has_conflict %}<span class="calendar-conflict-badge">CONFLICT</span>{% endif %}
@@ -126,6 +126,7 @@
   <div class="calendar-day-view">
     <div class="calendar-day-view-head">
       <h3>{{ cal.title }}</h3>
+      <a class="btn-secondary btn-sm" href="{{ url_for('calendar_daily_jobs', date_iso=cal.anchor_date, view=cal.view, year=cal.year, month=cal.month, day=cal.day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Daily Jobs</a>
       {% if cal.events %}
       {% set has_conflict = cal.events | selectattr('has_conflict') | list | length > 0 %}
       {% if has_conflict %}<span class="calendar-conflict-badge">CONFLICT</span>{% endif %}
@@ -147,17 +148,7 @@
   {% endif %}
 </section>
 
-<aside class="calendar-day-panel" id="calendar-day-panel" hidden>
-  <div class="calendar-day-panel-inner">
-    <button type="button" class="calendar-day-panel-close" id="calendar-day-panel-close" aria-label="Close">×</button>
-    <h3 id="calendar-day-panel-title">Day</h3>
-    <div id="calendar-day-panel-content"></div>
-    <a class="btn-primary btn-sm" id="calendar-new-booking-link" href="{{ url_for('new_booking') }}">+ New Booking</a>
-  </div>
-</aside>
-
 <script>
-  window.CALENDAR_DAY_DATA = {{ cal.events_by_date | tojson }};
   window.CALENDAR_TODAY = "{{ cal.today_iso }}";
 </script>
 <script src="{{ url_for('static', filename='calendar.js') }}"></script>

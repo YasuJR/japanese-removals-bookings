@@ -75,6 +75,7 @@ from dashboard_data import (
     paginate_dashboard_jobs,
     parse_jobs_limit,
 )
+from daily_jobs_data import build_daily_jobs
 import calendar_data
 from display_dates import format_display_date, get_weekday_class
 import automation
@@ -1528,6 +1529,38 @@ def booking_calendar():
         today=today,
     )
     return render_template("calendar.html", cal=cal)
+
+
+def _calendar_back_url(**kwargs) -> str:
+    params = {key: value for key, value in kwargs.items() if value not in (None, "")}
+    return url_for("booking_calendar", **params)
+
+
+@app.route("/calendar/daily/<date_iso>", endpoint="calendar_daily_jobs")
+@auth.login_required
+def calendar_daily_jobs(date_iso):
+    try:
+        datetime.strptime(date_iso[:10], "%Y-%m-%d")
+    except ValueError:
+        flash("Invalid date.", "error")
+        return redirect(url_for("booking_calendar"))
+
+    daily = build_daily_jobs(date_iso[:10])
+    back_to_calendar_url = _calendar_back_url(
+        view=request.args.get("view", "month"),
+        year=request.args.get("year"),
+        month=request.args.get("month"),
+        day=request.args.get("day"),
+        status=request.args.get("status"),
+        crew=request.args.get("crew"),
+        truck=request.args.get("truck"),
+        payment=request.args.get("payment"),
+    )
+    return render_template(
+        "daily_jobs.html",
+        daily=daily,
+        back_to_calendar_url=back_to_calendar_url,
+    )
 
 
 @app.route("/settings/gmail", methods=["GET", "POST"])

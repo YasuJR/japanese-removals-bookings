@@ -201,6 +201,7 @@
   border-right: 1px solid var(--border);
   position: relative;
   min-width: 0;
+  cursor: pointer;
 }
 
 .calendar-week-col-head {
