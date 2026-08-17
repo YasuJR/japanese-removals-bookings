@@ -1350,15 +1350,42 @@ def ceo_dashboard():
     )
 
 
-@app.route("/dashboard", endpoint="dashboard")
+@app.route("/dashboard", endpoint="dashboard", methods=["GET", "POST"])
 @auth.login_required
 def dashboard():
     today = date.today()
-    dash = build_dashboard(today)
     active_filter = request.args.get("filter", "all").strip().lower()
     valid_filters = {key for key, _ in job_status.DASHBOARD_FILTERS}
     if active_filter not in valid_filters:
         active_filter = "all"
+
+    if request.method == "POST":
+        if request.form.get("action") == "sync_xero_payments":
+            result = services.sync_xero_payments()
+            if not result.get("ok"):
+                flash(result.get("message") or "Xero payment sync failed.", "error")
+            elif result.get("errors"):
+                flash(
+                    "{0} {1} error(s) — no bookings were changed for failed rows.".format(
+                        result.get("message") or "Sync finished.",
+                        len(result.get("errors") or []),
+                    ),
+                    "warning",
+                )
+            else:
+                flash(result.get("message") or "Xero payment sync finished.", "success")
+        return redirect(
+            url_for(
+                "dashboard",
+                filter=active_filter,
+                jobs_limit=request.args.get("jobs_limit"),
+                profit_month=request.args.get("profit_month"),
+                profit_status=request.args.get("profit_status"),
+                profit_paid_only=request.args.get("profit_paid_only"),
+            )
+        )
+
+    dash = build_dashboard(today)
     jobs = dashboard_jobs(active_filter, today)
     jobs_limit = parse_jobs_limit(request.args.get("jobs_limit"), len(jobs))
     visible_jobs, jobs_total, has_more_jobs, next_jobs_limit = paginate_dashboard_jobs(
@@ -1411,6 +1438,7 @@ def dashboard():
         profit_status=profit_status,
         profit_paid_only=profit_paid_only,
         profit_status_filters=booking_profit.PROFIT_STATUS_FILTERS,
+        status=_integration_status(),
     )
 
 

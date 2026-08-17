@@ -205,6 +205,22 @@ body {
   margin: 0;
 }
 
+.panel-head-wrap {
+  align-items: flex-start;
+}
+
+.panel-head-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dashboard-sync-form {
+  margin: 0;
+  flex-shrink: 0;
+}
+
 .panel-toolbar {
   display: flex;
   flex-wrap: wrap;

@@ -86,14 +86,26 @@
 </section>
 
 <section class="panel">
-  <div class="panel-head">
-    <h3>Jobs</h3>
-    <nav class="filter-bar" aria-label="Dashboard filters">
-      {% for key, label in dashboard_filters %}
-      <a href="{{ url_for('dashboard', filter=key) }}"
-         class="filter-pill{% if active_filter == key %} active{% endif %}">{{ label }}</a>
-      {% endfor %}
-    </nav>
+  <div class="panel-head panel-head-wrap">
+    <div class="panel-head-main">
+      <h3>Jobs</h3>
+      <nav class="filter-bar" aria-label="Dashboard filters">
+        {% for key, label in dashboard_filters %}
+        <a href="{{ url_for('dashboard', filter=key) }}"
+           class="filter-pill{% if active_filter == key %} active{% endif %}">{{ label }}</a>
+        {% endfor %}
+      </nav>
+    </div>
+    <form method="post"
+          action="{{ url_for('dashboard', filter=active_filter, jobs_limit=jobs_limit, profit_month=profit_month, profit_status=profit_status, profit_paid_only=1 if profit_paid_only else none) }}"
+          class="dashboard-sync-form">
+      <input type="hidden" name="action" value="sync_xero_payments">
+      <button type="submit"
+              class="btn-secondary btn-sm"
+              {% if not status.xero_ready %}disabled title="Connect Xero in Settings first"{% endif %}>
+        Sync Xero Payments
+      </button>
+    </form>
   </div>
 
   {% if jobs %}

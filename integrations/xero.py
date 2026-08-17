@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import config
 import database as db
 import invoice
+import invoice_numbering
 from integrations import company_config, xero_branding, xero_config
 
 # Granular scopes required for apps created on/after 2026-03-02.
@@ -536,6 +537,45 @@ def fetch_invoice(invoice_id: str) -> Optional[Dict[str, Any]]:
         return invoices[0] if invoices else None
     except Exception:
         return None
+
+
+def fetch_invoice_by_number(invoice_number: str) -> Optional[Dict[str, Any]]:
+    """Find a Xero invoice by InvoiceNumber (plain, INV22, or INV-22)."""
+    import urllib.parse
+
+    if not is_ready():
+        return None
+    text = (invoice_number or "").strip()
+    if not text:
+        return None
+
+    candidates: List[str] = []
+    seen = set()
+
+    def add(value: str) -> None:
+        item = (value or "").strip()
+        if item and item not in seen:
+            seen.add(item)
+            candidates.append(item)
+
+    add(text)
+    num = invoice_numbering.numeric_sequence_value(text)
+    if num:
+        add(str(num))
+        add("INV{0}".format(num))
+        add("INV-{0}".format(num))
+
+    for candidate in candidates:
+        try:
+            where = 'InvoiceNumber=="{0}"'.format(candidate.replace('"', ""))
+            path = "Invoices?where={0}".format(urllib.parse.quote(where, safe="="))
+            result = _api_request("GET", path)
+            invoices = result.get("Invoices") or []
+            if invoices:
+                return invoices[0]
+        except Exception:
+            continue
+    return None
 
 
 def _parse_xero_datetime(value: Any) -> str:
