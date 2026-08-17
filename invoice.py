@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple
 import config
 import database as db
 import booking_profit
+import invoice_numbering
 from booking_times import inferred_duration_hours, parse_duration_hours
 from extra_charges import charge_line_total, charges_gross_total
 from integrations import company_config
@@ -105,11 +106,12 @@ def calculate_invoice_totals(booking: Dict[str, Any]) -> Dict[str, Any]:
 def invoice_summary(booking: Dict[str, Any]) -> Dict[str, Any]:
     """Totals plus status fields for templates."""
     totals = calculate_invoice_totals(booking)
+    raw_number = (booking.get("invoice_number") or "").strip()
     return {
         **totals,
         "payment_status": normalize_payment_status(booking.get("payment_status")),
         "invoice_status": (booking.get("invoice_status") or "").strip() or "—",
-        "invoice_number": (booking.get("invoice_number") or "").strip(),
+        "invoice_number": invoice_numbering.format_invoice_number(raw_number),
         "xero_invoice_id": (booking.get("xero_invoice_id") or "").strip(),
     }
 

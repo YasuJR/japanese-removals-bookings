@@ -10,7 +10,7 @@
     {% endif %}
     · Payment: {% with payment_status=invoice_summary.payment_status %}{% include '_payment_badge.html' %}{% endwith %}
     {% if booking.invoice_number %}
-    · Invoice: <strong>{{ booking.invoice_number }}</strong>
+    · Invoice: <strong>{{ booking.invoice_number|format_invoice_number }}</strong>
     {% endif %}
     {% if booking.paid_at and invoice_summary.payment_status == 'Paid' %}
     <span class="muted"> · paid {{ booking.paid_at[:10] }}</span>
@@ -32,7 +32,7 @@
   {% if booking.invoice_number or xero_invoice_linked %}
   <div class="xero-invoice-status-bar muted">
     {% if booking.invoice_number %}
-    <span><strong>Xero invoice:</strong> {{ booking.invoice_number }}</span>
+    <span><strong>Xero invoice:</strong> {{ booking.invoice_number|format_invoice_number }}</span>
     {% endif %}
     {% if xero_invoice_status %}
     <span class="status-pill status-invoice">{{ xero_invoice_status }}</span>
@@ -384,7 +384,7 @@
     {% if booking.google_calendar_event_id %}<li>Calendar event linked</li>{% endif %}
     {% if xero_invoice_draft %}
     <li>Draft invoice linked — saving this booking updates the Xero draft automatically.</li>
-    {% elif booking.invoice_number %}<li>Xero invoice: {{ booking.invoice_number }}</li>
+    {% elif booking.invoice_number %}<li>Xero invoice: {{ booking.invoice_number|format_invoice_number }}</li>
     {% elif booking.xero_invoice_id %}<li>Xero invoice linked</li>{% endif %}
     {% if xero_invoice_locked %}
     <li>This invoice is authorised/paid in Xero. Create a new invoice version instead.</li>

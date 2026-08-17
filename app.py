@@ -77,6 +77,7 @@ import calendar_data
 from display_dates import format_display_date, get_weekday_class
 import automation
 import invoice
+import invoice_numbering
 from validators import parse_booking_form
 
 app = Flask(__name__)
@@ -119,6 +120,7 @@ app.jinja_env.filters["format_hm_12h"] = format_time_12h
 app.jinja_env.filters["format_display_date"] = format_display_date
 app.jinja_env.filters["weekday_class"] = get_weekday_class
 app.jinja_env.filters["format_aud"] = invoice.format_aud
+app.jinja_env.filters["format_invoice_number"] = invoice_numbering.format_invoice_number
 app.jinja_env.filters["payment_status_css"] = (
     lambda value: invoice.normalize_payment_status(value)
     .lower()

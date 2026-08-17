@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import db_backend
+import invoice_numbering
 import job_status
 
 DB_PATH = Path(__file__).parent / "bookings.db"
@@ -187,8 +188,7 @@ def _bootstrap_invoice_sequence(conn) -> None:
     max_used = 0
     for row in rows:
         text = str(row["invoice_number"] if hasattr(row, "keys") else row[0]).strip()
-        if text.isdigit():
-            max_used = max(max_used, int(text))
+        max_used = max(max_used, invoice_numbering.numeric_sequence_value(text))
     if max_used <= 0:
         return
     floor = max_used + 1

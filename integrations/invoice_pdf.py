@@ -207,7 +207,6 @@ def build_invoice_document(booking: Dict[str, Any]) -> Dict[str, Any]:
         "company_location": settings.get("company_location") or "",
         "customer_name": booking.get("customer_name") or "",
         "invoice_number": invoice_number,
-        "reference": str(booking.get("id") or ""),
         "issue_date": _format_display_date(issue_date),
         "due_date": _format_display_date(due_date),
         "invoice_status": (booking.get("invoice_status") or "DRAFT").upper(),
@@ -406,7 +405,6 @@ def _meta_block(doc_data: Dict[str, Any], styles: Dict[str, ParagraphStyle]) -> 
     rows = [
         ("Invoice Date", doc_data["issue_date"]),
         ("Invoice Number", doc_data["invoice_number"]),
-        ("Reference", doc_data["reference"]),
         ("ABN", doc_data["company_abn"]),
     ]
     meta_rows = [
@@ -467,23 +465,31 @@ def _payment_details_table(
                 Paragraph(reference, styles["payment_value"]),
             ]
         )
-    payment_table = Table(payment_rows, colWidths=[label_w, value_w])
-    payment_table.setStyle(
-        TableStyle(
+        payment_rows.append(
             [
-                ("SPAN", (0, 0), (1, 0)),
-                ("BACKGROUND", (0, 0), (-1, -1), JR_GREEN_LIGHT),
-                ("BOX", (0, 0), (-1, -1), 1, JR_GREEN_TABLE),
-                ("LEFTPADDING", (0, 0), (-1, -1), 18),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 18),
-                ("TOPPADDING", (0, 1), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 1), (-1, -1), 6),
-                ("TOPPADDING", (0, 0), (1, 0), 14),
-                ("BOTTOMPADDING", (0, 0), (1, 0), 10),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                Paragraph(
+                    "<i>Please use the Invoice Number as your bank transfer payment reference.</i>",
+                    styles["payment_value"],
+                ),
+                "",
             ]
         )
-    )
+    payment_table = Table(payment_rows, colWidths=[label_w, value_w])
+    style_commands = [
+        ("SPAN", (0, 0), (1, 0)),
+        ("BACKGROUND", (0, 0), (-1, -1), JR_GREEN_LIGHT),
+        ("BOX", (0, 0), (-1, -1), 1, JR_GREEN_TABLE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 18),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 18),
+        ("TOPPADDING", (0, 1), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (1, 0), 14),
+        ("BOTTOMPADDING", (0, 0), (1, 0), 10),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]
+    if reference:
+        style_commands.insert(1, ("SPAN", (0, len(payment_rows) - 1), (1, len(payment_rows) - 1)))
+    payment_table.setStyle(TableStyle(style_commands))
     return payment_table
 
 

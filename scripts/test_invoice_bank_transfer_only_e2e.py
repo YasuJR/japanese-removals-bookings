@@ -13,6 +13,7 @@ import auth
 import config
 import database as db
 import invoice
+import invoice_numbering
 from app import app
 from integrations import invoice_pdf, stripe as stripe_service
 from integrations import stripe_config
@@ -57,7 +58,7 @@ def _create_unpaid_booking():
     db.update_booking_invoice_fields(
         booking_id,
         {
-            "invoice_number": "INV-BANK-{0}".format(booking_id),
+            "invoice_number": str(booking_id),
             "invoice_status": "AUTHORISED",
         },
     )
@@ -87,11 +88,14 @@ def test_invoice_preview_hides_stripe():
     booking_id = _create_unpaid_booking()
     client = _login_client()
     html = client.get("/bookings/{0}/invoice/preview".format(booking_id)).get_data(as_text=True)
+    expected = invoice_numbering.format_invoice_number(str(booking_id))
     assert "Bank Transfer" in html
     assert "Account Name" in html or "Account name" in html.lower()
     assert "BSB" in html
     assert "Payment Reference" in html
-    assert "INV-BANK-" in html
+    assert expected in html
+    assert html.count(expected) >= 2
+    assert ">Reference</td>" not in html
     assert "Pay Now" not in html
     assert "Credit Card" not in html
     assert "stripe_checkout" not in html
@@ -113,6 +117,7 @@ def test_invoice_pdf_hides_stripe():
 def test_public_pay_link_shows_bank_transfer():
     booking_id = _create_unpaid_booking()
     token = db.ensure_payment_token(booking_id)
+    expected = invoice_numbering.format_invoice_number(str(booking_id))
     client = app.test_client()
     resp = client.get("/pay/{0}".format(token))
     assert resp.status_code == 200
@@ -121,7 +126,7 @@ def test_public_pay_link_shows_bank_transfer():
     assert "Account Name" in html or "account name" in html.lower()
     assert "BSB" in html
     assert "Payment Reference" in html
-    assert "INV-BANK-" in html
+    assert expected in html
     assert "checkout.stripe.com" not in html
     assert resp.headers.get("Location", "") == ""
     return True

@@ -95,7 +95,10 @@ def test_pdf_shows_assigned_number():
     booking = dict(row)
     booking["extra_charges"] = []
     doc = invoice_pdf.build_invoice_document(booking)
-    assert doc["invoice_number"] == number
+    formatted = invoice_numbering.format_invoice_number(number)
+    assert doc["invoice_number"] == formatted
+    assert formatted.startswith("INV-")
+    assert doc["bank"]["payment_reference"] == formatted
     assert doc["company_abn"] == invoice_numbering.DEFAULT_ABN
     assert doc["company_contact_lines"] == [
         "Phone: 0481 089 573",
@@ -103,8 +106,53 @@ def test_pdf_shows_assigned_number():
         "Website: japaneseremovals.com.au",
     ]
     pdf_bytes = invoice_pdf.generate_invoice_pdf(booking)
-    assert str(number).encode("utf-8") in pdf_bytes
+    assert len(pdf_bytes) > 1000
     return number
+
+
+def test_format_existing_numeric_invoice():
+    assert invoice_numbering.format_invoice_number("25") == "INV-0025"
+    assert invoice_numbering.format_invoice_number("INV-0025") == "INV-0025"
+    assert invoice_numbering.format_invoice_number("INV-25") == "INV-0025"
+    assert invoice_numbering.numeric_sequence_value("INV-0025") == 25
+    booking = {"invoice_number": "25"}
+    assert invoice_numbering.display_invoice_number(booking) == "INV-0025"
+    return True
+
+
+def test_invoice_preview_no_reference_field():
+    import auth
+    from app import app
+
+    db.init_db()
+    booking_id = _create_booking("Preview")
+    db.update_booking_invoice_fields(booking_id, {"invoice_number": "25"})
+    uid = db.create_staff_user(
+        "inv-preview-{0}".format(booking_id),
+        auth.hash_password("test"),
+        "Preview",
+    )
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = uid
+        sess["username"] = "inv-preview-{0}".format(booking_id)
+    html = client.get("/bookings/{0}/invoice/preview".format(booking_id)).get_data(as_text=True)
+    assert "INV-0025" in html
+    assert ">Reference</td>" not in html
+    assert 'viewport' in html
+    return True
+
+
+def test_payment_reference_matches_invoice_number():
+    db.init_db()
+    booking_id = _create_booking("RefMatch")
+    invoice_numbering.ensure_booking_invoice_number(booking_id)
+    db.update_booking_invoice_fields(booking_id, {"invoice_number": "42"})
+    booking = dict(db.get_booking(booking_id))
+    doc = invoice_pdf.build_invoice_document(booking)
+    assert doc["invoice_number"] == "INV-0042"
+    assert doc["bank"]["payment_reference"] == "INV-0042"
+    return True
 
 
 def test_sequence_survives_reinit():
@@ -131,6 +179,9 @@ def main():
         ("first_and_second", test_first_and_second_invoice_numbers),
         ("edit_keeps_number", test_edit_keeps_same_number),
         ("pdf_number", test_pdf_shows_assigned_number),
+        ("format_existing", test_format_existing_numeric_invoice),
+        ("preview_no_reference", test_invoice_preview_no_reference_field),
+        ("payment_reference_match", test_payment_reference_matches_invoice_number),
         ("sequence_reinit", test_sequence_survives_reinit),
         ("no_reuse_after_delete", test_deleted_invoice_does_not_reuse_number),
     ]

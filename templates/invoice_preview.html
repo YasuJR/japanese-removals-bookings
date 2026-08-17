@@ -36,7 +36,6 @@
       <table class="invoice-meta-right">
         <tr><td>Invoice Date</td><td>{{ inv.issue_date }}</td></tr>
         <tr><td>Invoice Number</td><td>{{ inv.invoice_number }}</td></tr>
-        <tr><td>Reference</td><td>{{ inv.reference }}</td></tr>
         <tr><td>ABN</td><td>{{ inv.company_abn }}</td></tr>
       </table>
     </div>
@@ -142,6 +141,9 @@
             <dd>{{ inv.bank.payment_reference }}</dd>
             {% endif %}
           </dl>
+          {% if inv.bank.payment_reference %}
+          <p class="muted invoice-payment-note">Please use the Invoice Number as your bank transfer payment reference.</p>
+          {% endif %}
         </section>
       </div>
     </div>

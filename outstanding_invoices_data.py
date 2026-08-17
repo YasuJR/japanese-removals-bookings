@@ -83,9 +83,9 @@ def days_overdue(booking: Dict[str, Any], today: date) -> Optional[int]:
 
 
 def invoice_number_display(booking: Dict[str, Any]) -> str:
-    number = (booking.get("invoice_number") or "").strip()
-    if number:
-        return number
+    raw = (booking.get("invoice_number") or "").strip()
+    if raw:
+        return invoice_numbering.format_invoice_number(raw)
     return invoice_numbering.display_invoice_number(booking)
 
 
