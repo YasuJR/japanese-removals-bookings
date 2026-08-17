@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import config
-from crew import display_crew
 from extra_charges import charge_line_total
 from integrations import company_config, xero_branding
 from integrations import stripe as stripe_service
@@ -140,12 +139,8 @@ def _format_labour_hours(hours: float) -> str:
 def _labour_description(booking: Dict[str, Any], totals: Dict[str, Any]) -> str:
     hours = totals["hours"]
     rate = invoice.format_aud(totals["hourly_rate"])
-    crew = display_crew(booking)
-    return "<br/>".join(
-        [
-            "Moving Labour — {0} hrs @ {1}/hr".format(_format_labour_hours(hours), rate),
-            "Crew: {0}".format(crew),
-        ]
+    return "Moving Labour — {0} hrs @ {1}/hr".format(
+        _format_labour_hours(hours), rate
     )
 
 

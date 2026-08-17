@@ -439,6 +439,14 @@ body {
   color: var(--success);
 }
 
+.flash-saved {
+  background: var(--success-bg);
+  color: var(--success);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.45rem 0.75rem;
+}
+
 .flash-warning {
   background: #fde8e8;
   border-color: #c41e3a;
@@ -1556,6 +1564,81 @@ body {
 
 .status-cancelled {
   background: #dc3545;
+}
+
+.dashboard-status-picker {
+  position: relative;
+  display: inline-block;
+}
+
+.dashboard-status-cell {
+  vertical-align: middle;
+}
+
+.dashboard-status-trigger {
+  cursor: pointer;
+  border: none;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: 44px;
+  padding: 0.35rem 0.7rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.dashboard-status-trigger:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.dashboard-status-chevron {
+  font-size: 0.75rem;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.dashboard-status-menu {
+  position: absolute;
+  z-index: 120;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  min-width: 12rem;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dashboard-status-option {
+  cursor: pointer;
+  border: none;
+  text-align: left;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.dashboard-status-option[aria-selected="true"] {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.dashboard-status-option:hover,
+.dashboard-status-option:focus-visible {
+  filter: brightness(1.05);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.dashboard-status-picker.is-saving .dashboard-status-trigger {
+  opacity: 0.75;
 }
 
 .filter-bar {

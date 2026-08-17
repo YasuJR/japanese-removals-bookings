@@ -172,6 +172,7 @@ def inject_template_globals():
         "truck_options": active_truck_names(),
         "job_status_options": job_status.OPTIONS,
         "dashboard_filters": job_status.DASHBOARD_FILTERS,
+        "dashboard_status_options": job_status.DASHBOARD_INLINE_STATUS_OPTIONS,
         "crew_schedule_ranges": RANGE_OPTIONS,
         "invoice_filters": INVOICE_FILTERS,
         "company_settings": company_config.get_settings(),
@@ -1412,6 +1413,35 @@ def dashboard():
     )
 
 
+@app.route("/bookings/<int:booking_id>/status", methods=["POST"])
+@auth.login_required
+def update_booking_status_inline(booking_id):
+    row = db.get_booking(booking_id)
+    if row is None:
+        return jsonify({"error": "Booking not found."}), 404
+
+    payload = request.get_json(silent=True) or {}
+    new_status = job_status.validate_dashboard_inline(
+        payload.get("status") or request.form.get("status")
+    )
+    if not new_status:
+        return jsonify({"error": "Invalid status."}), 400
+
+    booking = services.booking_to_dict(row)
+    previous_status = job_status.display(booking)
+    if new_status != previous_status:
+        db.update_booking_status(booking_id, new_status)
+        services.after_booking_updated(booking_id, previous_status=previous_status)
+
+    return jsonify(
+        {
+            "ok": True,
+            "status": new_status,
+            "css_class": job_status.css_class(new_status),
+        }
+    )
+
+
 @app.route("/calendar", endpoint="booking_calendar")
 @auth.login_required
 def booking_calendar():
@@ -2018,8 +2048,8 @@ def edit_booking(booking_id):
                     booking_id, previous_status=previous_status
                 )
             )
-            flash("Booking #{0} updated.".format(booking_id), "success")
-            return redirect(url_for("ceo_dashboard"))
+            flash("Changes saved successfully.", "saved")
+            return redirect(url_for("edit_booking", booking_id=booking_id))
         flash("Could not update booking.", "error")
         return redirect(url_for("edit_booking", booking_id=booking_id))
 

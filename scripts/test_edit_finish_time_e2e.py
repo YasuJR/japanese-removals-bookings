@@ -102,6 +102,9 @@ def test_finish_time_change_updates_duration_and_invoice():
     }
     resp = client.post("/bookings/{0}/edit".format(booking_id), data=form, follow_redirects=False)
     assert resp.status_code in (302, 303), resp.status_code
+    assert "/bookings/{0}/edit".format(booking_id) in (resp.headers.get("Location") or "")
+    follow = client.get("/bookings/{0}/edit".format(booking_id))
+    assert "Changes saved successfully." in follow.get_data(as_text=True)
     row = dict(db.get_booking(booking_id))
     assert row.get("finish_time") == "13:00"
     assert row.get("duration_hours") == "5"

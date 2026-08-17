@@ -93,11 +93,24 @@ def test_many_line_items_may_use_second_page():
     return True
 
 
+def test_invoice_line_items_exclude_crew():
+    db.init_db()
+    booking = _sample_booking(invoice_number="26")
+    booking["crew"] = "Yasu,Tom,Ken"
+    doc = invoice_pdf.build_invoice_document(booking)
+    labour_html = doc["line_items"][0]["description_html"]
+    assert "Crew" not in labour_html
+    assert "Yasu" not in labour_html
+    assert "Moving Labour" in labour_html
+    return True
+
+
 def main():
     tests = [
         test_typical_invoice_single_page,
         test_booking_id_fallback_single_page,
         test_many_line_items_may_use_second_page,
+        test_invoice_line_items_exclude_crew,
     ]
     passed = 0
     for test in tests:

@@ -50,6 +50,15 @@ DASHBOARD_FILTERS = [
     ("cancelled", "Cancelled"),
 ]
 
+# Quick status changes from the Dashboard jobs table.
+DASHBOARD_INLINE_STATUS_OPTIONS: List[str] = [
+    "Quote",
+    "Confirmed",
+    "Invoiced",
+    "Completed",
+    "Cancelled",
+]
+
 
 def normalize(value: Any) -> str:
     text = str(value or "").strip()
@@ -71,5 +80,12 @@ def display(booking: Dict[str, Any]) -> str:
 def validate(value: Any) -> Optional[str]:
     text = str(value or "").strip()
     if text in OPTIONS:
+        return text
+    return None
+
+
+def validate_dashboard_inline(value: Any) -> Optional[str]:
+    text = validate(value)
+    if text and text in DASHBOARD_INLINE_STATUS_OPTIONS:
         return text
     return None

@@ -119,10 +119,8 @@
           <td class="customer-cell">
             <a class="customer-link" href="{{ url_for('view_booking', booking_id=b.id) }}"><strong>{{ b.customer_name }}</strong></a>
           </td>
-          <td class="nowrap">
-            {% with status=b|booking_job_status %}
-            {% include '_status_badge.html' %}
-            {% endwith %}
+          <td class="nowrap dashboard-status-cell">
+            {% include '_dashboard_status_picker.html' %}
           </td>
           <td class="nowrap">
             {% with double_booking_badge=b.double_booking_badge %}
@@ -162,4 +160,5 @@
   <p class="empty">No jobs match this filter.</p>
   {% endif %}
 </section>
+<script src="{{ url_for('static', filename='dashboard_status.js') }}"></script>
 {% endblock %}
