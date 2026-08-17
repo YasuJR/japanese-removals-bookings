@@ -106,12 +106,12 @@ def calculate_invoice_totals(booking: Dict[str, Any]) -> Dict[str, Any]:
 def invoice_summary(booking: Dict[str, Any]) -> Dict[str, Any]:
     """Totals plus status fields for templates."""
     totals = calculate_invoice_totals(booking)
-    raw_number = (booking.get("invoice_number") or "").strip()
+    displayed = invoice_numbering.display_invoice_number(booking)
     return {
         **totals,
         "payment_status": normalize_payment_status(booking.get("payment_status")),
         "invoice_status": (booking.get("invoice_status") or "").strip() or "—",
-        "invoice_number": invoice_numbering.format_invoice_number(raw_number),
+        "invoice_number": "" if displayed == "—" else displayed,
         "xero_invoice_id": (booking.get("xero_invoice_id") or "").strip(),
     }
 

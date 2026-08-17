@@ -97,7 +97,8 @@ def test_pdf_shows_assigned_number():
     doc = invoice_pdf.build_invoice_document(booking)
     formatted = invoice_numbering.format_invoice_number(number)
     assert doc["invoice_number"] == formatted
-    assert formatted.startswith("INV-")
+    assert formatted.startswith("INV")
+    assert "-" not in formatted
     assert doc["bank"]["payment_reference"] == formatted
     assert doc["company_abn"] == invoice_numbering.DEFAULT_ABN
     assert doc["company_contact_lines"] == [
@@ -111,12 +112,23 @@ def test_pdf_shows_assigned_number():
 
 
 def test_format_existing_numeric_invoice():
-    assert invoice_numbering.format_invoice_number("25") == "INV-0025"
-    assert invoice_numbering.format_invoice_number("INV-0025") == "INV-0025"
-    assert invoice_numbering.format_invoice_number("INV-25") == "INV-0025"
-    assert invoice_numbering.numeric_sequence_value("INV-0025") == 25
+    assert invoice_numbering.format_invoice_number("25") == "INV25"
+    assert invoice_numbering.format_invoice_number("100") == "INV100"
+    assert invoice_numbering.format_invoice_number("INV25") == "INV25"
+    assert invoice_numbering.format_invoice_number("INV-25") == "INV25"
+    assert invoice_numbering.format_invoice_number("INV-0025") == "INV25"
+    assert invoice_numbering.numeric_sequence_value("INV25") == 25
     booking = {"invoice_number": "25"}
-    assert invoice_numbering.display_invoice_number(booking) == "INV-0025"
+    assert invoice_numbering.display_invoice_number(booking) == "INV25"
+    return True
+
+
+def test_booking_id_fallback_when_no_stored_number():
+    booking = {"id": 25, "invoice_number": ""}
+    assert invoice_numbering.display_invoice_number(booking) == "INV25"
+    doc = invoice_pdf.build_invoice_document({**booking, "extra_charges": []})
+    assert doc["invoice_number"] == "INV25"
+    assert doc["bank"]["payment_reference"] == "INV25"
     return True
 
 
@@ -137,7 +149,8 @@ def test_invoice_preview_no_reference_field():
         sess["user_id"] = uid
         sess["username"] = "inv-preview-{0}".format(booking_id)
     html = client.get("/bookings/{0}/invoice/preview".format(booking_id)).get_data(as_text=True)
-    assert "INV-0025" in html
+    assert "INV-0025" not in html
+    assert "INV25" in html
     assert ">Reference</td>" not in html
     assert 'viewport' in html
     return True
@@ -150,8 +163,21 @@ def test_payment_reference_matches_invoice_number():
     db.update_booking_invoice_fields(booking_id, {"invoice_number": "42"})
     booking = dict(db.get_booking(booking_id))
     doc = invoice_pdf.build_invoice_document(booking)
-    assert doc["invoice_number"] == "INV-0042"
-    assert doc["bank"]["payment_reference"] == "INV-0042"
+    assert doc["invoice_number"] == "INV42"
+    assert doc["bank"]["payment_reference"] == "INV42"
+    return True
+
+
+def test_reference_25_without_stored_invoice_number():
+    db.init_db()
+    booking_id = _create_booking("Ref25")
+    db.update_booking_invoice_fields(booking_id, {"invoice_number": ""})
+    booking = dict(db.get_booking(booking_id))
+    doc = invoice_pdf.build_invoice_document(booking)
+    expected = "INV{0}".format(booking_id)
+    assert doc["invoice_number"] == expected
+    assert doc["bank"]["payment_reference"] == expected
+    assert doc["invoice_number"] == doc["bank"]["payment_reference"]
     return True
 
 
@@ -180,8 +206,10 @@ def main():
         ("edit_keeps_number", test_edit_keeps_same_number),
         ("pdf_number", test_pdf_shows_assigned_number),
         ("format_existing", test_format_existing_numeric_invoice),
+        ("booking_id_fallback", test_booking_id_fallback_when_no_stored_number),
         ("preview_no_reference", test_invoice_preview_no_reference_field),
         ("payment_reference_match", test_payment_reference_matches_invoice_number),
+        ("reference_25_fallback", test_reference_25_without_stored_invoice_number),
         ("sequence_reinit", test_sequence_survives_reinit),
         ("no_reuse_after_delete", test_deleted_invoice_does_not_reuse_number),
     ]

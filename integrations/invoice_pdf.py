@@ -124,11 +124,8 @@ def _bank_details(booking: Dict[str, Any], settings: Dict[str, Any]) -> Dict[str
 
 
 def _payment_reference(booking: Dict[str, Any]) -> str:
-    invoice_number = invoice_numbering.display_invoice_number(booking)
-    if invoice_number and invoice_number != "—":
-        return invoice_number
-    booking_id = booking.get("id")
-    return str(booking_id) if booking_id else ""
+    displayed = invoice_numbering.display_invoice_number(booking)
+    return displayed if displayed and displayed != "—" else ""
 
 
 def _labour_description(booking: Dict[str, Any], totals: Dict[str, Any]) -> str:
