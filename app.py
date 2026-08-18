@@ -2179,6 +2179,11 @@ def edit_booking(booking_id):
         "truck_assigned": row["truck_assigned"] or "",
         "status": job_status.display(_row_to_dict(row)),
     }
+    form.update(
+        invoice.invoice_description_form_values(
+            invoice.resolve_booking_invoice(services.booking_to_dict(row))
+        )
+    )
     return render_template(
         "edit_booking.html",
         booking=row,
@@ -2248,6 +2253,9 @@ def invoice_calculate(booking_id):
             "card_total_display": payment["card_total_display"],
             "surcharge_percent_display": payment["surcharge_percent_display"],
             "surcharge_display": payment["surcharge_display"],
+            "labour_description": invoice.format_moving_labour_description(
+                data, totals
+            ),
         }
     )
 

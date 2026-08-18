@@ -1235,6 +1235,13 @@ body {
   min-width: 0;
 }
 
+.pricing-textarea {
+  width: 100%;
+  min-height: 5.5rem;
+  resize: vertical;
+  line-height: 1.45;
+}
+
 .stepper-btn {
   width: 2rem;
   height: 2rem;

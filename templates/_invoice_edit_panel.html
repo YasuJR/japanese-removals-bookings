@@ -106,6 +106,14 @@
         GST inclusive pricing (10%)
       </label>
     </div>
+
+    <div class="pricing-row pricing-row-full">
+      <label class="pricing-label" for="invoice_description">Invoice Description</label>
+      <textarea name="invoice_description" id="invoice_description" class="pricing-textarea"
+                rows="4" maxlength="2000">{{ form.get('invoice_description', '') }}</textarea>
+      <input type="hidden" name="invoice_description_custom" id="invoice_description_custom"
+             value="{{ form.get('invoice_description_custom', '0') }}">
+    </div>
   </div>
 
   <dl class="invoice-totals-live">

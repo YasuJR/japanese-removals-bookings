@@ -41,15 +41,17 @@ def booking_to_dict(row: Any) -> Dict[str, Any]:
 
 def _persist_booking_extras(booking_id: int, data: Dict[str, Any]) -> None:
     db.replace_extra_charges(booking_id, data.get("extra_charges") or [])
-    db.update_booking_invoice_fields(
-        booking_id,
-        {
-            "invoice_custom_text": data.get("invoice_custom_text", ""),
-            "invoice_bank_account_name": data.get("invoice_bank_account_name", ""),
-            "invoice_bank_bsb": data.get("invoice_bank_bsb", ""),
-            "invoice_bank_account": data.get("invoice_bank_account", ""),
-        },
-    )
+    invoice_fields = {
+        "invoice_custom_text": data.get("invoice_custom_text", ""),
+        "invoice_bank_account_name": data.get("invoice_bank_account_name", ""),
+        "invoice_bank_bsb": data.get("invoice_bank_bsb", ""),
+        "invoice_bank_account": data.get("invoice_bank_account", ""),
+    }
+    if data.get("invoice_description_present"):
+        invoice_fields["invoice_description"] = invoice.stored_description_for_save(
+            data
+        )
+    db.update_booking_invoice_fields(booking_id, invoice_fields)
     truck = (data.get("truck_assigned") or "").strip()
     if "truck_assigned" in data:
         db.update_booking_integration_fields(

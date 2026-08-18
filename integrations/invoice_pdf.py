@@ -129,7 +129,7 @@ def _payment_reference(booking: Dict[str, Any]) -> str:
 
 
 def _labour_description(booking: Dict[str, Any], totals: Dict[str, Any]) -> str:
-    return invoice.format_moving_labour_description(booking, totals)
+    return invoice.invoice_description_markup(booking, totals)
 
 
 def _line_items(booking: Dict[str, Any], totals: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -303,6 +303,7 @@ def _styles():
             fontSize=9.5,
             leading=12,
             textColor=JR_TEXT,
+            alignment=TA_LEFT,
         ),
         "payment_title": ParagraphStyle(
             "PaymentTitle",

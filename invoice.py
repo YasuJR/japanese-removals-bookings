@@ -1,7 +1,8 @@
 """Invoice calculations and local Xero draft placeholder (no API yet)."""
 
+import html
 from datetime import datetime
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import config
 import database as db
@@ -164,6 +165,88 @@ def format_moving_labour_description(
             time_range, hours_text, rate
         )
     return "Moving Labour — {0} hrs @ {1}/hr".format(hours_text, rate)
+
+
+def normalize_invoice_description(value: Any) -> str:
+    """Preserve internal newlines; trim surrounding whitespace."""
+    text = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+    text = text.strip("\n").rstrip()
+    if len(text) > 2000:
+        return text[:2000]
+    return text
+
+
+def stored_invoice_description(booking: Dict[str, Any]) -> str:
+    """Saved custom labour description, or empty when using auto-generated text."""
+    return normalize_invoice_description(booking.get("invoice_description"))
+
+
+def resolve_labour_description(
+    booking: Dict[str, Any], totals: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Customer-facing labour line description.
+
+    Uses a saved Invoice Description when present; otherwise the auto-generated
+    Moving Labour text. Existing bookings with a NULL/blank value keep the
+    current auto-generated fallback.
+    """
+    stored = stored_invoice_description(booking)
+    if stored:
+        return stored
+    if totals is None:
+        totals = calculate_invoice_totals(booking)
+    return format_moving_labour_description(booking, totals)
+
+
+def invoice_description_markup(
+    booking: Dict[str, Any], totals: Optional[Dict[str, Any]] = None
+) -> str:
+    """HTML/ReportLab markup for preview and PDF (escaped, newlines as <br/>)."""
+    return plain_text_to_invoice_markup(resolve_labour_description(booking, totals))
+
+
+def plain_text_to_invoice_markup(text: str) -> str:
+    normalized = normalize_invoice_description(text)
+    escaped = html.escape(normalized, quote=False)
+    return escaped.replace("\n", "<br/>")
+
+
+def stored_description_for_save(data: Dict[str, Any]) -> str:
+    """
+    Persist a custom description only when the user edited it.
+
+    invoice_description_custom=1 keeps the submitted text (including after
+    later time/rate changes). Flag 0 or a blank value stores empty so the
+    auto-generated description remains the fallback.
+    """
+    submitted = normalize_invoice_description(data.get("invoice_description"))
+    flag = str(data.get("invoice_description_custom") or "").strip()
+    if flag == "0":
+        return ""
+    if flag == "1":
+        return submitted
+    if not submitted:
+        return ""
+    auto = format_moving_labour_description(data, calculate_invoice_totals(data))
+    if submitted == auto:
+        return ""
+    return submitted
+
+
+def invoice_description_form_values(booking: Dict[str, Any]) -> Dict[str, str]:
+    """Textarea value and custom flag for the Edit Booking form."""
+    stored = stored_invoice_description(booking)
+    if stored:
+        return {
+            "invoice_description": stored,
+            "invoice_description_custom": "1",
+        }
+    totals = calculate_invoice_totals(booking)
+    return {
+        "invoice_description": format_moving_labour_description(booking, totals),
+        "invoice_description_custom": "0",
+    }
 
 
 def normalize_payment_status(value: Any) -> str:

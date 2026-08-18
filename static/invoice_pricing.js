@@ -109,6 +109,16 @@
             "+" + data.surcharge_percent_display + "% surcharge";
         }
         toggleGstRows(!!data.gst_enabled);
+        var descEl = document.getElementById("invoice_description");
+        var customEl = document.getElementById("invoice_description_custom");
+        if (
+          descEl &&
+          customEl &&
+          customEl.value !== "1" &&
+          typeof data.labour_description === "string"
+        ) {
+          descEl.value = data.labour_description;
+        }
       })
       .catch(function () {
         /* keep last displayed totals on transient errors */
@@ -203,5 +213,14 @@
 
   bindSteppers();
   bindExtraCharges();
+
+  var invoiceDescEl = document.getElementById("invoice_description");
+  var invoiceDescCustomEl = document.getElementById("invoice_description_custom");
+  if (invoiceDescEl && invoiceDescCustomEl) {
+    invoiceDescEl.addEventListener("input", function () {
+      invoiceDescCustomEl.value = "1";
+    });
+  }
+
   scheduleRecalc();
 })();

@@ -72,6 +72,12 @@ def parse_booking_form(
     payment_status = (form.get("payment_status") or "Unpaid").strip() or "Unpaid"
     invoice_status = (form.get("invoice_status") or "").strip()
     invoice_custom_text = (form.get("invoice_custom_text") or "").strip()
+    invoice_description_present = "invoice_description" in form
+    if invoice_description_present:
+        invoice_description = form.get("invoice_description") or ""
+    else:
+        invoice_description = ""
+    invoice_description_custom = (form.get("invoice_description_custom") or "").strip()
     invoice_bank_account_name = (form.get("invoice_bank_account_name") or "").strip()
     invoice_bank_bsb = (form.get("invoice_bank_bsb") or "").strip()
     invoice_bank_account = (form.get("invoice_bank_account") or "").strip()
@@ -104,6 +110,9 @@ def parse_booking_form(
         "payment_status": payment_status,
         "invoice_status": invoice_status,
         "invoice_custom_text": invoice_custom_text,
+        "invoice_description": invoice_description,
+        "invoice_description_custom": invoice_description_custom,
+        "invoice_description_present": invoice_description_present,
         "invoice_bank_account_name": invoice_bank_account_name,
         "invoice_bank_bsb": invoice_bank_bsb,
         "invoice_bank_account": invoice_bank_account,
