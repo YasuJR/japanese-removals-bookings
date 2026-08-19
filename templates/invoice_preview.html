@@ -11,6 +11,10 @@
   <div class="invoice-preview-toolbar">
     <a class="btn-secondary btn-sm" href="{{ url_for('edit_booking', booking_id=booking_id) }}">← Back to booking</a>
     <a class="btn-primary btn-sm" href="{{ url_for('invoice_pdf', booking_id=booking_id) }}" target="_blank">Download PDF</a>
+    <button type="button" class="btn-secondary btn-sm js-share-invoice-pdf"
+            data-share-invoice-pdf="{{ url_for('invoice_pdf', booking_id=booking_id) }}">
+      Share PDF
+    </button>
     <button type="button" class="btn-secondary btn-sm" onclick="window.print()">Print</button>
   </div>
 
@@ -153,5 +157,6 @@
       <p>{{ inv.footer_tagline }}</p>
     </footer>
   </article>
+  <script src="{{ url_for('static', filename='invoice_share.js') }}"></script>
 </body>
 </html>

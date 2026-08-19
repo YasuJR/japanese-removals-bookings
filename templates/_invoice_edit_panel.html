@@ -151,6 +151,10 @@
   <div class="invoice-workflow-bar">
     <a class="btn-secondary" href="{{ url_for('invoice_preview', booking_id=booking.id) }}" target="_blank">Invoice Preview</a>
     <a class="btn-secondary" href="{{ url_for('invoice_pdf', booking_id=booking.id) }}" target="_blank">Download PDF</a>
+    <button type="button" class="btn-secondary js-share-invoice-pdf"
+            data-share-invoice-pdf="{{ url_for('invoice_pdf', booking_id=booking.id) }}">
+      Share PDF
+    </button>
     <button type="submit" name="action" value="send_invoice" class="btn-primary btn-lg invoice-send-btn"
       {% if not invoice_send.can_send %}disabled title="{{ invoice_send.blocked_reason }}"{% endif %}
       data-send-method="{{ invoice_send.method }}"
@@ -212,3 +216,4 @@
 <script src="{{ url_for('static', filename='mover_pricing.js') }}"></script>
 <script src="{{ url_for('static', filename='invoice_pricing.js') }}"></script>
 <script src="{{ url_for('static', filename='invoice_send.js') }}"></script>
+<script src="{{ url_for('static', filename='invoice_share.js') }}"></script>
