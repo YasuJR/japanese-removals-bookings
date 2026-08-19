@@ -132,6 +132,15 @@
       </thead>
       <tbody>
         {% for b in jobs %}
+        {% if upcoming_divider_index is not none and loop.index0 == upcoming_divider_index %}
+        <tr class="dashboard-upcoming-divider-row">
+          <td colspan="10">
+            <div class="dashboard-upcoming-divider" role="separator" aria-label="Today and upcoming">
+              <span class="dashboard-upcoming-divider-label">TODAY &amp; UPCOMING</span>
+            </div>
+          </td>
+        </tr>
+        {% endif %}
         <tr>
           <td class="customer-cell">
             <a class="customer-link" href="{{ url_for('view_booking', booking_id=b.id) }}"><strong>{{ b.customer_name }}</strong></a>

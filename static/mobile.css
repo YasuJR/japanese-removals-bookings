@@ -366,6 +366,20 @@
     min-width: 36rem;
   }
 
+  .dashboard-upcoming-divider-row td {
+    padding: 0.8rem 0.35rem;
+  }
+
+  .dashboard-upcoming-divider {
+    min-height: 1.7rem;
+  }
+
+  .dashboard-upcoming-divider-label {
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    padding: 0.05rem 0.55rem;
+  }
+
   .dashboard-actions-cell .btn-sm {
     min-height: var(--touch);
     padding: 0.45rem 0.65rem;

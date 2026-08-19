@@ -906,6 +906,45 @@ body {
   opacity: 0.65;
 }
 
+.dashboard-upcoming-divider-row td {
+  padding: 0.7rem 0.4rem;
+  background: var(--panel) !important;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  border-bottom: none;
+}
+
+.dashboard-upcoming-divider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.55rem;
+}
+
+.dashboard-upcoming-divider::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: #083d28;
+  border-radius: 2px;
+}
+
+.dashboard-upcoming-divider-label {
+  position: relative;
+  z-index: 1;
+  background: var(--panel);
+  padding: 0.05rem 0.75rem;
+  color: #083d28;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
 .nowrap {
   white-space: nowrap;
 }

@@ -1,12 +1,57 @@
 """Summary stats for the staff dashboard."""
 
-from datetime import date, timedelta
-from typing import Any, Dict, List, Tuple
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 
+import config
 import database as db
 
 DASHBOARD_JOBS_INITIAL = 40
 DASHBOARD_JOBS_PAGE_SIZE = 40
+UPCOMING_DIVIDER_LABEL = "TODAY & UPCOMING"
+
+
+def perth_today(now: Optional[datetime] = None) -> date:
+    """Current calendar date in Australia/Perth (config.TIMEZONE)."""
+    tz = ZoneInfo(config.TIMEZONE)
+    if now is None:
+        return datetime.now(tz).date()
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=tz)
+    return now.astimezone(tz).date()
+
+
+def job_move_date_iso(job: Any) -> str:
+    """Normalize a booking move_date to YYYY-MM-DD."""
+    raw = None
+    if hasattr(job, "keys"):
+        try:
+            raw = job["move_date"]
+        except (KeyError, TypeError):
+            raw = None
+    elif isinstance(job, dict):
+        raw = job.get("move_date")
+    if raw is None:
+        return ""
+    if hasattr(raw, "isoformat"):
+        return str(raw.isoformat())[:10]
+    return str(raw).strip()[:10]
+
+
+def upcoming_divider_index(jobs: List[Any], today_iso: str) -> Optional[int]:
+    """
+    Index of the first visible job dated today or later (Perth today).
+
+    Does not reorder jobs. Returns None when every visible row is in the past.
+    """
+    boundary = (today_iso or "")[:10]
+    if not boundary:
+        return None
+    for index, job in enumerate(jobs):
+        if job_move_date_iso(job) >= boundary:
+            return index
+    return None
 
 
 def week_range(today: date) -> tuple:
