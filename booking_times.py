@@ -1,5 +1,6 @@
 """Start/finish time helpers for bookings and Google Calendar."""
 
+import re
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, Optional, Tuple
 
@@ -11,15 +12,35 @@ DEFAULT_START_TIME = "08:00"
 DEFAULT_FINISH_TIME = "18:00"
 DEFAULT_DURATION_HOURS = 10.0
 
+# HTML type="time" (especially Safari/iOS) often submits HH:MM:SS.
+_TIME_RE = re.compile(r"^(\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?$")
+
 
 def normalize_time_input(value: Any) -> str:
-    """Return HH:MM or empty string from form input."""
+    """Return HH:MM or empty string from form/DB time values.
+
+    Accepts H:MM, HH:MM, and HH:MM:SS (with optional fractional seconds).
+    Seconds are discarded; the stored source of truth is HH:MM.
+    """
     text = str(value or "").strip()
     if not text:
         return ""
-    if len(text) == 5 and text[2] == ":":
-        return text
-    return ""
+    if "T" in text:
+        text = text.split("T", 1)[1].strip()
+    elif " " in text:
+        text = text.rsplit(" ", 1)[-1].strip()
+    if text.endswith("Z"):
+        text = text[:-1]
+    if "+" in text:
+        text = text.split("+", 1)[0].strip()
+    match = _TIME_RE.match(text)
+    if not match:
+        return ""
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    if hour > 23 or minute > 59:
+        return ""
+    return "{0:02d}:{1:02d}".format(hour, minute)
 
 
 def parse_hhmm(value: str) -> Optional[time]:
@@ -129,6 +150,13 @@ def display_finish_time(booking: Dict[str, Any]) -> str:
     return format_time_12h(effective_finish_hm(booking))
 
 
+def _duration_storage(hours: float) -> str:
+    rounded = round(float(hours), 2)
+    if rounded == int(rounded):
+        return str(int(rounded))
+    return str(rounded)
+
+
 def resolve_finish_time(
     start_time: str,
     finish_time: str,
@@ -137,52 +165,45 @@ def resolve_finish_time(
     """
     Return (start_norm, finish_norm, duration_storage, errors).
     duration_storage is '' or string like '3' / '3.5'.
-    When both duration and an explicit finish time are supplied, the finish
-    time wins and duration is derived from start/finish.
+
+    Explicit Start + Finish are the source of truth whenever Finish is
+    present and parseable. Duration is then Finish − Start.
+
+    Duration is used to derive Finish only when Finish is missing
+    (new booking / duration-only entry). A stale Duration must never
+    overwrite or reject an explicit Finish.
     """
     errors = []
     start_norm = normalize_time_input(start_time)
     finish_norm = normalize_time_input(finish_time)
 
+    if not start_norm:
+        start_norm = DEFAULT_START_TIME
+
+    if finish_norm:
+        hours = duration_hours_from_times(start_norm, finish_norm)
+        if hours is None:
+            errors.append("Finish time must be after start time.")
+            stored = (
+                _duration_storage(duration_hours) if duration_hours is not None else ""
+            )
+            return start_norm, finish_norm, stored, errors
+        return start_norm, finish_norm, _duration_storage(hours), errors
+
     if duration_hours is not None:
-        base_start = start_norm or DEFAULT_START_TIME
-        if not start_norm:
-            start_norm = DEFAULT_START_TIME
-        derived_finish = finish_from_duration(base_start, duration_hours)
-        if finish_norm and finish_norm != derived_finish:
-            start_t = parse_hhmm(start_norm)
-            finish_t = parse_hhmm(finish_norm)
-            if start_t and finish_t:
-                if finish_t <= start_t:
-                    errors.append("Finish time must be after start time.")
-                    return start_norm, finish_norm, "", errors
-                delta = datetime.combine(date.min, finish_t) - datetime.combine(
-                    date.min, start_t
-                )
-                hours = round(delta.total_seconds() / 3600, 2)
-                duration_storage = (
-                    str(int(hours)) if hours == int(hours) else str(hours)
-                )
-                return start_norm, finish_norm, duration_storage, errors
-        finish_norm = derived_finish
-        duration_storage = (
-            str(int(duration_hours))
-            if duration_hours == int(duration_hours)
-            else str(duration_hours)
-        )
-    else:
-        duration_storage = ""
-        if not finish_norm:
-            finish_norm = DEFAULT_FINISH_TIME
-        if not start_norm:
-            start_norm = DEFAULT_START_TIME
+        derived_finish = finish_from_duration(start_norm, duration_hours)
+        hours = duration_hours_from_times(start_norm, derived_finish)
+        if hours is None:
+            errors.append("Finish time must be after start time.")
+            return start_norm, derived_finish, _duration_storage(duration_hours), errors
+        return start_norm, derived_finish, _duration_storage(duration_hours), errors
 
-    start_t = parse_hhmm(start_norm)
-    finish_t = parse_hhmm(finish_norm)
-    if start_t and finish_t and finish_t <= start_t:
+    finish_norm = DEFAULT_FINISH_TIME
+    hours = duration_hours_from_times(start_norm, finish_norm)
+    if hours is None:
         errors.append("Finish time must be after start time.")
-
-    return start_norm, finish_norm, duration_storage, errors
+        return start_norm, finish_norm, "", errors
+    return start_norm, finish_norm, _duration_storage(hours), errors
 
 
 def validate_times(
@@ -190,7 +211,7 @@ def validate_times(
     finish_time: str,
     duration_hours_raw: Any = "",
 ) -> Tuple[str, str, str, list]:
-    """Validate optional times; duration mode overrides finish time."""
+    """Validate times. Explicit Finish wins over a stale Duration."""
     errors = []
     duration = parse_duration_hours(duration_hours_raw)
     if str(duration_hours_raw or "").strip() and duration is None:

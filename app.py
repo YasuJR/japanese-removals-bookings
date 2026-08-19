@@ -2153,7 +2153,7 @@ def edit_booking(booking_id):
         "pickup_address": row["pickup_address"],
         "delivery_address": row["delivery_address"],
         "move_date": row["move_date"],
-        "start_time": row["start_time"] or DEFAULT_START_TIME,
+        "start_time": normalize_time_input(row["start_time"]) or DEFAULT_START_TIME,
         "finish_time": normalize_time_input(row["finish_time"])
         or effective_finish_hm(_row_to_dict(row)),
         "duration_hours": _form_duration_from_row(row),

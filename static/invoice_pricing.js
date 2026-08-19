@@ -12,12 +12,44 @@
     return document.getElementById(id);
   }
 
+  function finishTimeIsUserEditable() {
+    var finishEl = document.getElementById("finish_time");
+    return !!(finishEl && finishEl.type === "time");
+  }
+
+  // Edit Booking: Start/Finish are the source of truth.
+  // New Booking: Duration drives the hidden Finish field.
+  var lastTimeEditSource = finishTimeIsUserEditable() ? "times" : "duration";
+
+  function parseTimeMinutes(value) {
+    var parts = String(value || "").split(":");
+    var hours = parseInt(parts[0], 10);
+    var minutes = parseInt(parts[1] || "0", 10);
+    if (isNaN(hours) || isNaN(minutes)) return null;
+    return hours * 60 + minutes;
+  }
+
+  function formatHm(totalMins) {
+    var mins = ((totalMins % (24 * 60)) + 24 * 60) % (24 * 60);
+    var fh = Math.floor(mins / 60);
+    var fm = mins % 60;
+    return String(fh).padStart(2, "0") + ":" + String(fm).padStart(2, "0");
+  }
+
   function formatDurationValue(hours) {
     var snapped = Math.round(hours / 0.25) * 0.25;
     if (snapped % 1 === 0) {
       return String(snapped);
     }
     return snapped.toFixed(2);
+  }
+
+  function formatExactDuration(hours) {
+    var rounded = Math.round(hours * 100) / 100;
+    if (rounded % 1 === 0) {
+      return String(rounded);
+    }
+    return String(rounded);
   }
 
   function syncDurationToFinishTime() {
@@ -29,14 +61,9 @@
     var hours = parseFloat(durationEl.value);
     if (isNaN(hours) || hours <= 0) return;
 
-    var parts = (startEl.value || "08:00").split(":");
-    var startMins = parseInt(parts[0], 10) * 60 + parseInt(parts[1] || "0", 10);
-    var finishMins = startMins + Math.round(hours * 60);
-    var fh = Math.floor(finishMins / 60) % 24;
-    var fm = finishMins % 60;
-    var finishVal =
-      String(fh).padStart(2, "0") + ":" + String(fm).padStart(2, "0");
-    finishEl.value = finishVal;
+    var startMins = parseTimeMinutes(startEl.value || "08:00");
+    if (startMins == null) return;
+    finishEl.value = formatHm(startMins + Math.round(hours * 60));
   }
 
   function syncFinishToDuration() {
@@ -46,16 +73,32 @@
     if (!durationEl || !startEl || !finishEl || finishEl.type !== "time") return;
     if (!startEl.value || !finishEl.value) return;
 
-    var startParts = startEl.value.split(":");
-    var finishParts = finishEl.value.split(":");
-    var startMins =
-      parseInt(startParts[0], 10) * 60 + parseInt(startParts[1] || "0", 10);
-    var finishMins =
-      parseInt(finishParts[0], 10) * 60 + parseInt(finishParts[1] || "0", 10);
+    var startMins = parseTimeMinutes(startEl.value);
+    var finishMins = parseTimeMinutes(finishEl.value);
+    if (startMins == null || finishMins == null) return;
     if (finishMins <= startMins) return;
 
-    var hours = Math.round(((finishMins - startMins) / 60) * 100) / 100;
-    durationEl.value = formatDurationValue(hours);
+    durationEl.value = formatExactDuration((finishMins - startMins) / 60);
+  }
+
+  function startChange() {
+    if (finishTimeIsUserEditable()) {
+      lastTimeEditSource = "times";
+      syncFinishToDuration();
+    }
+    scheduleRecalc();
+  }
+
+  function finishChange() {
+    lastTimeEditSource = "times";
+    syncFinishToDuration();
+    scheduleRecalc();
+  }
+
+  function durationChange() {
+    lastTimeEditSource = "duration";
+    syncDurationToFinishTime();
+    scheduleRecalc();
   }
 
   function scheduleRecalc() {
@@ -82,7 +125,11 @@
   }
 
   function recalculate() {
-    syncDurationToFinishTime();
+    if (lastTimeEditSource === "duration") {
+      syncDurationToFinishTime();
+    } else {
+      syncFinishToDuration();
+    }
     var body = new FormData(form);
     fetch(calculateUrl, {
       method: "POST",
@@ -195,21 +242,34 @@
 
   var startEl = document.getElementById("start_time");
   if (startEl) {
-    startEl.addEventListener("input", scheduleRecalc);
-    startEl.addEventListener("change", scheduleRecalc);
+    startEl.addEventListener("input", startChange);
+    startEl.addEventListener("change", startChange);
   }
 
   var finishEl = document.getElementById("finish_time");
   if (finishEl && finishEl.type === "time") {
-    finishEl.addEventListener("input", function () {
-      syncFinishToDuration();
-      scheduleRecalc();
-    });
-    finishEl.addEventListener("change", function () {
-      syncFinishToDuration();
-      scheduleRecalc();
-    });
+    finishEl.addEventListener("input", finishChange);
+    finishEl.addEventListener("change", finishChange);
   }
+
+  var durationEl = pricingInput("pricing_duration_hours");
+  if (durationEl) {
+    durationEl.addEventListener("input", durationChange);
+    durationEl.addEventListener("change", durationChange);
+  }
+
+  form.addEventListener("submit", function () {
+    [startEl, finishEl].forEach(function (el) {
+      if (!el || !el.value) return;
+      var mins = parseTimeMinutes(el.value);
+      if (mins != null) el.value = formatHm(mins);
+    });
+    if (lastTimeEditSource === "duration") {
+      syncDurationToFinishTime();
+    } else if (finishTimeIsUserEditable()) {
+      syncFinishToDuration();
+    }
+  });
 
   bindSteppers();
   bindExtraCharges();

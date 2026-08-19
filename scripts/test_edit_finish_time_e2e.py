@@ -122,11 +122,51 @@ def test_validate_times_prefers_explicit_finish_over_duration():
     return True
 
 
+def test_hhmmss_finish_is_saved_not_overwritten_by_duration():
+    start, finish, duration, errors = validate_times("08:00", "13:00:00", "3")
+    assert not errors
+    assert finish == "13:00"
+    assert duration == "5"
+
+    booking_id, move_date = _create_booking()
+    client = _login_client()
+    form = {
+        "customer_name": "Finish Time Customer",
+        "phone": "0412000333",
+        "email": "finish@example.com",
+        "pickup_address": "1 Start St, Perth WA",
+        "delivery_address": "2 End Ave, Fremantle WA",
+        "move_date": move_date,
+        "num_movers": "2",
+        "notes": "Finish time edit test",
+        "start_time": "08:00:00",
+        "finish_time": "13:00:00",
+        "duration_hours": "3",
+        "hourly_rate": "180",
+        "callout_fee": "90",
+        "gst_enabled": "on",
+        "payment_status": "Unpaid",
+        "invoice_status": "",
+        "status": "Completed",
+        "action": "save",
+        "double_booking_override_confirm": "on",
+    }
+    resp = client.post("/bookings/{0}/edit".format(booking_id), data=form, follow_redirects=False)
+    assert resp.status_code in (302, 303), resp.status_code
+    row = dict(db.get_booking(booking_id))
+    assert row.get("finish_time") == "13:00"
+    assert row.get("duration_hours") == "5"
+    html = client.get("/bookings/{0}/edit".format(booking_id)).get_data(as_text=True)
+    assert 'value="13:00"' in html
+    return True
+
+
 def main():
     tests = [
         test_edit_page_has_finish_time_input,
         test_finish_time_change_updates_duration_and_invoice,
         test_validate_times_prefers_explicit_finish_over_duration,
+        test_hhmmss_finish_is_saved_not_overwritten_by_duration,
     ]
     passed = 0
     for test in tests:
