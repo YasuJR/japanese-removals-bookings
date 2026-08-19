@@ -14,6 +14,7 @@ import database as db
 
 db.init_db()
 production_bootstrap.bootstrap_stripe_settings()
+production_bootstrap.bootstrap_xero_settings()
 production_bootstrap.ensure_staff_user()
 
 if config.PRODUCTION and not config.get_database_url():

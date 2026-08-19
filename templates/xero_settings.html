@@ -101,6 +101,7 @@
   </form>
 
   <ul class="config-check muted">
+    <li>Storage: <code>{{ xero_form.credentials_debug.storage }}</code></li>
     <li>Settings file: <code class="path-code">{{ xero_form.credentials_debug.settings_path }}</code></li>
     <li>Redirect URI (must match Xero Web App exactly): <code>{{ xero_form.credentials_debug.redirect_uri }}</code></li>
     <li>OAuth scopes: <code>{{ xero_form.credentials_debug.scopes | join(' ') }}</code></li>
@@ -117,7 +118,7 @@
       {% endif %}
     </li>
     <li>Client secret in settings file: {% if xero_form.secret_saved_in_file %}Yes{% elif xero_form.secret_from_env %}No — using .env{% else %}No — paste secret and Save{% endif %}</li>
-    <li>OAuth token: {% if status.xero_connected %}Yes{% else %}No — click Connect Xero{% endif %}</li>
+    <li>OAuth token: {% if status.xero_connected %}Yes{% else %}No — click Connect Xero{% endif %}{% if xero_form.credentials_debug.token_stored %} (saved in {{ xero_form.credentials_debug.storage }}){% endif %}</li>
     <li>Tenant ID: {% if xero_form.tenant_id %}{{ xero_form.tenant_id[:12] }}…{% else %}Not set{% endif %}</li>
     <li>Ready for draft invoices: {% if status.xero_ready %}Yes{% else %}No{% endif %}</li>
   </ul>

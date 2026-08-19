@@ -23,6 +23,7 @@ def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     dry_run = "--dry-run" in args
     db.init_db()
+    production_bootstrap.bootstrap_xero_settings()
     result = services.sync_xero_payments(source="cron", dry_run=dry_run)
     for line in result.get("log_lines") or []:
         print(line)

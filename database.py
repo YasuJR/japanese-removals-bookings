@@ -454,6 +454,7 @@ def _ensure_indexes(conn) -> None:
 
 
 INTEGRATION_SETTING_STRIPE = "stripe"
+INTEGRATION_SETTING_XERO = "xero"
 
 
 def get_integration_settings(key: str) -> Dict[str, Any]:

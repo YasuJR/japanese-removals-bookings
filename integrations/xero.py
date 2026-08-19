@@ -3,7 +3,6 @@ Xero draft invoices — OAuth + Accounting API.
 """
 
 import json
-import os
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -44,7 +43,8 @@ def is_configured() -> bool:
 
 
 def is_connected() -> bool:
-    return has_credentials() and Path(config.XERO_TOKEN_FILE).is_file()
+    token = xero_config.get_token()
+    return has_credentials() and bool((token.get("access_token") or "").strip())
 
 
 def is_ready() -> bool:
@@ -53,12 +53,8 @@ def is_ready() -> bool:
 
 def payments_scope_granted() -> bool:
     """True when the stored OAuth token includes accounting.payments."""
-    path = Path(config.XERO_TOKEN_FILE)
-    if not path.is_file():
-        return False
-    try:
-        token = json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError):
+    token = xero_config.get_token()
+    if not token:
         return False
     scope = (token.get("scope") or "").split()
     return "accounting.payments" in scope or "accounting.transactions" in scope
@@ -97,20 +93,15 @@ def is_real_invoice_id(invoice_id: Any) -> bool:
 
 
 def _load_token() -> Optional[Dict[str, Any]]:
-    path = Path(config.XERO_TOKEN_FILE)
-    if not path.is_file():
+    token = xero_config.get_token()
+    if not token or not (token.get("access_token") or "").strip():
         return None
-    return json.loads(path.read_text())
+    return token
 
 
 def _save_token(data: Dict[str, Any]) -> None:
-    path = Path(config.XERO_TOKEN_FILE)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2))
-    try:
-        os.chmod(path, 0o600)
-    except OSError:
-        pass
+    """Persist OAuth tokens to PostgreSQL (production) and the local token file."""
+    xero_config.save_token(data)
 
 
 def resolve_redirect_uri(redirect_uri: str = "") -> str:

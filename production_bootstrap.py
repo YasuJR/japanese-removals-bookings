@@ -50,7 +50,32 @@ def bootstrap_production() -> None:
     config.CREDENTIALS_DIR.mkdir(parents=True, exist_ok=True)
     _write_google_credentials()
     _write_json_env("GOOGLE_TOKEN_JSON", config.GOOGLE_TOKEN_FILE)
-    _write_json_env("XERO_TOKEN_JSON", config.XERO_TOKEN_FILE)
+    # Xero tokens are migrated in bootstrap_xero_settings() after init_db so a
+    # stale XERO_TOKEN_JSON env var cannot overwrite a live reconnect on disk.
+
+
+def bootstrap_xero_settings() -> None:
+    """
+    Load Xero auth from PostgreSQL (production), migrating live JSON files or
+    env vars into the database without deleting the files.
+    """
+    from integrations import xero_config
+
+    stored = xero_config.read_stored_settings()
+    if xero_config.has_credentials() or xero_config.has_stored_token():
+        xero_config.restore_files_from_stored()
+        if config.PRODUCTION:
+            logger.info(
+                "Xero authentication loaded from %s.",
+                xero_config.storage_description(),
+            )
+        return
+    if config.PRODUCTION:
+        logger.warning(
+            "Xero is not configured — connect in Settings → Xero or migrate "
+            "credentials/xero_settings.json and credentials/xero_token.json "
+            "into PostgreSQL."
+        )
 
 
 def bootstrap_stripe_settings() -> None:
