@@ -223,11 +223,11 @@ def check_xero_payment_status(booking_id: int) -> Tuple[bool, str]:
     return xero.sync_payment_status_from_xero(booking_to_dict(row))
 
 
-def sync_xero_payments(*, source: str = "manual") -> Dict[str, Any]:
+def sync_xero_payments(*, source: str = "manual", dry_run: bool = False) -> Dict[str, Any]:
     """Sync fully paid Xero invoices to local booking payment_status (Dashboard + cron)."""
     from integrations import xero_payment_sync
 
-    return xero_payment_sync.sync_xero_payments(source=source)
+    return xero_payment_sync.sync_xero_payments(source=source, dry_run=dry_run)
 
 
 def create_stripe_checkout(

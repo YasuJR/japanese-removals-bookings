@@ -19,9 +19,11 @@ import services
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    dry_run = "--dry-run" in args
     db.init_db()
-    result = services.sync_xero_payments(source="cron")
+    result = services.sync_xero_payments(source="cron", dry_run=dry_run)
     for line in result.get("log_lines") or []:
         print(line)
     print(json.dumps({k: result[k] for k in result if k != "log_lines"}, indent=2, sort_keys=True))
