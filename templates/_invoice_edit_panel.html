@@ -87,14 +87,24 @@
               <tr class="extra-charge-row">
                 <td><input type="text" name="extra_description" value="{{ item.description }}" placeholder="e.g. Stairs Fee"></td>
                 <td><input type="number" name="extra_quantity" min="0.01" step="0.01" value="{{ item.quantity }}"></td>
-                <td><input type="number" name="extra_unit_price" min="0" step="0.01" value="{{ item.unit_price }}"></td>
+                <td><input type="number" name="extra_unit_price" step="0.01" value="{{ item.unit_price }}"></td>
                 <td><button type="button" class="btn-secondary btn-sm extra-charge-remove">Remove</button></td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
-        <button type="button" class="btn-secondary btn-sm" id="extra-charge-add">+ Add charge</button>
+        <div class="extra-charge-actions">
+          <button type="button" class="btn-secondary btn-sm" id="extra-charge-add">+ Add charge</button>
+          <button type="button" class="btn-secondary btn-sm" id="extra-adjust-break">Break deduction</button>
+          <button type="button" class="btn-secondary btn-sm extra-adjust-preset" data-description="Discount">Discount</button>
+          <button type="button" class="btn-secondary btn-sm extra-adjust-preset" data-description="Credit">Credit</button>
+          <button type="button" class="btn-secondary btn-sm extra-adjust-preset" data-description="Other adjustment">Other adjustment</button>
+          <label class="extra-charge-break-mins">Break (min)
+            <input type="number" id="extra-break-minutes" min="1" step="1" value="30">
+          </label>
+        </div>
+        <p class="hint muted extra-charge-hint">Unit ($) can be negative for break deductions, discounts, and credits. Breaks do not change Start Time, Finish Time, or Duration.</p>
         <span class="pricing-value" id="live-extras-total">{{ invoice_summary.extras_total|format_aud }}</span>
       </div>
     </div>

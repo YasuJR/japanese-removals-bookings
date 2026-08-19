@@ -23,7 +23,10 @@
   function formatAud(amount) {
     var n = parseFloat(amount);
     if (isNaN(n)) return "$0.00";
-    return "$" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    var abs = Math.abs(n)
+      .toFixed(2)
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return (n < 0 ? "-$" : "$") + abs;
   }
 
   function scheduleRecalc() {

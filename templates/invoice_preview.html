@@ -63,8 +63,8 @@
         <tr>
           <td class="invoice-line-desc">{{ item.description_html|safe }}</td>
           <td class="num">{{ item.quantity }}</td>
-          <td class="num">{{ item.unit_price }}</td>
-          <td class="num">{{ item.amount }}</td>
+          <td class="num{% if item.unit_price.startswith('-') %} invoice-amount-negative{% endif %}">{{ item.unit_price }}</td>
+          <td class="num{% if item.amount.startswith('-') %} invoice-amount-negative{% endif %}">{{ item.amount }}</td>
         </tr>
         {% endfor %}
       </tbody>

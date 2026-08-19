@@ -120,4 +120,10 @@ def parse_booking_form(
         "truck_assigned": (form.get("truck_assigned") or "").strip(),
         "status": status or job_status.DEFAULT_STATUS,
     }
+    if hourly_rate is not None and callout_fee is not None:
+        import invoice as invoice_mod
+
+        totals = invoice_mod.calculate_from_form_data(data)
+        if totals["total"] < 0:
+            errors.append("Invoice total cannot be negative.")
     return data, errors

@@ -47,10 +47,10 @@ def parse_extra_charges_from_form(form: Any) -> Tuple[List[Dict[str, Any]], List
             continue
         try:
             unit_price = float(price_raw or "0")
-            if unit_price < 0:
-                raise ValueError
         except (TypeError, ValueError):
-            errors.append("Extra charge row {0}: unit price must be zero or greater.".format(index + 1))
+            errors.append(
+                "Extra charge row {0}: unit price must be a number.".format(index + 1)
+            )
             continue
         items.append(
             {
@@ -79,3 +79,29 @@ def charge_line_total(item: Dict[str, Any]) -> float:
 
 def charges_gross_total(items: List[Dict[str, Any]]) -> float:
     return round(sum(charge_line_total(item) for item in items), 2)
+
+
+def break_deduction_unit_price(hourly_rate: Any, break_minutes: Any) -> float:
+    """GST-inclusive deduction: hourly_rate × minutes / 60 × -1."""
+    try:
+        rate = float(hourly_rate or 0)
+        minutes = float(break_minutes or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    if rate < 0 or minutes <= 0:
+        return 0.0
+    return round(rate * minutes / 60.0 * -1, 2)
+
+
+def break_deduction_description(break_minutes: Any) -> str:
+    try:
+        minutes = float(break_minutes or 0)
+    except (TypeError, ValueError):
+        minutes = 0
+    if minutes <= 0:
+        return "Break deduction"
+    if minutes == int(minutes):
+        label = str(int(minutes))
+    else:
+        label = "{0:g}".format(minutes)
+    return "{0} min break deduction".format(label)

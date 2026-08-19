@@ -1,6 +1,6 @@
 <section class="extra-charges-panel">
   <h3>Extra charges</h3>
-  <p class="hint">Add optional fees such as stairs, piano, packing, or after-hours surcharges. Amounts are GST inclusive when GST is enabled.</p>
+  <p class="hint">Add optional fees such as stairs, piano, packing, or after-hours surcharges. Unit ($) can be negative for deductions, discounts, or credits. Amounts are GST inclusive when GST is enabled.</p>
 
   <div class="extra-charges-table-wrap">
     <table class="extra-charges-table" id="extra-charges-table">
@@ -18,7 +18,7 @@
         <tr class="extra-charge-row">
           <td><input type="text" name="extra_description" value="{{ item.description }}" placeholder="e.g. Stairs Fee"></td>
           <td><input type="number" name="extra_quantity" min="0.01" step="0.01" value="{{ item.quantity }}"></td>
-          <td><input type="number" name="extra_unit_price" min="0" step="0.01" value="{{ item.unit_price }}"></td>
+          <td><input type="number" name="extra_unit_price" step="0.01" value="{{ item.unit_price }}"></td>
           <td><button type="button" class="btn-secondary btn-sm extra-charge-remove">Remove</button></td>
         </tr>
         {% endfor %}
@@ -48,7 +48,7 @@
     row.innerHTML =
       '<td><input type="text" name="extra_description" placeholder="e.g. Piano Fee"></td>' +
       '<td><input type="number" name="extra_quantity" min="0.01" step="0.01" value="1"></td>' +
-      '<td><input type="number" name="extra_unit_price" min="0" step="0.01" value="0"></td>' +
+      '<td><input type="number" name="extra_unit_price" step="0.01" value="0"></td>' +
       '<td><button type="button" class="btn-secondary btn-sm extra-charge-remove">Remove</button></td>';
     body.appendChild(row);
     bindRemoveButtons();

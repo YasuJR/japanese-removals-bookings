@@ -222,6 +222,10 @@
   word-break: break-word;
 }
 
+.invoice-amount-negative {
+  font-weight: 600;
+}
+
 .invoice-bottom {
   display: flex;
   flex-direction: column;

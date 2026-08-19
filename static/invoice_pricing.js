@@ -121,7 +121,10 @@
   function formatAud(amount) {
     var n = parseFloat(amount);
     if (isNaN(n)) return "$0.00";
-    return "$" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    var abs = Math.abs(n)
+      .toFixed(2)
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return (n < 0 ? "-$" : "$") + abs;
   }
 
   function recalculate() {
@@ -217,22 +220,69 @@
       });
     }
 
-    addBtn.addEventListener("click", function () {
+    function extraChargeRowHtml(description, quantity, unitPrice) {
+      var desc = String(description || "")
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;");
+      return (
+        '<td><input type="text" name="extra_description" placeholder="e.g. Piano Fee" value="' +
+        desc +
+        '"></td>' +
+        '<td><input type="number" name="extra_quantity" min="0.01" step="0.01" value="' +
+        (quantity || "1") +
+        '"></td>' +
+        '<td><input type="number" name="extra_unit_price" step="0.01" value="' +
+        (unitPrice || "0") +
+        '"></td>' +
+        '<td><button type="button" class="btn-secondary btn-sm extra-charge-remove">Remove</button></td>'
+      );
+    }
+
+    function addChargeRow(description, quantity, unitPrice, focusUnit) {
       var row = document.createElement("tr");
       row.className = "extra-charge-row";
-      row.innerHTML =
-        '<td><input type="text" name="extra_description" placeholder="e.g. Piano Fee"></td>' +
-        '<td><input type="number" name="extra_quantity" min="0.01" step="0.01" value="1"></td>' +
-        '<td><input type="number" name="extra_unit_price" min="0" step="0.01" value="0"></td>' +
-        '<td><button type="button" class="btn-secondary btn-sm extra-charge-remove">Remove</button></td>';
+      row.innerHTML = extraChargeRowHtml(description, quantity, unitPrice);
       body.appendChild(row);
       bindRemoveButtons();
       bindInputs(row);
+      if (focusUnit) {
+        var unitEl = row.querySelector('input[name="extra_unit_price"]');
+        if (unitEl) unitEl.focus();
+      }
       scheduleRecalc();
+      return row;
+    }
+
+    addBtn.addEventListener("click", function () {
+      addChargeRow("", "1", "0", false);
     });
 
     bindInputs(body);
     bindRemoveButtons();
+
+    var breakBtn = document.getElementById("extra-adjust-break");
+    if (breakBtn) {
+      breakBtn.addEventListener("click", function () {
+        var rateEl = pricingInput("pricing_hourly_rate");
+        var minutesEl = document.getElementById("extra-break-minutes");
+        var rate = parseFloat(rateEl && rateEl.value ? rateEl.value : "0");
+        var minutes = parseFloat(minutesEl && minutesEl.value ? minutesEl.value : "30");
+        if (isNaN(minutes) || minutes <= 0) minutes = 30;
+        var unit = 0;
+        if (!isNaN(rate) && rate > 0) {
+          unit = Math.round(rate * (minutes / 60) * -1 * 100) / 100;
+        }
+        var minuteLabel = Number.isInteger(minutes) ? String(minutes) : String(minutes);
+        addChargeRow(minuteLabel + " min break deduction", "1", String(unit.toFixed(2)), unit === 0);
+      });
+    }
+
+    panel.querySelectorAll(".extra-adjust-preset").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        addChargeRow(btn.getAttribute("data-description") || "Adjustment", "1", "0", true);
+      });
+    });
   }
 
   panel.querySelectorAll("input, select, textarea").forEach(function (el) {

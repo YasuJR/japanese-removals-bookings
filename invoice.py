@@ -136,7 +136,14 @@ def calculate_from_form_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def format_aud(amount: float) -> str:
-    return "${0:,.2f}".format(amount)
+    """Format money as $1,234.56 or -$143.50."""
+    value = round(float(amount), 2)
+    if value == 0:
+        return "$0.00"
+    formatted = "${0:,.2f}".format(abs(value))
+    if value < 0:
+        return "-" + formatted
+    return formatted
 
 
 def _format_labour_hours(hours: float) -> str:

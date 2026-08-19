@@ -1263,6 +1263,30 @@ body {
   gap: 0.5rem;
 }
 
+.extra-charge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.extra-charge-break-mins {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.extra-charge-break-mins input {
+  width: 4.5rem;
+  padding: 0.25rem 0.4rem;
+}
+
+.extra-charge-hint {
+  margin: 0;
+}
+
 .invoice-totals-live {
   margin: 0 0 1rem;
   padding: 0.85rem 1rem;
