@@ -336,7 +336,7 @@
   }
 
   .booking-details-grid > div {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.2rem;
     padding: 0.65rem 0.75rem;
     background: var(--cream);
@@ -348,6 +348,19 @@
     font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
+  }
+
+  .booking-details-pricing {
+    padding: 0;
+    background: transparent;
+    border: none;
+  }
+
+  .booking-details-extras dd,
+  .booking-details-extra-list li {
+    overflow-wrap: break-word;
+    word-break: normal;
+    white-space: normal;
   }
 
   .booking-details-footer-actions .touch-action-btn {
