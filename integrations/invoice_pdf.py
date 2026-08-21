@@ -198,9 +198,10 @@ def build_invoice_document(booking: Dict[str, Any]) -> Dict[str, Any]:
         "company_abn": company_abn,
         "company_location": settings.get("company_location") or "",
         "customer_name": bill_to["customer_name"],
-        "customer_address": bill_to["customer_address"],
-        "customer_phone": bill_to["customer_phone"],
-        "customer_email": bill_to["customer_email"],
+        "pickup_address": bill_to["pickup_address"],
+        "dropoff_address": bill_to["dropoff_address"],
+        "pickup_line": bill_to["pickup_line"],
+        "dropoff_line": bill_to["dropoff_line"],
         "invoice_number": invoice_number,
         "issue_date": _format_display_date(issue_date),
         "due_date": _format_display_date(due_date),
@@ -658,10 +659,15 @@ def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
     story.append(
         Paragraph(_pdf_markup(doc_data.get("customer_name") or ""), styles["customer_name"])
     )
-    for key in ("customer_address", "customer_phone", "customer_email"):
-        value = str(doc_data.get(key) or "").strip()
-        if value:
-            story.append(Paragraph(_pdf_markup(value), styles["customer_detail"]))
+    story.append(
+        Paragraph(_pdf_markup(doc_data.get("pickup_line") or "Pickup:"), styles["customer_detail"])
+    )
+    story.append(
+        Paragraph(
+            _pdf_markup(doc_data.get("dropoff_line") or "Drop-off:"),
+            styles["customer_detail"],
+        )
+    )
     story.append(Spacer(1, BILL_GAP))
 
     # --- Line items (full content width) ---

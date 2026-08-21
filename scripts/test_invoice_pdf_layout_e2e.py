@@ -52,7 +52,8 @@ def test_typical_invoice_single_page():
     doc = invoice_pdf.build_invoice_document(booking)
     assert doc["invoice_number"] == "INV25"
     assert doc["bank"]["payment_reference"] == "INV25"
-    assert doc["customer_address"] == "1 Layout St, Perth WA"
+    assert doc["pickup_address"] == "1 Layout St, Perth WA"
+    assert doc["dropoff_address"] == "2 Layout Ave, Fremantle WA"
     assert invoice.format_aud(doc["totals"]["total"]) == "$220.00"
     pdf_bytes = invoice_pdf.generate_invoice_pdf(booking)
     assert _page_count(pdf_bytes) == 1, "Expected 1 page, got {0}".format(

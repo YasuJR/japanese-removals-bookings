@@ -123,10 +123,10 @@ def invoice_summary(booking: Dict[str, Any]) -> Dict[str, Any]:
 
 def invoice_customer_bill_to(booking: Any) -> Dict[str, str]:
     """
-    Customer block for Invoice preview and PDF.
+    BILL TO block for Invoice preview and PDF.
 
-    Address comes from the stored booking pickup_address field. Does not
-    modify booking data or invent a value when that field is empty.
+    Uses stored booking pickup_address and delivery_address (drop-off).
+    Does not include phone or email, and does not fall back to company contact.
     """
     if booking is None:
         row: Dict[str, Any] = {}
@@ -136,11 +136,20 @@ def invoice_customer_bill_to(booking: Any) -> Dict[str, str]:
         row = dict(booking)
     else:
         row = {}
+    pickup = str(row.get("pickup_address") or "").strip()
+    dropoff = ""
+    for key in ("delivery_address", "dropoff_address", "destination_address"):
+        dropoff = str(row.get(key) or "").strip()
+        if dropoff:
+            break
+    pickup_line = "Pickup: {0}".format(pickup).rstrip()
+    dropoff_line = "Drop-off: {0}".format(dropoff).rstrip()
     return {
         "customer_name": str(row.get("customer_name") or "").strip(),
-        "customer_address": str(row.get("pickup_address") or "").strip(),
-        "customer_phone": str(row.get("phone") or "").strip(),
-        "customer_email": str(row.get("email") or "").strip(),
+        "pickup_address": pickup,
+        "dropoff_address": dropoff,
+        "pickup_line": pickup_line,
+        "dropoff_line": dropoff_line,
     }
 
 

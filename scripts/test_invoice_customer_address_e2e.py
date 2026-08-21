@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E2E tests — Invoice BILL TO uses stored booking pickup_address."""
+"""E2E tests — Invoice BILL TO shows pickup and drop-off addresses only."""
 
 import base64
 import os
@@ -83,7 +83,14 @@ def _pdf_text(pdf_bytes):
     return "\n".join(chunks)
 
 
-def test_bill_to_helper_uses_pickup_address():
+def _bill_to_html(html):
+    start = html.find("invoice-bill-section")
+    end = html.find("invoice-lines", start)
+    assert start != -1 and end != -1
+    return html[start:end]
+
+
+def test_bill_to_helper_uses_pickup_and_delivery_address():
     booking = {
         "customer_name": "Kate",
         "pickup_address": "  12 Smith St, Subiaco WA 6008 ",
@@ -93,44 +100,57 @@ def test_bill_to_helper_uses_pickup_address():
     }
     bill_to = invoice.invoice_customer_bill_to(booking)
     assert bill_to["customer_name"] == "Kate"
-    assert bill_to["customer_address"] == "12 Smith St, Subiaco WA 6008"
-    assert bill_to["customer_phone"] == "0412555000"
-    assert bill_to["customer_email"] == "kate@example.com"
+    assert bill_to["pickup_address"] == "12 Smith St, Subiaco WA 6008"
+    assert bill_to["dropoff_address"] == "88 Harbour Rd, Fremantle WA 6160"
+    assert bill_to["pickup_line"] == "Pickup: 12 Smith St, Subiaco WA 6008"
+    assert bill_to["dropoff_line"] == "Drop-off: 88 Harbour Rd, Fremantle WA 6160"
+    assert "customer_phone" not in bill_to
+    assert "customer_email" not in bill_to
     empty = invoice.invoice_customer_bill_to(
         {
             "customer_name": "No Address",
             "pickup_address": "",
-            "delivery_address": "88 Harbour Rd, Fremantle WA 6160",
-            "phone": "",
-            "email": "",
+            "delivery_address": "",
+            "phone": "0412000000",
+            "email": "office@japaneseremovals.com.au",
         }
     )
-    assert empty["customer_address"] == ""
-    assert empty["customer_phone"] == ""
-    assert empty["customer_email"] == ""
+    assert empty["pickup_address"] == ""
+    assert empty["dropoff_address"] == ""
+    assert empty["pickup_line"] == "Pickup:"
+    assert empty["dropoff_line"] == "Drop-off:"
+    alt = invoice.invoice_customer_bill_to(
+        {"customer_name": "Alt", "dropoff_address": "9 Alt St, Perth WA"}
+    )
+    assert alt["dropoff_address"] == "9 Alt St, Perth WA"
     return True
 
 
-def test_document_and_pdf_include_stored_address():
+def test_document_and_pdf_include_pickup_and_dropoff():
     db.init_db()
     pickup = "12 Smith St, Subiaco WA 6008"
-    booking_id = _create_booking(pickup=pickup)
+    dropoff = "88 Harbour Rd, Fremantle WA 6160"
+    booking_id = _create_booking(pickup=pickup, delivery=dropoff)
     db.update_booking_invoice_fields(booking_id, {"invoice_number": "25"})
     before = dict(db.get_booking(booking_id))
     booking = dict(before)
     booking["extra_charges"] = db.list_extra_charges(booking_id)
     doc = invoice_pdf.build_invoice_document(booking)
-    assert doc["customer_address"] == pickup
-    assert doc["customer_phone"] == "0412555000"
-    assert doc["customer_email"] == "address@example.com"
+    assert doc["pickup_address"] == pickup
+    assert doc["dropoff_address"] == dropoff
+    assert doc["pickup_line"] == "Pickup: {0}".format(pickup)
+    assert doc["dropoff_line"] == "Drop-off: {0}".format(dropoff)
+    assert "customer_phone" not in doc
+    assert "customer_email" not in doc
     assert doc["customer_name"] == "Address Customer"
     assert doc["invoice_number"] == "INV25"
     assert doc["bank"]["payment_reference"] == "INV25"
     assert invoice.format_aud(doc["totals"]["total"]) == "$450.00"
     pdf_text = _pdf_text(invoice_pdf.generate_invoice_pdf(booking))
-    assert pickup in pdf_text
-    assert "0412555000" in pdf_text
-    assert "address@example.com" in pdf_text
+    assert "Pickup: {0}".format(pickup) in pdf_text
+    assert "Drop-off: {0}".format(dropoff) in pdf_text
+    assert "0412555000" not in pdf_text
+    assert "address@example.com" not in pdf_text
     assert "INV25" in pdf_text
     after = dict(db.get_booking(booking_id))
     assert after["pickup_address"] == before["pickup_address"]
@@ -138,43 +158,63 @@ def test_document_and_pdf_include_stored_address():
     return True
 
 
-def test_preview_html_shows_bill_to_fields():
+def test_preview_html_shows_pickup_and_dropoff_not_phone_email():
     client = _login_client()
     pickup = "45 Stirling Hwy, Nedlands WA 6009"
+    dropoff = "10 Beach St, Fremantle WA 6160"
     booking_id = _create_booking(
         name="Preview Address Customer",
         pickup=pickup,
+        delivery=dropoff,
         phone="0412666777",
         email="preview-addr@example.com",
     )
     html = client.get("/bookings/{0}/invoice/preview".format(booking_id)).get_data(
         as_text=True
     )
+    bill = _bill_to_html(html)
     assert "invoice-bill-to" in html
-    assert "Preview Address Customer" in html
-    assert pickup in html
-    assert "0412666777" in html
-    assert "preview-addr@example.com" in html
-    assert 'class="invoice-bill-detail"' in html
+    assert "Preview Address Customer" in bill
+    assert "Pickup: {0}".format(pickup) in bill
+    assert "Drop-off: {0}".format(dropoff) in bill
+    assert "0412666777" not in bill
+    assert "preview-addr@example.com" not in bill
+    assert "Phone:" not in bill
+    assert "Email:" not in bill
     after = dict(db.get_booking(booking_id))
     assert after["pickup_address"] == pickup
+    assert after["delivery_address"] == dropoff
     return True
 
 
-def test_existing_booking_empty_address_stays_blank():
+def test_empty_addresses_stay_blank_without_company_contact():
     client = _login_client()
-    booking_id = _create_booking(name="Blank Address Customer", pickup="")
+    booking_id = _create_booking(
+        name="Blank Address Customer",
+        pickup="",
+        delivery="",
+        phone="0412000000",
+        email="office@example.com",
+    )
     booking = dict(db.get_booking(booking_id))
     booking["extra_charges"] = []
     doc = invoice_pdf.build_invoice_document(booking)
-    assert doc["customer_address"] == ""
+    assert doc["pickup_address"] == ""
+    assert doc["dropoff_address"] == ""
+    assert doc["pickup_line"] == "Pickup:"
+    assert doc["dropoff_line"] == "Drop-off:"
     html = client.get("/bookings/{0}/invoice/preview".format(booking_id)).get_data(
         as_text=True
     )
-    assert "Blank Address Customer" in html
-    assert "88 Harbour Rd, Fremantle WA 6160" not in html
+    bill = _bill_to_html(html)
+    assert "Blank Address Customer" in bill
+    assert "Pickup:" in bill
+    assert "Drop-off:" in bill
+    assert "0412000000" not in bill
+    assert "office@example.com" not in bill
     pdf_text = _pdf_text(invoice_pdf.generate_invoice_pdf(booking))
-    assert "88 Harbour Rd" not in pdf_text
+    assert "0412000000" not in pdf_text
+    assert "office@example.com" not in pdf_text
     assert dict(db.get_booking(booking_id))["pickup_address"] == ""
     return True
 
@@ -182,7 +222,8 @@ def test_existing_booking_empty_address_stays_blank():
 def test_pdf_route_does_not_change_address_or_totals():
     client = _login_client()
     pickup = "9 Queen St, Perth WA 6000"
-    booking_id = _create_booking(pickup=pickup)
+    dropoff = "2 Port Rd, Fremantle WA 6160"
+    booking_id = _create_booking(pickup=pickup, delivery=dropoff)
     db.update_booking_invoice_fields(
         booking_id,
         {"invoice_number": "118", "payment_status": invoice.PAYMENT_STATUS_UNPAID},
@@ -192,10 +233,12 @@ def test_pdf_route_does_not_change_address_or_totals():
     assert resp.status_code == 200
     assert resp.data.startswith(b"%PDF")
     pdf_text = _pdf_text(resp.data)
-    assert pickup in pdf_text
+    assert "Pickup: {0}".format(pickup) in pdf_text
+    assert "Drop-off: {0}".format(dropoff) in pdf_text
     assert "INV118" in pdf_text
     after = dict(db.get_booking(booking_id))
     assert after["pickup_address"] == before["pickup_address"]
+    assert after["delivery_address"] == before["delivery_address"]
     assert after["payment_status"] == before["payment_status"]
     assert after["invoice_number"] == before["invoice_number"]
     return True
@@ -203,10 +246,10 @@ def test_pdf_route_does_not_change_address_or_totals():
 
 def main():
     tests = [
-        test_bill_to_helper_uses_pickup_address,
-        test_document_and_pdf_include_stored_address,
-        test_preview_html_shows_bill_to_fields,
-        test_existing_booking_empty_address_stays_blank,
+        test_bill_to_helper_uses_pickup_and_delivery_address,
+        test_document_and_pdf_include_pickup_and_dropoff,
+        test_preview_html_shows_pickup_and_dropoff_not_phone_email,
+        test_empty_addresses_stay_blank_without_company_contact,
         test_pdf_route_does_not_change_address_or_totals,
     ]
     passed = 0
