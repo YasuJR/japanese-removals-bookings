@@ -48,7 +48,7 @@
 
   <section class="booking-details-section">
     <h3>Pricing &amp; invoice</h3>
-    <dl class="booking-details-grid invoice-summary">
+    <dl class="booking-details-grid booking-details-pricing">
       <div><dt>Hourly rate</dt><dd>{{ invoice_summary.hourly_rate|format_aud }}/hr</dd></div>
       <div><dt>Callout fee</dt><dd>{{ invoice_summary.callout_fee|format_aud }}</dd></div>
       {% if invoice_summary.extra_charges %}
