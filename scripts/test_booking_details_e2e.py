@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 import auth
 import database as db
 from app import app
+from dashboard_data import perth_today
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-local-tests-only")
 
@@ -42,7 +43,7 @@ def _sample_booking_id():
         email="details@example.com",
         pickup_address="10 Pickup Rd, Subiaco WA 6008",
         delivery_address="20 Delivery St, Fremantle WA 6160",
-        move_date="2026-08-20",
+        move_date=perth_today().isoformat(),
         num_movers=2,
         notes="Handle with care",
         start_time="08:00",
@@ -118,6 +119,72 @@ def test_view_booking_page_shows_pricing_and_status_fields():
         assert label in html, label
     assert "Truck 1" in html
     assert "Ken" in html
+    assert "$180.00/hr" in html
+    assert "$90.00" in html
+    return True
+
+
+def _pricing_block(html: str) -> str:
+    start = html.find("Pricing &amp; invoice")
+    if start == -1:
+        start = html.find("Pricing & invoice")
+    assert start != -1
+    end = html.find("booking-details-footer-actions", start)
+    return html[start:end if end != -1 else start + 4000]
+
+
+def test_view_booking_extra_charges_display_horizontally():
+    client = _login_client()
+    booking_id = _sample_booking_id()
+    long_description = (
+        "Pots delivered to the second-floor balcony including wrapping, "
+        "stair carry, and placement against the courtyard wall"
+    )
+    db.replace_extra_charges(
+        booking_id,
+        [
+            {"description": "Pots delivered", "quantity": 1, "unit_price": 660.0},
+            {"description": long_description, "quantity": 2, "unit_price": 45.5},
+        ],
+    )
+    html = client.get("/bookings/{0}".format(booking_id)).get_data(as_text=True)
+    pricing = _pricing_block(html)
+
+    assert 'class="booking-details-grid booking-details-pricing"' in html
+    assert "invoice-summary" not in pricing
+    assert "<li>Pots delivered — 1.0 × $660.00</li>" in pricing or (
+        "<li>Pots delivered — 1 × $660.00</li>" in pricing
+    )
+    assert long_description in pricing
+    assert "2.0 × $45.50" in pricing or "2 × $45.50" in pricing
+    extras_li = re.search(
+        r'<li>Pots delivered — [^<]+</li>',
+        pricing,
+    )
+    assert extras_li, pricing
+    assert "\nP\n" not in extras_li.group(0)
+    assert "$180.00/hr" in pricing
+    assert "Callout fee" in pricing
+    assert "Hourly rate" in pricing
+    return True
+
+
+def test_booking_details_pricing_css_keeps_value_column_wide():
+    desktop = (ROOT / "static" / "style.css").read_text()
+    mobile = (ROOT / "static" / "mobile.css").read_text()
+    grid_block = desktop.split(".booking-details-grid > div")[1][:500]
+    assert "minmax(0, 1fr)" in grid_block
+    assert "width: 100%" in desktop.split(".booking-details-grid {")[1][:220]
+    assert "9.5rem 1fr" not in grid_block
+    extras_block = desktop.split(".booking-details-extra-list li")[1][:280]
+    assert "word-break: normal" in extras_block
+    assert "overflow-wrap: break-word" in extras_block
+    assert "white-space: normal" in extras_block
+    assert ".booking-details-pricing" in desktop
+    invoice_summary = desktop.split(".invoice-summary {")[1][:280]
+    assert "auto-fill" in invoice_summary
+    assert "minmax(0, 1fr)" in mobile.split(".booking-details-grid > div")[1][:400]
+    assert "word-break: normal" in mobile.split(".booking-details-extra-list li")[1][:200]
     return True
 
 
@@ -179,6 +246,8 @@ def main():
         test_view_booking_page_shows_correct_booking,
         test_view_booking_page_is_read_only,
         test_view_booking_page_shows_pricing_and_status_fields,
+        test_view_booking_extra_charges_display_horizontally,
+        test_booking_details_pricing_css_keeps_value_column_wide,
         test_view_booking_action_links,
         test_edit_booking_still_works,
         test_view_booking_mobile_layout,

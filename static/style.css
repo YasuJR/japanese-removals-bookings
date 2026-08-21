@@ -741,7 +741,7 @@ body {
 }
 
 .booking-details-page {
-  max-width: 42rem;
+  max-width: 48rem;
 }
 
 .booking-details-head {
@@ -772,34 +772,63 @@ body {
   margin: 0;
   display: grid;
   gap: 0.75rem;
+  width: 100%;
 }
 
 .booking-details-grid > div {
   display: grid;
-  grid-template-columns: 9.5rem 1fr;
-  gap: 0.5rem;
+  grid-template-columns: minmax(8rem, 10.5rem) minmax(0, 1fr);
+  gap: 0.5rem 0.85rem;
+  align-items: start;
   font-size: 0.95rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .booking-details-grid dt {
   margin: 0;
+  min-width: 0;
   font-weight: 600;
   color: var(--muted);
 }
 
 .booking-details-grid dd {
   margin: 0;
-  word-break: break-word;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
-.booking-details-notes dd,
-.booking-details-extras dd {
+.booking-details-pricing {
+  padding: 0.85rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.booking-details-notes dd {
   white-space: pre-wrap;
+}
+
+.booking-details-extras {
+  align-items: start;
+}
+
+.booking-details-extras dd {
+  white-space: normal;
 }
 
 .booking-details-extra-list {
   margin: 0;
   padding-left: 1.1rem;
+  max-width: 100%;
+}
+
+.booking-details-extra-list li {
+  overflow-wrap: break-word;
+  word-break: normal;
+  white-space: normal;
 }
 
 .booking-details-total dd {
