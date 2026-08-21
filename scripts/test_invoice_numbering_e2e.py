@@ -120,6 +120,8 @@ def test_format_existing_numeric_invoice():
     assert invoice_numbering.numeric_sequence_value("INV25") == 25
     booking = {"invoice_number": "25"}
     assert invoice_numbering.display_invoice_number(booking) == "INV25"
+    assert invoice_numbering.stored_invoice_number_display(booking) == "INV25"
+    assert invoice_numbering.stored_invoice_number_display({"id": 25}) == ""
     return True
 
 

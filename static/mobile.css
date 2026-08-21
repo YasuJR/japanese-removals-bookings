@@ -366,6 +366,10 @@
     min-width: 36rem;
   }
 
+  .dashboard-customer-invoice {
+    font-size: 0.68rem;
+  }
+
     .dashboard-section-divider-row td,
     .dashboard-upcoming-divider-row td {
         padding: 0.8rem 0.35rem;

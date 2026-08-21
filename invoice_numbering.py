@@ -73,6 +73,26 @@ def display_invoice_number(booking: Dict[str, Any]) -> str:
     return "—"
 
 
+def stored_invoice_number_display(booking: Any) -> str:
+    """
+    Official invoice number for Dashboard when one is already issued.
+
+    Returns '' when the booking has no stored invoice_number. Does not
+    allocate a new number or fall back to the booking id.
+    """
+    if booking is None:
+        return ""
+    if not isinstance(booking, dict):
+        if hasattr(booking, "keys"):
+            booking = dict(booking)
+        else:
+            return ""
+    stored = str(booking.get("invoice_number") or "").strip()
+    if not stored:
+        return ""
+    return format_invoice_number(stored)
+
+
 def ensure_booking_invoice_number(booking_id: int) -> str:
     """
     Assign the next sequential invoice number when a booking has none yet.

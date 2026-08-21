@@ -124,6 +124,9 @@ app.jinja_env.filters["weekday_class"] = get_weekday_class
 app.jinja_env.filters["format_aud"] = invoice.format_aud
 app.jinja_env.filters["format_invoice_number"] = invoice_numbering.format_invoice_number
 app.jinja_env.filters["display_invoice_number"] = invoice_numbering.display_invoice_number
+app.jinja_env.filters["dashboard_invoice_number"] = (
+    invoice_numbering.stored_invoice_number_display
+)
 app.jinja_env.filters["payment_status_css"] = (
     lambda value: invoice.normalize_payment_status(value)
     .lower()

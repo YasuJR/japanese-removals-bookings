@@ -44,6 +44,7 @@ def test_dashboard_uses_compact_table_only():
     html = (ROOT / "templates" / "dashboard.html").read_text()
     assert "dashboard-job-cards" not in html
     assert "dashboard-sheet" in html
+    assert "dashboard-customer-invoice" in html
     assert 'class="table-scroll desktop-only"' not in html
     return True
 

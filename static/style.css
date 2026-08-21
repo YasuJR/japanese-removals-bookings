@@ -1899,6 +1899,24 @@ body {
   white-space: nowrap;
 }
 
+.dashboard-sheet .customer-cell {
+  vertical-align: middle;
+}
+
+.dashboard-sheet .customer-link {
+  display: inline-block;
+}
+
+.dashboard-customer-invoice {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
 .crew-range-bar {
   margin-bottom: 0.75rem;
 }
