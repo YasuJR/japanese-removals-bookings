@@ -17,6 +17,7 @@ import database as db
 import invoice_numbering
 from app import app
 from dashboard_data import perth_today
+from outstanding_invoices_data import dashboard_invoice_number_for_row
 
 
 _test_user_counter = 0
@@ -81,6 +82,49 @@ def test_stored_invoice_number_display_helper():
     return True
 
 
+def test_dashboard_helper_uses_pdf_number_when_issued_without_stored_field():
+    """Production issued invoices often have empty invoice_number; PDF uses INV{id}."""
+    assert dashboard_invoice_number_for_row({}) == ""
+    assert dashboard_invoice_number_for_row({"id": 25}) == ""
+    assert dashboard_invoice_number_for_row(
+        {"id": 25, "invoice_number": "", "status": "Confirmed"}
+    ) == ""
+    assert dashboard_invoice_number_for_row(
+        {"id": 25, "invoice_number": "25", "status": "Confirmed"}
+    ) == "INV25"
+    assert dashboard_invoice_number_for_row(
+        {
+            "id": 25,
+            "invoice_number": "",
+            "xero_invoice_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "status": "Completed",
+        }
+    ) == "INV25"
+    assert dashboard_invoice_number_for_row(
+        {
+            "id": 7,
+            "invoice_number": "",
+            "invoice_status": "AUTHORISED",
+            "status": "Confirmed",
+        }
+    ) == "INV7"
+    assert dashboard_invoice_number_for_row(
+        {"id": 31, "invoice_number": "", "status": "Invoiced"}
+    ) == "INV31"
+    assert dashboard_invoice_number_for_row(
+        {
+            "id": 42,
+            "invoice_number": "",
+            "invoice_sent_at": "2026-08-01T10:00:00",
+            "status": "Completed",
+        }
+    ) == "INV42"
+    assert dashboard_invoice_number_for_row(
+        {"id": 99, "invoice_number": "INV-118", "status": "Paid"}
+    ) == "INV118"
+    return True
+
+
 def test_dashboard_shows_issued_invoice_under_customer_name():
     today = perth_today()
     named = _unique("Kate")
@@ -134,6 +178,84 @@ def test_invoice_number_appears_in_all_dashboard_groups():
     return True
 
 
+def test_dashboard_shows_pdf_number_when_invoice_number_column_empty():
+    """Kate-style Production row: issued in Xero, invoice_number column blank, PDF shows INV{id}."""
+    today = perth_today()
+    kate = _unique("Kate")
+    quote = _unique("Quote Only")
+    kate_id = _create_job(kate, today.isoformat(), "Completed", "Paid")
+    quote_id = _create_job(quote, today.isoformat(), "Quote", "Unpaid")
+    db.update_booking_invoice_fields(
+        kate_id,
+        {
+            "invoice_number": "",
+            "xero_invoice_id": "11111111-2222-3333-4444-555555555555",
+            "invoice_status": "PAID",
+        },
+    )
+    before_kate = dict(db.get_booking(kate_id))["invoice_number"]
+    before_quote = dict(db.get_booking(quote_id))["invoice_number"]
+    client = _login_client()
+    html = client.get("/dashboard?filter=all&jobs_limit=500").get_data(as_text=True)
+
+    kate_block = _customer_block(html, kate)
+    quote_block = _customer_block(html, quote)
+    expected = "INV{0}".format(kate_id)
+    assert kate in html and quote in html
+    assert 'class="dashboard-customer-invoice"' in kate_block
+    assert expected in kate_block
+    assert "<div class=\"dashboard-customer-invoice\">{0}</div>".format(expected) in kate_block
+    assert "dashboard-customer-invoice" not in quote_block
+    assert "INV{0}".format(quote_id) not in quote_block
+    after_kate = dict(db.get_booking(kate_id))
+    after_quote = dict(db.get_booking(quote_id))
+    assert after_kate["invoice_number"] == before_kate
+    assert after_quote["invoice_number"] == before_quote
+    return True
+
+
+def test_issued_without_stored_number_in_all_dashboard_groups():
+    today = perth_today()
+    upcoming = _unique("Upcoming Issued")
+    unpaid = _unique("Unpaid Issued")
+    paid = _unique("Paid Issued")
+    upcoming_id = _create_job(upcoming, today.isoformat(), "Invoiced", "Unpaid")
+    unpaid_id = _create_job(
+        unpaid, (today - timedelta(days=2)).isoformat(), "Confirmed", "Unpaid"
+    )
+    paid_id = _create_job(paid, today.isoformat(), "Completed", "Paid")
+    db.update_booking_invoice_fields(upcoming_id, {"invoice_number": ""})
+    db.update_booking_invoice_fields(
+        unpaid_id,
+        {"invoice_number": "", "invoice_status": "AUTHORISED"},
+    )
+    db.update_booking_invoice_fields(
+        paid_id,
+        {
+            "invoice_number": "",
+            "xero_invoice_id": "aaaaaaa1-bbbb-cccc-dddd-eeeeeeeeeee1",
+            "invoice_status": "PAID",
+        },
+    )
+    client = _login_client()
+    html = client.get("/dashboard?filter=all&jobs_limit=500").get_data(as_text=True)
+
+    assert "dashboard-upcoming-divider-row" in html
+    assert "dashboard-unpaid-divider-row" in html
+    assert "dashboard-paid-divider-row" in html
+    assert "INV{0}".format(upcoming_id) in _customer_block(html, upcoming)
+    assert "INV{0}".format(unpaid_id) in _customer_block(html, unpaid)
+    assert "INV{0}".format(paid_id) in _customer_block(html, paid)
+    upcoming_pos = html.find(upcoming)
+    unpaid_pos = html.find(unpaid)
+    paid_pos = html.find(paid)
+    assert upcoming_pos < unpaid_pos < paid_pos
+    assert not (dict(db.get_booking(upcoming_id)).get("invoice_number") or "").strip()
+    assert not (dict(db.get_booking(unpaid_id)).get("invoice_number") or "").strip()
+    assert not (dict(db.get_booking(paid_id)).get("invoice_number") or "").strip()
+    return True
+
+
 def test_does_not_allocate_invoice_numbers_on_dashboard_view():
     today = perth_today()
     name = _unique("Unissued")
@@ -181,8 +303,11 @@ def test_css_keeps_invoice_number_smaller_and_muted():
 def main():
     tests = [
         test_stored_invoice_number_display_helper,
+        test_dashboard_helper_uses_pdf_number_when_issued_without_stored_field,
         test_dashboard_shows_issued_invoice_under_customer_name,
         test_invoice_number_appears_in_all_dashboard_groups,
+        test_dashboard_shows_pdf_number_when_invoice_number_column_empty,
+        test_issued_without_stored_number_in_all_dashboard_groups,
         test_does_not_allocate_invoice_numbers_on_dashboard_view,
         test_customer_name_stays_clickable,
         test_css_keeps_invoice_number_smaller_and_muted,

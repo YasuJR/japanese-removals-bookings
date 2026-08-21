@@ -43,7 +43,11 @@ from integrations import executive_config, review_config, sms_config, xero_confi
 from integrations import stripe as stripe_service
 from booking_helpers import apple_maps_url, mailto_href, sms_href, tel_href
 from driver_run_sheet_data import build_driver_run_sheet
-from outstanding_invoices_data import INVOICE_FILTERS, build_outstanding_dashboard
+from outstanding_invoices_data import (
+    INVOICE_FILTERS,
+    build_outstanding_dashboard,
+    dashboard_invoice_number_for_row,
+)
 from executive_dashboard_data import build_executive_dashboard
 from profit_data import PROFIT_CSV_HEADERS, build_profit_dashboard, profit_csv_rows
 import booking_profit
@@ -125,7 +129,7 @@ app.jinja_env.filters["format_aud"] = invoice.format_aud
 app.jinja_env.filters["format_invoice_number"] = invoice_numbering.format_invoice_number
 app.jinja_env.filters["display_invoice_number"] = invoice_numbering.display_invoice_number
 app.jinja_env.filters["dashboard_invoice_number"] = (
-    invoice_numbering.stored_invoice_number_display
+    dashboard_invoice_number_for_row
 )
 app.jinja_env.filters["payment_status_css"] = (
     lambda value: invoice.normalize_payment_status(value)
@@ -1403,6 +1407,7 @@ def dashboard():
     for row in job_dicts:
         item = dict(row)
         item["double_booking_badge"] = conflict_badges.get(int(item["id"]))
+        item["dashboard_invoice_number"] = dashboard_invoice_number_for_row(item)
         enriched_jobs.append(item)
     profit_month = request.args.get(
         "profit_month", today.strftime("%Y-%m")

@@ -27,13 +27,36 @@ def _parse_iso_date(value: Any) -> Optional[date]:
         return None
 
 
+def _as_booking_dict(booking: Any) -> Dict[str, Any]:
+    if booking is None:
+        return {}
+    if isinstance(booking, dict):
+        return booking
+    if hasattr(booking, "keys"):
+        return dict(booking)
+    return {}
+
+
 def has_invoice(booking: Dict[str, Any]) -> bool:
+    booking = _as_booking_dict(booking)
     if xero.is_real_invoice_id(booking.get("xero_invoice_id")):
         return True
     if (booking.get("invoice_number") or "").strip():
         return True
     status = (booking.get("invoice_status") or "").strip()
     return status in ("DRAFT", "Draft Created", "AUTHORISED", "SUBMITTED", "PAID")
+
+
+def invoice_has_been_issued(booking: Dict[str, Any]) -> bool:
+    """True when a booking already has an invoice the staff UI treats as issued."""
+    booking = _as_booking_dict(booking)
+    if has_invoice(booking):
+        return True
+    if str(booking.get("status") or "").strip() == "Invoiced":
+        return True
+    if (booking.get("invoice_sent_at") or "").strip():
+        return True
+    return False
 
 
 def issue_date_for(booking: Dict[str, Any]) -> str:
@@ -85,6 +108,20 @@ def days_overdue(booking: Dict[str, Any], today: date) -> Optional[int]:
 def invoice_number_display(booking: Dict[str, Any]) -> str:
     displayed = invoice_numbering.display_invoice_number(booking)
     return "" if displayed == "—" else displayed
+
+
+def dashboard_invoice_number_for_row(booking: Any) -> str:
+    """
+    Official invoice number for Dashboard under the customer name.
+
+    Uses the same value as Invoice PDF / invoice detail
+    (stored invoice_number, else INV{booking id}). Does not allocate a new
+    number. Returns '' when no invoice has been issued yet.
+    """
+    booking = _as_booking_dict(booking)
+    if not booking or not invoice_has_been_issued(booking):
+        return ""
+    return invoice_number_display(booking)
 
 
 def _invoice_row(booking: Dict[str, Any], today: date) -> Dict[str, Any]:

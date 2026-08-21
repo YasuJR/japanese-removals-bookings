@@ -75,10 +75,12 @@ def display_invoice_number(booking: Dict[str, Any]) -> str:
 
 def stored_invoice_number_display(booking: Any) -> str:
     """
-    Official invoice number for Dashboard when one is already issued.
+    Format a value already stored in bookings.invoice_number.
 
-    Returns '' when the booking has no stored invoice_number. Does not
-    allocate a new number or fall back to the booking id.
+    Returns '' when that column is empty. Does not fall back to booking id
+    and does not allocate a number. Dashboard display should use
+    outstanding_invoices_data.dashboard_invoice_number_for_row instead,
+    which matches Invoice PDF / invoice detail.
     """
     if booking is None:
         return ""

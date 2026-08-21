@@ -150,9 +150,8 @@
         <tr>
           <td class="customer-cell">
             <a class="customer-link" href="{{ url_for('view_booking', booking_id=b.id) }}"><strong>{{ b.customer_name }}</strong></a>
-            {% set dashboard_invoice = b|dashboard_invoice_number %}
-            {% if dashboard_invoice %}
-            <span class="dashboard-customer-invoice">{{ dashboard_invoice }}</span>
+            {% if b.dashboard_invoice_number %}
+            <div class="dashboard-customer-invoice">{{ b.dashboard_invoice_number }}</div>
             {% endif %}
           </td>
           <td class="nowrap dashboard-status-cell">
