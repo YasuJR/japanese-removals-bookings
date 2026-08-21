@@ -131,6 +131,20 @@
       })
       .then(function (data) {
         applyPayment(picker, data.payment_status, data.css_class);
+        if (data.job_status && window.dashboardApplyStatus) {
+          var statusPicker = document.querySelector(
+            '.dashboard-status-picker[data-booking-id="' +
+              picker.getAttribute("data-booking-id") +
+              '"]'
+          );
+          if (statusPicker) {
+            window.dashboardApplyStatus(
+              statusPicker,
+              data.job_status,
+              data.job_status_css || "completed"
+            );
+          }
+        }
         closePortal();
       })
       .catch(function (err) {

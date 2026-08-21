@@ -342,7 +342,7 @@ def main() -> int:
         and phase9_ok
         and phase10_ok
         and wh_ok
-        and row.get("status") == "Paid"
+        and row.get("status") == "Completed"
         and row.get("payment_status") == "Paid"
         and bool(row.get("xero_payment_id"))
         and results["after_stripe"]["xero_amount_due"] <= 0.01

@@ -377,7 +377,7 @@ def main() -> int:
 
     passed = (
         results["after_gmail"]["status"] == "Pending"
-        and results["after_stripe"]["status"] == "Paid"
+        and results["after_stripe"]["status"] == "Completed"
         and phase9_ok
         and phase10_ok
         and phase11_ok

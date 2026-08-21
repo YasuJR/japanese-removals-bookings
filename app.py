@@ -1473,11 +1473,15 @@ def update_booking_payment_inline(booking_id):
     if new_status != current:
         invoice.apply_payment_status(booking_id, new_status)
 
+    updated = services.booking_to_dict(db.get_booking(booking_id) or {})
+    job = job_status.display(updated)
     return jsonify(
         {
             "ok": True,
             "payment_status": new_status,
             "css_class": invoice.payment_status_css(new_status),
+            "job_status": job,
+            "job_status_css": job_status.css_class(job),
         }
     )
 

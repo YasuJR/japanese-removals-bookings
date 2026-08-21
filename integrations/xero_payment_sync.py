@@ -300,7 +300,9 @@ def sync_booking_payment_from_xero(
     """
     One-way sync: Xero fully paid → booking payment_status Paid.
 
-    Never changes Booking Status. Never downgrades a manually marked Paid booking.
+    Also sets Job Status to Completed when marking Paid. Never changes Job
+    Status for unpaid / part-paid invoices, and never reverts Completed.
+    Never downgrades a manually marked Paid booking.
     """
     booking_id = int(booking["id"])
     invoice_label = _booking_invoice_label(booking)

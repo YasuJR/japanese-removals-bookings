@@ -300,7 +300,7 @@ def _apply_local_stripe_payment(
             "stripe_total_charged": card_total,
         },
     )
-    db.update_booking_status(booking_id, "Paid")
+    invoice.complete_job_when_payment_paid(booking_id)
     booking_profit.recalculate_and_save(booking_id)
 
 

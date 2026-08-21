@@ -268,6 +268,7 @@ def init_db() -> None:
                 _ensure_invoice_sequence(conn)
                 _seed_crew_and_trucks(conn)
                 _ensure_indexes(conn)
+                _complete_existing_paid_jobs(conn)
             finally:
                 conn.execute("SELECT pg_advisory_unlock(?)", (_INIT_DB_LOCK_KEY,))
         _DB_INITIALIZED = True
@@ -437,8 +438,36 @@ def init_db() -> None:
         _ensure_invoice_sequence(conn)
         _seed_crew_and_trucks(conn)
         _ensure_indexes(conn)
+        _complete_existing_paid_jobs(conn)
         conn.commit()
     _DB_INITIALIZED = True
+
+
+def _complete_existing_paid_jobs(conn) -> None:
+    """Paid bookings that are still Invoiced (etc.) become Completed."""
+    conn.execute(
+        """
+        UPDATE bookings
+        SET status = 'Completed'
+        WHERE payment_status = 'Paid'
+          AND COALESCE(status, '') NOT IN ('Completed', 'Cancelled')
+        """
+    )
+
+
+def complete_existing_paid_jobs() -> int:
+    """Backfill Job Status to Completed for bookings already Payment Paid."""
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE bookings
+            SET status = 'Completed'
+            WHERE payment_status = 'Paid'
+              AND COALESCE(status, '') NOT IN ('Completed', 'Cancelled')
+            """
+        )
+        conn.commit()
+        return int(cursor.rowcount or 0)
 
 
 def _ensure_indexes(conn) -> None:

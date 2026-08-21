@@ -290,7 +290,7 @@ def main() -> int:
         and results["after_confirmed"]["status"] == "Confirmed"
         and xero.is_real_invoice_id(results["after_confirmed"]["xero_invoice_id"])
         and wh_ok
-        and row.get("status") == "Paid"
+        and row.get("status") == "Completed"
         and row.get("payment_status") == "Paid"
         and (row.get("invoice_status") or "").upper() == "PAID"
         and bool(row.get("xero_payment_id"))

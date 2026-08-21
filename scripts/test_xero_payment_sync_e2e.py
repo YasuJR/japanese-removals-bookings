@@ -109,7 +109,7 @@ def test_fully_paid_xero_invoice_marks_booking_paid():
     row = dict(db.get_booking(booking_id))
     assert row["payment_status"] == "Paid"
     assert row["paid_at"]
-    assert row["status"] == "Invoiced"
+    assert row["status"] == "Completed"
     persist_mock.assert_not_called()
     lines = "\n".join(outcome.get("log_lines") or [])
     assert "invoice=INV{0}".format(number) in lines
@@ -164,7 +164,7 @@ def test_authorised_zero_due_is_treated_as_fully_paid():
 
     assert outcome["updated"] is True
     assert dict(db.get_booking(booking_id))["payment_status"] == "Paid"
-    assert dict(db.get_booking(booking_id))["status"] == "Invoiced"
+    assert dict(db.get_booking(booking_id))["status"] == "Completed"
     return True
 
 
@@ -265,7 +265,7 @@ def test_same_customer_different_invoice_numbers_only_match_correct_booking():
     assert result["updated"] == 1
     assert dict(db.get_booking(booking_22))["payment_status"] == "Paid"
     assert dict(db.get_booking(booking_23))["payment_status"] != "Paid"
-    assert dict(db.get_booking(booking_22))["status"] == "Invoiced"
+    assert dict(db.get_booking(booking_22))["status"] == "Completed"
     assert dict(db.get_booking(booking_23))["status"] == "Invoiced"
     return True
 
@@ -316,7 +316,7 @@ def test_dashboard_sync_action_updates_paid_booking():
     assert resp.status_code == 200
     row = dict(db.get_booking(booking_id))
     assert row["payment_status"] == "Paid"
-    assert row["status"] == "Invoiced"
+    assert row["status"] == "Completed"
     html = resp.get_data(as_text=True)
     assert "Synced 1 payment" in html or "marked Paid" in html or "Synced" in html
     return True
@@ -364,7 +364,7 @@ def test_cron_entrypoint_uses_same_sync():
     assert code == 0
     row = dict(db.get_booking(booking_id))
     assert row["payment_status"] == "Paid"
-    assert row["status"] == "Invoiced"
+    assert row["status"] == "Completed"
     state = xero_payment_sync.load_sync_state()
     assert state.get("last_source") == "cron"
     assert state.get("last_success_at")

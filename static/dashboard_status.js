@@ -122,6 +122,8 @@
     picker.setAttribute("data-current-status", status);
   }
 
+  window.dashboardApplyStatus = applyStatus;
+
   function saveStatus(picker, status) {
     var bookingId = picker.getAttribute("data-booking-id");
     var trigger = picker.querySelector(".dashboard-status-trigger");

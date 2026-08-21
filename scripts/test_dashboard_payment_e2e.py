@@ -75,9 +75,11 @@ def test_inline_payment_update_persists():
     assert payload["ok"] is True
     assert payload["payment_status"] == "Paid"
     assert payload["css_class"] == "paid"
+    assert payload["job_status"] == "Completed"
     row = dict(db.get_booking(booking_id))
     assert row["payment_status"] == "Paid"
     assert row["paid_at"]
+    assert row["status"] == "Completed"
     return True
 
 
@@ -98,6 +100,7 @@ def test_inline_payment_can_revert_to_unpaid():
     row = dict(db.get_booking(booking_id))
     assert row["payment_status"] == "Unpaid"
     assert not (row.get("paid_at") or "").strip()
+    assert row["status"] == "Completed"
     return True
 
 

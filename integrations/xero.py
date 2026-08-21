@@ -660,7 +660,7 @@ def sync_invoice_after_stripe_payment(
             fields["paid_at"] = paid_at
     db.update_booking_invoice_fields(booking_id, fields)
     if payment_status == invoice.PAYMENT_STATUS_PAID:
-        db.update_booking_status(booking_id, "Paid")
+        invoice.complete_job_when_payment_paid(booking_id)
 
     number = fields.get("invoice_number") or invoice_id[:8]
     msg = "Xero invoice {0} synced — status {1}.".format(

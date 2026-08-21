@@ -290,7 +290,30 @@ def apply_payment_status(
     db.update_booking_invoice_fields(booking_id, fields)
     if normalized == PAYMENT_STATUS_PAID:
         booking_profit.recalculate_and_save(booking_id)
+        complete_job_when_payment_paid(booking_id)
     return True, "Payment status updated to {0}.".format(normalized)
+
+
+def complete_job_when_payment_paid(booking_id: int) -> bool:
+    """
+    When Payment is Paid, set Job Status to Completed.
+
+    Leaves Cancelled and already-Completed jobs unchanged. Does not run when
+    Payment is Unpaid / Part Paid / Overdue, and does not revert Completed
+    if Payment is later changed back.
+    """
+    import job_status
+
+    row = db.get_booking(booking_id)
+    if not row:
+        return False
+    if normalize_payment_status(row["payment_status"]) != PAYMENT_STATUS_PAID:
+        return False
+    current = job_status.normalize(row["status"])
+    if current in ("Completed", "Cancelled"):
+        return False
+    db.update_booking_status(booking_id, "Completed")
+    return True
 
 
 def set_payment_status(booking_id: int, paid: bool) -> Tuple[bool, str]:
