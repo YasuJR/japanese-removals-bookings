@@ -6,6 +6,7 @@ import io
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import html as html_lib
 
 import config
 from extra_charges import charge_line_total
@@ -123,6 +124,10 @@ def _bank_details(booking: Dict[str, Any], settings: Dict[str, Any]) -> Dict[str
     }
 
 
+def _pdf_markup(text: str) -> str:
+    return html_lib.escape(str(text or ""), quote=False).replace("\n", "<br/>")
+
+
 def _payment_reference(booking: Dict[str, Any]) -> str:
     displayed = invoice_numbering.display_invoice_number(booking)
     return displayed if displayed and displayed != "—" else ""
@@ -178,6 +183,7 @@ def build_invoice_document(booking: Dict[str, Any]) -> Dict[str, Any]:
         or invoice_numbering.DEFAULT_ABN
     )
     payment_options = stripe_service.payment_options_for_booking(booking, totals["total"])
+    bill_to = invoice.invoice_customer_bill_to(booking)
 
     return {
         "settings": settings,
@@ -191,7 +197,10 @@ def build_invoice_document(booking: Dict[str, Any]) -> Dict[str, Any]:
         "company_contact_line": _contact_line(settings),
         "company_abn": company_abn,
         "company_location": settings.get("company_location") or "",
-        "customer_name": booking.get("customer_name") or "",
+        "customer_name": bill_to["customer_name"],
+        "customer_address": bill_to["customer_address"],
+        "customer_phone": bill_to["customer_phone"],
+        "customer_email": bill_to["customer_email"],
         "invoice_number": invoice_number,
         "issue_date": _format_display_date(issue_date),
         "due_date": _format_display_date(due_date),
@@ -278,6 +287,14 @@ def _styles():
             fontName="Helvetica-Bold",
             fontSize=10.5,
             leading=13,
+            textColor=JR_TEXT,
+        ),
+        "customer_detail": ParagraphStyle(
+            "CustomerDetail",
+            parent=base["Normal"],
+            fontName="Helvetica",
+            fontSize=9.5,
+            leading=12,
             textColor=JR_TEXT,
         ),
         "body": ParagraphStyle(
@@ -638,7 +655,13 @@ def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
 
     # --- Bill to ---
     story.append(Paragraph("BILL TO", styles["section_heading"]))
-    story.append(Paragraph(doc_data["customer_name"], styles["customer_name"]))
+    story.append(
+        Paragraph(_pdf_markup(doc_data.get("customer_name") or ""), styles["customer_name"])
+    )
+    for key in ("customer_address", "customer_phone", "customer_email"):
+        value = str(doc_data.get(key) or "").strip()
+        if value:
+            story.append(Paragraph(_pdf_markup(value), styles["customer_detail"]))
     story.append(Spacer(1, BILL_GAP))
 
     # --- Line items (full content width) ---

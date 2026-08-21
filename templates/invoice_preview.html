@@ -47,6 +47,15 @@
     <section class="invoice-bill-section">
       <h3 class="invoice-section-title">BILL TO</h3>
       <p class="invoice-bill-to">{{ inv.customer_name }}</p>
+      {% if inv.customer_address %}
+      <p class="invoice-bill-detail">{{ inv.customer_address }}</p>
+      {% endif %}
+      {% if inv.customer_phone %}
+      <p class="invoice-bill-detail">{{ inv.customer_phone }}</p>
+      {% endif %}
+      {% if inv.customer_email %}
+      <p class="invoice-bill-detail">{{ inv.customer_email }}</p>
+      {% endif %}
     </section>
 
     <table class="invoice-lines">

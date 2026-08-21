@@ -121,6 +121,29 @@ def invoice_summary(booking: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def invoice_customer_bill_to(booking: Any) -> Dict[str, str]:
+    """
+    Customer block for Invoice preview and PDF.
+
+    Address comes from the stored booking pickup_address field. Does not
+    modify booking data or invent a value when that field is empty.
+    """
+    if booking is None:
+        row: Dict[str, Any] = {}
+    elif isinstance(booking, dict):
+        row = booking
+    elif hasattr(booking, "keys"):
+        row = dict(booking)
+    else:
+        row = {}
+    return {
+        "customer_name": str(row.get("customer_name") or "").strip(),
+        "customer_address": str(row.get("pickup_address") or "").strip(),
+        "customer_phone": str(row.get("phone") or "").strip(),
+        "customer_email": str(row.get("email") or "").strip(),
+    }
+
+
 def calculate_from_form_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Invoice totals from parsed form pricing fields (no DB read)."""
     booking = {
