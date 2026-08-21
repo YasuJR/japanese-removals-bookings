@@ -1272,8 +1272,15 @@ def list_all() -> List[sqlite3.Row]:
     return list(rows)
 
 
+def _dashboard_payment_group(row: sqlite3.Row) -> int:
+    """0 = UNPAID group (including Part Paid / Overdue), 1 = PAID."""
+    text = str(row["payment_status"] or "").strip()
+    return 1 if text == "Paid" else 0
+
+
 def _dashboard_sort_key(row: sqlite3.Row) -> tuple:
     return (
+        _dashboard_payment_group(row),
         job_status.sort_priority(row["status"]),
         row["move_date"] or "",
         row["start_time"] or "",

@@ -16,7 +16,11 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-local-tests-only")
 import auth
 import database as db
 from app import app
-from dashboard_data import perth_today, upcoming_divider_index
+from dashboard_data import (
+    perth_today,
+    upcoming_divider_index,
+    upcoming_divider_indexes,
+)
 
 
 _test_user_counter = 0
@@ -77,6 +81,13 @@ def test_upcoming_divider_index_helpers():
     assert upcoming_divider_index(jobs, "2026-08-21") is None
     assert upcoming_divider_index(jobs, "2026-08-17") == 0
     assert upcoming_divider_index([], today) is None
+    grouped = [
+        {"payment_status": "Unpaid", "move_date": "2026-08-18"},
+        {"payment_status": "Unpaid", "move_date": "2026-08-19"},
+        {"payment_status": "Paid", "move_date": "2026-08-17"},
+        {"payment_status": "Paid", "move_date": "2026-08-20"},
+    ]
+    assert upcoming_divider_indexes(grouped, today) == [1, 3]
     # Postgres-style date objects must compare the same way.
     assert (
         upcoming_divider_index(
@@ -99,16 +110,16 @@ def test_dashboard_divider_between_past_and_upcoming():
     client = _login_client()
     html = client.get("/dashboard?filter=all&jobs_limit=500").get_data(as_text=True)
 
-    assert html.count("TODAY &amp; UPCOMING") == 1 or html.count("TODAY & UPCOMING") == 1
-    assert html.count('class="dashboard-upcoming-divider-row"') == 1
+    assert "TODAY &amp; UPCOMING" in html or "TODAY & UPCOMING" in html
+    assert "dashboard-upcoming-divider-row" in html
     assert 'colspan="10"' in html
     assert 'aria-label="Today and upcoming"' in html
 
     past_pos = html.find(past_name)
-    divider_pos = html.find("dashboard-upcoming-divider-row")
     upcoming_pos = html.find(upcoming_name)
-    assert past_pos != -1 and divider_pos != -1 and upcoming_pos != -1
-    assert past_pos < divider_pos < upcoming_pos
+    assert past_pos != -1 and upcoming_pos != -1
+    assert past_pos < upcoming_pos
+    assert "dashboard-upcoming-divider-row" in html[past_pos:upcoming_pos]
 
     assert dict(db.get_booking(past_id))["status"] == "Confirmed"
     assert dict(db.get_booking(upcoming_id))["status"] == "Confirmed"
@@ -169,9 +180,11 @@ def test_mobile_css_covers_divider():
     css = (ROOT / "static" / "mobile.css").read_text()
     assert "@media (max-width: 767px)" in css
     assert ".dashboard-upcoming-divider-label" in css
+    assert ".dashboard-section-divider-label" in css
     desktop = (ROOT / "static" / "style.css").read_text()
     assert "height: 4px" in desktop
     assert "#083d28" in desktop
+    assert ".dashboard-section-divider-label" in desktop
     return True
 
 

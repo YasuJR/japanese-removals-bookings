@@ -6,10 +6,13 @@ from zoneinfo import ZoneInfo
 
 import config
 import database as db
+import invoice
 
 DASHBOARD_JOBS_INITIAL = 40
 DASHBOARD_JOBS_PAGE_SIZE = 40
 UPCOMING_DIVIDER_LABEL = "TODAY & UPCOMING"
+PAYMENT_UNPAID_DIVIDER_LABEL = "UNPAID"
+PAYMENT_PAID_DIVIDER_LABEL = "PAID"
 
 
 def perth_today(now: Optional[datetime] = None) -> date:
@@ -39,6 +42,19 @@ def job_move_date_iso(job: Any) -> str:
     return str(raw).strip()[:10]
 
 
+def is_dashboard_paid(job: Any) -> bool:
+    """True when the booking Payment status is Paid (not Unpaid / Part Paid / Overdue)."""
+    raw = None
+    if hasattr(job, "keys"):
+        try:
+            raw = job["payment_status"]
+        except (KeyError, TypeError):
+            raw = None
+    elif isinstance(job, dict):
+        raw = job.get("payment_status")
+    return invoice.normalize_payment_status(raw) == invoice.PAYMENT_STATUS_PAID
+
+
 def upcoming_divider_index(jobs: List[Any], today_iso: str) -> Optional[int]:
     """
     Index of the first visible job dated today or later (Perth today).
@@ -52,6 +68,49 @@ def upcoming_divider_index(jobs: List[Any], today_iso: str) -> Optional[int]:
         if job_move_date_iso(job) >= boundary:
             return index
     return None
+
+
+def upcoming_divider_indexes(jobs: List[Any], today_iso: str) -> List[int]:
+    """
+    TODAY & UPCOMING divider indexes, one per Payment group (UNPAID then PAID).
+
+    Within each contiguous payment group, insert before the first job dated
+    today or later. Does not reorder jobs.
+    """
+    boundary = (today_iso or "")[:10]
+    if not boundary or not jobs:
+        return []
+    indexes: List[int] = []
+    index = 0
+    while index < len(jobs):
+        paid = is_dashboard_paid(jobs[index])
+        group_start = index
+        while index < len(jobs) and is_dashboard_paid(jobs[index]) == paid:
+            index += 1
+        group = jobs[group_start:index]
+        local = upcoming_divider_index(group, boundary)
+        if local is not None:
+            indexes.append(group_start + local)
+    return indexes
+
+
+def payment_section_indexes(jobs: List[Any]) -> Tuple[Optional[int], Optional[int]]:
+    """
+    Indexes of the first UNPAID row and first PAID row in the visible list.
+
+    None when that payment group is not present.
+    """
+    unpaid_index = None
+    paid_index = None
+    for index, job in enumerate(jobs):
+        if is_dashboard_paid(job):
+            if paid_index is None:
+                paid_index = index
+        elif unpaid_index is None:
+            unpaid_index = index
+        if unpaid_index is not None and paid_index is not None:
+            break
+    return unpaid_index, paid_index
 
 
 def week_range(today: date) -> tuple:
