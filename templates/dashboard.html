@@ -132,6 +132,11 @@
       </thead>
       <tbody>
         {% for b in jobs %}
+        {% if upcoming_divider_index is not none and loop.index0 == upcoming_divider_index %}
+        {% with divider_kind="upcoming", divider_label="TODAY & UPCOMING", divider_aria="Today and upcoming" %}
+        {% include '_dashboard_section_divider.html' %}
+        {% endwith %}
+        {% endif %}
         {% if payment_unpaid_index is not none and loop.index0 == payment_unpaid_index %}
         {% with divider_kind="unpaid", divider_label="UNPAID", divider_aria="Unpaid" %}
         {% include '_dashboard_section_divider.html' %}
@@ -139,11 +144,6 @@
         {% endif %}
         {% if payment_paid_index is not none and loop.index0 == payment_paid_index %}
         {% with divider_kind="paid", divider_label="PAID", divider_aria="Paid" %}
-        {% include '_dashboard_section_divider.html' %}
-        {% endwith %}
-        {% endif %}
-        {% if upcoming_divider_indexes and loop.index0 in upcoming_divider_indexes %}
-        {% with divider_kind="upcoming", divider_label="TODAY & UPCOMING", divider_aria="Today and upcoming" %}
         {% include '_dashboard_section_divider.html' %}
         {% endwith %}
         {% endif %}

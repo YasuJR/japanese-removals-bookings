@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""E2E tests — Dashboard UNPAID / PAID section dividers."""
+"""E2E tests — Dashboard TODAY & UPCOMING / UNPAID / PAID groups."""
 
 import os
 import re
@@ -19,10 +19,14 @@ from app import app
 from dashboard_data import (
     PAYMENT_PAID_DIVIDER_LABEL,
     PAYMENT_UNPAID_DIVIDER_LABEL,
+    SECTION_PAID,
+    SECTION_TODAY_UPCOMING,
+    SECTION_UNPAID,
+    UPCOMING_DIVIDER_LABEL,
+    dashboard_section_group,
+    dashboard_section_indexes,
     is_dashboard_paid,
-    payment_section_indexes,
     perth_today,
-    upcoming_divider_indexes,
 )
 
 
@@ -70,86 +74,149 @@ def _customer_names(html):
     )
 
 
-def test_payment_section_index_helpers():
-    jobs = [
-        {"payment_status": "Unpaid", "move_date": "2026-08-18"},
-        {"payment_status": "Part Paid", "move_date": "2026-08-19"},
-        {"payment_status": "Paid", "move_date": "2026-08-17"},
-        {"payment_status": "Paid", "move_date": "2026-08-20"},
-    ]
-    assert payment_section_indexes(jobs) == (0, 2)
-    assert payment_section_indexes([]) == (None, None)
-    assert payment_section_indexes([{"payment_status": "Paid"}]) == (None, 0)
-    assert payment_section_indexes([{"payment_status": "Overdue"}]) == (0, None)
+def test_section_index_helpers():
+    today = "2026-08-21"
+    assert dashboard_section_group({"payment_status": "Unpaid", "move_date": today}, today) == SECTION_TODAY_UPCOMING
+    assert dashboard_section_group({"payment_status": "Part Paid", "move_date": today}, today) == SECTION_TODAY_UPCOMING
+    assert dashboard_section_group({"payment_status": "Overdue", "move_date": "2026-08-20"}, today) == SECTION_UNPAID
+    assert dashboard_section_group({"payment_status": "Paid", "move_date": today}, today) == SECTION_PAID
+    assert dashboard_section_group({"payment_status": "Paid", "move_date": "2026-08-20"}, today) == SECTION_PAID
     assert is_dashboard_paid({"payment_status": "Paid"}) is True
     assert is_dashboard_paid({"payment_status": "Part Paid"}) is False
-    assert is_dashboard_paid({"payment_status": "Overdue"}) is False
-    assert is_dashboard_paid({"payment_status": "Unpaid"}) is False
-    assert upcoming_divider_indexes(jobs, "2026-08-19") == [1, 3]
+
+    # Display order: today unpaid, past unpaid, paid.
+    jobs = [
+        {"payment_status": "Unpaid", "move_date": "2026-08-21"},
+        {"payment_status": "Part Paid", "move_date": "2026-08-20"},
+        {"payment_status": "Paid", "move_date": "2026-08-17"},
+        {"payment_status": "Paid", "move_date": "2026-08-22"},
+    ]
+    assert dashboard_section_indexes(jobs, today) == (0, 1, 2)
+    assert dashboard_section_indexes([], today) == (None, None, None)
+    assert dashboard_section_indexes([{"payment_status": "Paid", "move_date": today}], today) == (
+        None,
+        None,
+        0,
+    )
+    assert dashboard_section_indexes(
+        [{"payment_status": "Overdue", "move_date": "2026-08-20"}], today
+    ) == (None, 0, None)
     return True
 
 
-def test_dashboard_groups_unpaid_then_paid_with_headers():
+def test_today_upcoming_unpaid_then_paid_are_independent_groups():
     today = perth_today()
-    unpaid_name = _unique("Unpaid Group Customer")
-    paid_name = _unique("Paid Group Customer")
-    unpaid_id = _create_job(unpaid_name, today.isoformat(), "Confirmed", "Unpaid")
-    paid_id = _create_job(paid_name, today.isoformat(), "Confirmed", "Paid")
+    yuki = _unique("Yuki Tamura")
+    sam = _unique("Sam")
+    lee = _unique("Lee")
+    natalie = _unique("Natalie")
+    kate = _unique("Kate")
+    yuki_id = _create_job(yuki, today.isoformat(), "Confirmed", "Unpaid")
+    sam_id = _create_job(sam, today.isoformat(), "Confirmed", "Unpaid")
+    _create_job(lee, (today - timedelta(days=2)).isoformat(), "Confirmed", "Unpaid")
+    _create_job(natalie, (today - timedelta(days=1)).isoformat(), "Confirmed", "Unpaid")
+    kate_id = _create_job(kate, (today - timedelta(days=3)).isoformat(), "Confirmed", "Paid")
     client = _login_client()
     html = client.get("/dashboard?filter=all&jobs_limit=500").get_data(as_text=True)
 
-    unpaid_header = html.find('dashboard-unpaid-divider-row')
-    paid_header = html.find('dashboard-paid-divider-row')
-    unpaid_pos = html.find(unpaid_name)
-    paid_pos = html.find(paid_name)
-    assert unpaid_header != -1 and paid_header != -1
-    assert unpaid_pos != -1 and paid_pos != -1
-    assert unpaid_header < unpaid_pos < paid_header < paid_pos
+    today_header = html.find("dashboard-upcoming-divider-row")
+    unpaid_header = html.find("dashboard-unpaid-divider-row")
+    paid_header = html.find("dashboard-paid-divider-row")
+    yuki_pos = html.find(yuki)
+    sam_pos = html.find(sam)
+    lee_pos = html.find(lee)
+    natalie_pos = html.find(natalie)
+    kate_pos = html.find(kate)
+    assert today_header != -1 and unpaid_header != -1 and paid_header != -1
+    assert today_header < yuki_pos < unpaid_header
+    assert today_header < sam_pos < unpaid_header
+    assert unpaid_header < lee_pos < paid_header
+    assert unpaid_header < natalie_pos < paid_header
+    assert paid_header < kate_pos
+    assert today_header < unpaid_header < paid_header
+    assert UPCOMING_DIVIDER_LABEL in html or "TODAY &amp; UPCOMING" in html
     assert PAYMENT_UNPAID_DIVIDER_LABEL in html
     assert PAYMENT_PAID_DIVIDER_LABEL in html
-    assert 'aria-label="Unpaid"' in html
-    assert 'aria-label="Paid"' in html
 
-    names = [name for name in _customer_names(html) if name in (unpaid_name, paid_name)]
-    assert names == [unpaid_name, paid_name], names
+    wanted = [yuki, sam, lee, natalie, kate]
+    names = [name for name in _customer_names(html) if name in wanted]
+    assert names[:2] == [yuki, sam], names
+    assert set(names[2:4]) == {lee, natalie}, names
+    assert names[-1] == kate, names
+    assert names.count(yuki) == 1 and names.count(sam) == 1
+    assert names.count(lee) == 1 and names.count(kate) == 1
 
-    assert dict(db.get_booking(unpaid_id))["status"] == "Confirmed"
-    assert dict(db.get_booking(paid_id))["status"] == "Confirmed"
-    assert dict(db.get_booking(unpaid_id))["payment_status"] == "Unpaid"
-    assert dict(db.get_booking(paid_id))["payment_status"] == "Paid"
+    assert dict(db.get_booking(yuki_id))["status"] == "Confirmed"
+    assert dict(db.get_booking(sam_id))["status"] == "Confirmed"
+    assert dict(db.get_booking(yuki_id))["payment_status"] == "Unpaid"
+    assert dict(db.get_booking(kate_id))["payment_status"] == "Paid"
     return True
 
 
-def test_part_paid_and_overdue_stay_in_unpaid_group():
+def test_paid_jobs_stay_in_paid_group_regardless_of_date():
+    today = perth_today()
+    paid_today = _unique("Paid Today Customer")
+    paid_future = _unique("Paid Future Customer")
+    unpaid_today = _unique("Unpaid Today Customer")
+    _create_job(paid_today, today.isoformat(), "Confirmed", "Paid")
+    _create_job(paid_future, (today + timedelta(days=2)).isoformat(), "Confirmed", "Paid")
+    _create_job(unpaid_today, today.isoformat(), "Confirmed", "Unpaid")
+    client = _login_client()
+    html = client.get("/dashboard?filter=all&jobs_limit=500").get_data(as_text=True)
+    today_header = html.find("dashboard-upcoming-divider-row")
+    unpaid_header = html.find("dashboard-unpaid-divider-row")
+    paid_header = html.find("dashboard-paid-divider-row")
+    unpaid_today_pos = html.find(unpaid_today)
+    paid_today_pos = html.find(paid_today)
+    paid_future_pos = html.find(paid_future)
+    assert today_header < unpaid_today_pos
+    if unpaid_header != -1:
+        assert unpaid_today_pos < unpaid_header
+    assert paid_header < paid_today_pos
+    assert paid_header < paid_future_pos
+    assert unpaid_today_pos < paid_header
+    return True
+
+
+def test_part_paid_and_overdue_past_jobs_are_in_unpaid_group():
     today = perth_today()
     part_name = _unique("Part Paid Customer")
     overdue_name = _unique("Overdue Customer")
     paid_name = _unique("Fully Paid Customer")
-    _create_job(part_name, today.isoformat(), "Confirmed", invoice.PAYMENT_STATUS_PART_PAID)
-    _create_job(overdue_name, today.isoformat(), "Confirmed", invoice.PAYMENT_STATUS_OVERDUE)
+    _create_job(
+        part_name,
+        (today - timedelta(days=1)).isoformat(),
+        "Confirmed",
+        invoice.PAYMENT_STATUS_PART_PAID,
+    )
+    _create_job(
+        overdue_name,
+        (today - timedelta(days=2)).isoformat(),
+        "Confirmed",
+        invoice.PAYMENT_STATUS_OVERDUE,
+    )
     _create_job(paid_name, today.isoformat(), "Confirmed", invoice.PAYMENT_STATUS_PAID)
     client = _login_client()
     html = client.get("/dashboard?filter=all&jobs_limit=500").get_data(as_text=True)
 
+    unpaid_header = html.find("dashboard-unpaid-divider-row")
     paid_header = html.find("dashboard-paid-divider-row")
     part_pos = html.find(part_name)
     overdue_pos = html.find(overdue_name)
     paid_pos = html.find(paid_name)
-    assert paid_header != -1
-    assert part_pos != -1 and overdue_pos != -1 and paid_pos != -1
-    assert part_pos < paid_header
-    assert overdue_pos < paid_header
+    assert unpaid_header != -1 and paid_header != -1
+    assert unpaid_header < part_pos < paid_header
+    assert unpaid_header < overdue_pos < paid_header
     assert paid_header < paid_pos
     return True
 
 
-def test_status_order_is_preserved_within_payment_group():
+def test_status_order_is_preserved_within_each_group():
     today = perth_today()
     paid_confirmed = _unique("Paid Confirmed First Date")
     unpaid_invoiced = _unique("Unpaid Invoiced")
     unpaid_completed = _unique("Unpaid Completed")
     unpaid_confirmed = _unique("Unpaid Confirmed")
-    # Paid Confirmed is earlier by date; it must still come after all UNPAID rows.
     _create_job(
         paid_confirmed,
         (today - timedelta(days=3)).isoformat(),
@@ -199,29 +266,6 @@ def test_job_status_paid_is_not_payment_paid():
     return True
 
 
-def test_today_upcoming_still_splits_past_and_future_inside_unpaid():
-    today = perth_today()
-    past_name = _unique("Unpaid Past Divider")
-    upcoming_name = _unique("Unpaid Upcoming Divider")
-    paid_past = _unique("Paid Past After Unpaid")
-    _create_job(past_name, (today - timedelta(days=1)).isoformat(), "Confirmed", "Unpaid")
-    _create_job(upcoming_name, today.isoformat(), "Confirmed", "Unpaid")
-    _create_job(paid_past, (today - timedelta(days=2)).isoformat(), "Confirmed", "Paid")
-    client = _login_client()
-    html = client.get("/dashboard?filter=all&jobs_limit=500").get_data(as_text=True)
-
-    past_pos = html.find(past_name)
-    upcoming_pos = html.find(upcoming_name)
-    paid_pos = html.find(paid_past)
-    paid_header = html.find("dashboard-paid-divider-row")
-    assert past_pos != -1 and upcoming_pos != -1 and paid_pos != -1
-    slice_html = html[past_pos:upcoming_pos]
-    assert "dashboard-upcoming-divider-row" in slice_html
-    assert "TODAY" in slice_html
-    assert past_pos < upcoming_pos < paid_header < paid_pos
-    return True
-
-
 def test_mobile_and_desktop_css_cover_payment_dividers():
     css = (ROOT / "static" / "mobile.css").read_text()
     assert ".dashboard-section-divider-label" in css
@@ -234,12 +278,12 @@ def test_mobile_and_desktop_css_cover_payment_dividers():
 
 def main():
     tests = [
-        test_payment_section_index_helpers,
-        test_dashboard_groups_unpaid_then_paid_with_headers,
-        test_part_paid_and_overdue_stay_in_unpaid_group,
-        test_status_order_is_preserved_within_payment_group,
+        test_section_index_helpers,
+        test_today_upcoming_unpaid_then_paid_are_independent_groups,
+        test_paid_jobs_stay_in_paid_group_regardless_of_date,
+        test_part_paid_and_overdue_past_jobs_are_in_unpaid_group,
+        test_status_order_is_preserved_within_each_group,
         test_job_status_paid_is_not_payment_paid,
-        test_today_upcoming_still_splits_past_and_future_inside_unpaid,
         test_mobile_and_desktop_css_cover_payment_dividers,
     ]
     passed = 0

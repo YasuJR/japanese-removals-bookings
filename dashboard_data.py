@@ -42,6 +42,11 @@ def job_move_date_iso(job: Any) -> str:
     return str(raw).strip()[:10]
 
 
+SECTION_TODAY_UPCOMING = 0
+SECTION_UNPAID = 1
+SECTION_PAID = 2
+
+
 def is_dashboard_paid(job: Any) -> bool:
     """True when the booking Payment status is Paid (not Unpaid / Part Paid / Overdue)."""
     raw = None
@@ -55,62 +60,58 @@ def is_dashboard_paid(job: Any) -> bool:
     return invoice.normalize_payment_status(raw) == invoice.PAYMENT_STATUS_PAID
 
 
+def dashboard_section_group(job: Any, today_iso: str) -> int:
+    """
+    Independent Dashboard groups (each job belongs to exactly one):
+
+    0. TODAY & UPCOMING — not Paid, job date today or later
+    1. UNPAID — not Paid, job date yesterday or earlier (Unpaid / Part Paid / Overdue)
+    2. PAID — Payment status Paid, any date
+    """
+    if is_dashboard_paid(job):
+        return SECTION_PAID
+    boundary = (today_iso or "")[:10]
+    if boundary and job_move_date_iso(job) >= boundary:
+        return SECTION_TODAY_UPCOMING
+    return SECTION_UNPAID
+
+
 def upcoming_divider_index(jobs: List[Any], today_iso: str) -> Optional[int]:
     """
-    Index of the first visible job dated today or later (Perth today).
+    Index of the first visible unpaid job dated today or later (Perth today).
 
-    Does not reorder jobs. Returns None when every visible row is in the past.
+    Paid jobs are ignored. Returns None when that group is absent.
     """
-    boundary = (today_iso or "")[:10]
-    if not boundary:
-        return None
-    for index, job in enumerate(jobs):
-        if job_move_date_iso(job) >= boundary:
-            return index
-    return None
+    upcoming, _, _ = dashboard_section_indexes(jobs, today_iso)
+    return upcoming
 
 
-def upcoming_divider_indexes(jobs: List[Any], today_iso: str) -> List[int]:
+def dashboard_section_indexes(
+    jobs: List[Any], today_iso: str
+) -> Tuple[Optional[int], Optional[int], Optional[int]]:
     """
-    TODAY & UPCOMING divider indexes, one per Payment group (UNPAID then PAID).
+    Indexes of the first TODAY & UPCOMING, past UNPAID, and PAID rows.
 
-    Within each contiguous payment group, insert before the first job dated
-    today or later. Does not reorder jobs.
+    None when that group is not present in the visible list.
     """
-    boundary = (today_iso or "")[:10]
-    if not boundary or not jobs:
-        return []
-    indexes: List[int] = []
-    index = 0
-    while index < len(jobs):
-        paid = is_dashboard_paid(jobs[index])
-        group_start = index
-        while index < len(jobs) and is_dashboard_paid(jobs[index]) == paid:
-            index += 1
-        group = jobs[group_start:index]
-        local = upcoming_divider_index(group, boundary)
-        if local is not None:
-            indexes.append(group_start + local)
-    return indexes
-
-
-def payment_section_indexes(jobs: List[Any]) -> Tuple[Optional[int], Optional[int]]:
-    """
-    Indexes of the first UNPAID row and first PAID row in the visible list.
-
-    None when that payment group is not present.
-    """
+    upcoming_index = None
     unpaid_index = None
     paid_index = None
     for index, job in enumerate(jobs):
-        if is_dashboard_paid(job):
-            if paid_index is None:
-                paid_index = index
-        elif unpaid_index is None:
+        group = dashboard_section_group(job, today_iso)
+        if group == SECTION_TODAY_UPCOMING and upcoming_index is None:
+            upcoming_index = index
+        elif group == SECTION_UNPAID and unpaid_index is None:
             unpaid_index = index
-        if unpaid_index is not None and paid_index is not None:
+        elif group == SECTION_PAID and paid_index is None:
+            paid_index = index
+        if (
+            upcoming_index is not None
+            and unpaid_index is not None
+            and paid_index is not None
+        ):
             break
-    return unpaid_index, paid_index
+    return upcoming_index, unpaid_index, paid_index
 
 
 def week_range(today: date) -> tuple:

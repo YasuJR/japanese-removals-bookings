@@ -17,9 +17,9 @@ import auth
 import database as db
 from app import app
 from dashboard_data import (
+    dashboard_section_indexes,
     perth_today,
     upcoming_divider_index,
-    upcoming_divider_indexes,
 )
 
 
@@ -82,12 +82,13 @@ def test_upcoming_divider_index_helpers():
     assert upcoming_divider_index(jobs, "2026-08-17") == 0
     assert upcoming_divider_index([], today) is None
     grouped = [
-        {"payment_status": "Unpaid", "move_date": "2026-08-18"},
         {"payment_status": "Unpaid", "move_date": "2026-08-19"},
+        {"payment_status": "Unpaid", "move_date": "2026-08-18"},
         {"payment_status": "Paid", "move_date": "2026-08-17"},
         {"payment_status": "Paid", "move_date": "2026-08-20"},
     ]
-    assert upcoming_divider_indexes(grouped, today) == [1, 3]
+    assert dashboard_section_indexes(grouped, today) == (0, 1, 2)
+    assert upcoming_divider_index(grouped, today) == 0
     # Postgres-style date objects must compare the same way.
     assert (
         upcoming_divider_index(
@@ -112,14 +113,16 @@ def test_dashboard_divider_between_past_and_upcoming():
 
     assert "TODAY &amp; UPCOMING" in html or "TODAY & UPCOMING" in html
     assert "dashboard-upcoming-divider-row" in html
+    assert "dashboard-unpaid-divider-row" in html
     assert 'colspan="10"' in html
     assert 'aria-label="Today and upcoming"' in html
 
-    past_pos = html.find(past_name)
     upcoming_pos = html.find(upcoming_name)
-    assert past_pos != -1 and upcoming_pos != -1
-    assert past_pos < upcoming_pos
-    assert "dashboard-upcoming-divider-row" in html[past_pos:upcoming_pos]
+    past_pos = html.find(past_name)
+    today_header = html.find("dashboard-upcoming-divider-row")
+    unpaid_header = html.find("dashboard-unpaid-divider-row")
+    assert upcoming_pos != -1 and past_pos != -1
+    assert today_header < upcoming_pos < unpaid_header < past_pos
 
     assert dict(db.get_booking(past_id))["status"] == "Confirmed"
     assert dict(db.get_booking(upcoming_id))["status"] == "Confirmed"
@@ -170,7 +173,7 @@ def test_divider_does_not_change_job_order_or_status():
         html,
     )
     confirmed = [name for name in names if name in (bravo, alpha)]
-    assert confirmed == [bravo, alpha], confirmed
+    assert confirmed == [alpha, bravo], confirmed
     assert dict(db.get_booking(first))["status"] == "Confirmed"
     assert dict(db.get_booking(second))["status"] == "Confirmed"
     return True

@@ -72,11 +72,10 @@ from integrations import website_quote, sms_inbound
 from dashboard_data import (
     build_dashboard,
     dashboard_jobs,
+    dashboard_section_indexes,
     paginate_dashboard_jobs,
     parse_jobs_limit,
-    payment_section_indexes,
     perth_today,
-    upcoming_divider_indexes,
 )
 from daily_jobs_data import build_daily_jobs
 import calendar_data
@@ -1427,14 +1426,15 @@ def dashboard():
             profit_status=profit_status,
             profit_paid_only=1 if profit_paid_only else None,
         )
-    unpaid_index, paid_index = payment_section_indexes(enriched_jobs)
-    divider_indexes = upcoming_divider_indexes(enriched_jobs, dash["today"])
+    upcoming_index, unpaid_index, paid_index = dashboard_section_indexes(
+        enriched_jobs, dash["today"]
+    )
     return render_template(
         "dashboard.html",
         dash=dash,
         today=dash["today"],
         jobs=enriched_jobs,
-        upcoming_divider_indexes=divider_indexes,
+        upcoming_divider_index=upcoming_index,
         payment_unpaid_index=unpaid_index,
         payment_paid_index=paid_index,
         jobs_total=jobs_total,

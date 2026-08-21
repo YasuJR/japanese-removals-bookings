@@ -1272,15 +1272,33 @@ def list_all() -> List[sqlite3.Row]:
     return list(rows)
 
 
-def _dashboard_payment_group(row: sqlite3.Row) -> int:
-    """0 = UNPAID group (including Part Paid / Overdue), 1 = PAID."""
-    text = str(row["payment_status"] or "").strip()
-    return 1 if text == "Paid" else 0
+def _dashboard_payment_is_paid(row: sqlite3.Row) -> bool:
+    """True when Payment status is Paid (not Unpaid / Part Paid / Overdue)."""
+    return str(row["payment_status"] or "").strip() == "Paid"
 
 
-def _dashboard_sort_key(row: sqlite3.Row) -> tuple:
+def _dashboard_move_date_iso(row: sqlite3.Row) -> str:
+    raw = row["move_date"]
+    if raw is None:
+        return ""
+    if hasattr(raw, "isoformat"):
+        return str(raw.isoformat())[:10]
+    return str(raw).strip()[:10]
+
+
+def _dashboard_section_group(row: sqlite3.Row, today_iso: str) -> int:
+    """0 = TODAY & UPCOMING, 1 = past UNPAID, 2 = PAID."""
+    if _dashboard_payment_is_paid(row):
+        return 2
+    boundary = (today_iso or "")[:10]
+    if boundary and _dashboard_move_date_iso(row) >= boundary:
+        return 0
+    return 1
+
+
+def _dashboard_sort_key(row: sqlite3.Row, today_iso: str) -> tuple:
     return (
-        _dashboard_payment_group(row),
+        _dashboard_section_group(row, today_iso),
         job_status.sort_priority(row["status"]),
         row["move_date"] or "",
         row["start_time"] or "",
@@ -1321,7 +1339,7 @@ def list_for_dashboard(filter_name: str, today_iso: str) -> List[sqlite3.Row]:
     with get_connection() as conn:
         rows = conn.execute(sql, params).fetchall()
 
-    return sorted(list(rows), key=_dashboard_sort_key)
+    return sorted(list(rows), key=lambda row: _dashboard_sort_key(row, today_iso))
 
 
 def get_booking(booking_id: int) -> Optional[sqlite3.Row]:
