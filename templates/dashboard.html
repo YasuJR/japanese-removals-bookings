@@ -85,7 +85,10 @@
 <section class="panel profit-summary-panel">
   <div class="panel-head">
     <h3>Monthly profit summary</h3>
-    <p class="hint">{{ monthly_profit.booking_count }} booking{% if monthly_profit.booking_count != 1 %}s{% endif %} · {{ monthly_profit.month_start }} – {{ monthly_profit.month_end }} · Pending excluded by default</p>
+    <p class="hint">
+      {{ monthly_profit.month_start }} – {{ monthly_profit.month_end }}
+      · Actual uses Paid invoices · Projected uses booked jobs · Perth time
+    </p>
   </div>
 
   <form method="get" class="profit-summary-filters">
@@ -94,47 +97,90 @@
       Month
       <input type="month" name="profit_month" value="{{ profit_month }}">
     </label>
-    <label>
-      Status
-      <select name="profit_status">
-        {% for key, label in profit_status_filters %}
-        <option value="{{ key }}"{% if profit_status == key %} selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="checkbox-inline">
-      <input type="checkbox" name="profit_paid_only" value="1"{% if profit_paid_only %} checked{% endif %}>
-      Paid only
-    </label>
     <button type="submit" class="btn-secondary btn-sm">Apply</button>
   </form>
 
-  <div class="profit-metrics-grid profit-summary-grid">
-    <div class="profit-metric">
-      <span class="profit-metric-label">Total revenue</span>
-      <strong class="profit-metric-value money">{{ monthly_profit.revenue|format_aud }}</strong>
+  <section class="profit-section profit-section-actual" aria-labelledby="profit-actual-heading">
+    <h4 id="profit-actual-heading">Actual / Paid performance</h4>
+    <div class="profit-metrics-grid profit-summary-grid">
+      <div class="profit-metric">
+        <span class="profit-metric-label">Paid Revenue</span>
+        <strong class="profit-metric-value money">{{ monthly_profit.actual.paid_revenue|format_aud }}</strong>
+      </div>
+      <div class="profit-metric">
+        <span class="profit-metric-label">GST Collected</span>
+        <span class="profit-metric-value money">{{ monthly_profit.actual.gst_collected|format_aud }}</span>
+      </div>
+      <div class="profit-metric">
+        <span class="profit-metric-label">Net Revenue</span>
+        <span class="profit-metric-value money">{{ monthly_profit.actual.net_revenue|format_aud }}</span>
+      </div>
+      <div class="profit-metric">
+        <span class="profit-metric-label">Actual Costs</span>
+        <span class="profit-metric-value money">{{ monthly_profit.actual.actual_costs|format_aud }}</span>
+      </div>
+      <div class="profit-metric profit-metric-highlight">
+        <span class="profit-metric-label">Actual Profit</span>
+        <strong class="profit-metric-value money{% if monthly_profit.actual.actual_profit < 0 %} profit-negative{% endif %}">{{ monthly_profit.actual.actual_profit|format_aud }}</strong>
+      </div>
+      <div class="profit-metric">
+        <span class="profit-metric-label">Actual Margin</span>
+        <span class="profit-margin-badge {{ monthly_profit.actual.actual_margin|margin_badge }}">{{ monthly_profit.actual.actual_margin|format_margin }}</span>
+      </div>
+      <div class="profit-metric">
+        <span class="profit-metric-label">Paid Jobs</span>
+        <span class="profit-metric-value">{{ monthly_profit.actual.paid_jobs }}</span>
+      </div>
     </div>
-    <div class="profit-metric">
-      <span class="profit-metric-label">GST</span>
-      <span class="profit-metric-value money">{{ monthly_profit.gst_amount|format_aud }}</span>
+  </section>
+
+  <section class="profit-section profit-section-outstanding" aria-labelledby="profit-outstanding-heading">
+    <h4 id="profit-outstanding-heading">Outstanding</h4>
+    <div class="profit-metrics-grid profit-summary-grid">
+      <div class="profit-metric profit-metric-highlight">
+        <span class="profit-metric-label">Outstanding Amount</span>
+        <strong class="profit-metric-value money">{{ monthly_profit.outstanding.amount|format_aud }}</strong>
+      </div>
+      <div class="profit-metric">
+        <span class="profit-metric-label">Unpaid invoices</span>
+        <span class="profit-metric-value">{{ monthly_profit.outstanding.count }}</span>
+      </div>
     </div>
-    <div class="profit-metric">
-      <span class="profit-metric-label">Net revenue</span>
-      <span class="profit-metric-value money">{{ monthly_profit.net_revenue|format_aud }}</span>
+  </section>
+
+  <section class="profit-section profit-section-projected" aria-labelledby="profit-projected-heading">
+    <h4 id="profit-projected-heading">Projected / Booked performance</h4>
+    <div class="profit-metrics-grid profit-summary-grid">
+      <div class="profit-metric">
+        <span class="profit-metric-label">Booked Revenue</span>
+        <strong class="profit-metric-value money">{{ monthly_profit.projected.booked_revenue|format_aud }}</strong>
+      </div>
+      <div class="profit-metric">
+        <span class="profit-metric-label">Projected GST</span>
+        <span class="profit-metric-value money">{{ monthly_profit.projected.projected_gst|format_aud }}</span>
+      </div>
+      <div class="profit-metric">
+        <span class="profit-metric-label">Projected Net Revenue</span>
+        <span class="profit-metric-value money">{{ monthly_profit.projected.projected_net_revenue|format_aud }}</span>
+      </div>
+      <div class="profit-metric">
+        <span class="profit-metric-label">Projected Costs</span>
+        <span class="profit-metric-value money">{{ monthly_profit.projected.projected_costs|format_aud }}</span>
+      </div>
+      <div class="profit-metric profit-metric-highlight">
+        <span class="profit-metric-label">Projected Profit</span>
+        <strong class="profit-metric-value money{% if monthly_profit.projected.projected_profit < 0 %} profit-negative{% endif %}">{{ monthly_profit.projected.projected_profit|format_aud }}</strong>
+      </div>
+      <div class="profit-metric">
+        <span class="profit-metric-label">Projected Margin</span>
+        <span class="profit-margin-badge {{ monthly_profit.projected.projected_margin|margin_badge }}">{{ monthly_profit.projected.projected_margin|format_margin }}</span>
+      </div>
+      <div class="profit-metric">
+        <span class="profit-metric-label">Booked Jobs</span>
+        <span class="profit-metric-value">{{ monthly_profit.projected.booked_jobs }}</span>
+      </div>
     </div>
-    <div class="profit-metric">
-      <span class="profit-metric-label">Total costs</span>
-      <span class="profit-metric-value money">{{ monthly_profit.total_costs|format_aud }}</span>
-    </div>
-    <div class="profit-metric profit-metric-highlight">
-      <span class="profit-metric-label">Estimated profit</span>
-      <strong class="profit-metric-value money{% if monthly_profit.estimated_profit < 0 %} profit-negative{% endif %}">{{ monthly_profit.estimated_profit|format_aud }}</strong>
-    </div>
-    <div class="profit-metric">
-      <span class="profit-metric-label">Average margin</span>
-      <span class="profit-margin-badge {{ monthly_profit.average_margin_percent|margin_badge }}">{{ monthly_profit.average_margin_percent|format_margin }}</span>
-    </div>
-  </div>
+  </section>
 </section>
 
 <section class="panel">

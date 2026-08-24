@@ -97,34 +97,108 @@ def paid_on_perth(booking: Dict[str, Any]) -> Optional[date]:
     return dt.astimezone(PERTH_TZ).date()
 
 
-def _is_paid(booking: Dict[str, Any]) -> bool:
+def is_paid_invoice(booking: Dict[str, Any]) -> bool:
     return (
         invoice.normalize_payment_status(booking.get("payment_status"))
         == invoice.PAYMENT_STATUS_PAID
     )
 
 
-def _is_cancelled(booking: Dict[str, Any]) -> bool:
+def is_cancelled_booking(booking: Dict[str, Any]) -> bool:
     return job_status.normalize(booking.get("status")) == "Cancelled"
 
 
-def _invoice_total(booking: Dict[str, Any]) -> float:
+def invoice_total(booking: Dict[str, Any]) -> float:
     return round(float(invoice.calculate_invoice_totals(booking)["total"]), 2)
 
 
-def _period_sales(
-    paid_rows: List[Tuple[int, float, date]], start: date, end: date
+def booking_move_date(booking: Dict[str, Any]) -> Optional[date]:
+    return _parse_iso_date(booking.get("move_date"))
+
+
+def load_unique_bookings() -> List[Dict[str, Any]]:
+    """All bookings, unique by id, with extra charges attached. Read-only."""
+    rows: List[Dict[str, Any]] = []
+    seen = set()
+    for raw in db.list_all():
+        row = dict(raw)
+        try:
+            booking_id = int(row["id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if booking_id in seen:
+            continue
+        seen.add(booking_id)
+        rows.append(row)
+    db.attach_extra_charges(rows)
+    return rows
+
+
+def paid_bookings_in_period(
+    start: date,
+    end: date,
+    rows: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """Paid invoices whose Perth paid_at (or fallback) falls in [start, end]."""
+    if rows is None:
+        rows = load_unique_bookings()
+    matched: List[Dict[str, Any]] = []
+    seen = set()
+    for row in rows:
+        try:
+            booking_id = int(row["id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if booking_id in seen:
+            continue
+        if not is_paid_invoice(row):
+            continue
+        paid_on = paid_on_perth(row)
+        if paid_on is None or not (start <= paid_on <= end):
+            continue
+        seen.add(booking_id)
+        matched.append(row)
+    return matched
+
+
+def paid_sales_in_period(
+    start: date,
+    end: date,
+    rows: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[float, int]:
+    """Invoice-total sum and job count for Paid invoices in the period."""
+    bookings = paid_bookings_in_period(start, end, rows)
+    total = round(sum(invoice_total(row) for row in bookings), 2)
+    return total, len(bookings)
+
+
+def outstanding_invoices(
+    rows: Optional[List[Dict[str, Any]]] = None,
+) -> Tuple[float, int]:
+    """
+    Unpaid invoice total: has an invoice, not Paid, not Cancelled.
+
+    Not period-filtered. Paid invoices are never included.
+    """
+    if rows is None:
+        rows = load_unique_bookings()
     total = 0.0
     count = 0
     seen = set()
-    for booking_id, amount, paid_on in paid_rows:
+    for row in rows:
+        try:
+            booking_id = int(row["id"])
+        except (KeyError, TypeError, ValueError):
+            continue
         if booking_id in seen:
             continue
-        if start <= paid_on <= end:
-            seen.add(booking_id)
-            total += amount
-            count += 1
+        seen.add(booking_id)
+        if is_paid_invoice(row) or is_cancelled_booking(row):
+            continue
+        if not has_invoice(row):
+            continue
+        total += invoice_total(row)
+        count += 1
     return round(total, 2), count
 
 
@@ -149,42 +223,13 @@ def build_sales_summary(today: Optional[date] = None) -> Dict[str, Any]:
     week_start, week_end = week_range(today)
     month_start, month_end = month_range(today)
     fy_start, fy_end = australian_financial_year(today)
+    rows = load_unique_bookings()
 
-    rows = [dict(row) for row in db.list_all()]
-    db.attach_extra_charges(rows)
-
-    paid_rows: List[Tuple[int, float, date]] = []
-    unpaid_total = 0.0
-    unpaid_count = 0
-    seen_ids = set()
-
-    for row in rows:
-        try:
-            booking_id = int(row["id"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        if booking_id in seen_ids:
-            continue
-        seen_ids.add(booking_id)
-
-        if _is_paid(row):
-            paid_on = paid_on_perth(row)
-            if paid_on is None:
-                continue
-            paid_rows.append((booking_id, _invoice_total(row), paid_on))
-            continue
-
-        if _is_cancelled(row):
-            continue
-        if not has_invoice(row):
-            continue
-        unpaid_total += _invoice_total(row)
-        unpaid_count += 1
-
-    today_sales, today_jobs = _period_sales(paid_rows, today, today)
-    week_sales, week_jobs = _period_sales(paid_rows, week_start, week_end)
-    month_sales, month_jobs = _period_sales(paid_rows, month_start, month_end)
-    fy_sales, fy_jobs = _period_sales(paid_rows, fy_start, fy_end)
+    today_sales, today_jobs = paid_sales_in_period(today, today, rows)
+    week_sales, week_jobs = paid_sales_in_period(week_start, week_end, rows)
+    month_sales, month_jobs = paid_sales_in_period(month_start, month_end, rows)
+    fy_sales, fy_jobs = paid_sales_in_period(fy_start, fy_end, rows)
+    unpaid_total, unpaid_count = outstanding_invoices(rows)
 
     return {
         "today": today.isoformat(),
@@ -202,7 +247,7 @@ def build_sales_summary(today: Optional[date] = None) -> Dict[str, Any]:
         "fy_end": fy_end.isoformat(),
         "fy_sales": fy_sales,
         "fy_paid_jobs": fy_jobs,
-        "unpaid_amount": round(unpaid_total, 2),
+        "unpaid_amount": unpaid_total,
         "unpaid_count": unpaid_count,
         "average_job_value": _average_job_value(fy_sales, fy_jobs),
         "average_job_count": fy_jobs,

@@ -544,6 +544,14 @@
     width: 100%;
   }
 
+  .profit-section {
+    padding: 0.75rem 0.7rem 0.2rem;
+  }
+
+  .profit-section h4 {
+    font-size: 0.72rem;
+  }
+
   .dashboard-stats {
     grid-template-columns: 1fr 1fr;
   }

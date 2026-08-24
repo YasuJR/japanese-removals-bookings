@@ -2515,6 +2515,43 @@ a.driver-action-btn {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem 1rem;
+  align-items: flex-end;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.profit-section {
+  margin-top: 0.9rem;
+  padding: 0.85rem 0.9rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.profit-section h4 {
+  margin: 0 0 0.55rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.profit-section-actual {
+  background: #f3f8f4;
+  border-color: #c5d9cc;
+}
+
+.profit-section-outstanding {
+  background: #fdf6f4;
+  border-color: #e8c9c4;
+}
+
+.profit-section-projected {
+  background: #f7f5f0;
+  border-color: #ddd4c4;
+}
+
+.profit-section .profit-summary-grid {
+  margin-bottom: 0.35rem;
+}
   align-items: end;
   margin-bottom: 0.5rem;
 }

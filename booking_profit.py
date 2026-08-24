@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 import database as db
 import invoice
 import job_status
+import sales_dashboard
 
 PROFIT_STATUS_FILTERS = [
     ("all", "All statuses"),
@@ -95,6 +96,13 @@ def profit_margin_percent(revenue: float, estimated_profit: float) -> float:
     return _money(estimated_profit / revenue * 100.0)
 
 
+def net_margin_percent(profit: float, net_revenue: float) -> float:
+    """Actual/Projected margin: profit ÷ net revenue × 100."""
+    if net_revenue <= 0:
+        return 0.0
+    return _money(float(profit) / float(net_revenue) * 100.0)
+
+
 def margin_badge_class(margin_pct: float) -> str:
     if margin_pct >= 30:
         return "profit-margin-high"
@@ -172,7 +180,47 @@ def _month_bounds(month_key: str) -> tuple:
     first = date(int(year), int(month), 1)
     last_day = monthrange(first.year, first.month)[1]
     last = date(first.year, first.month, last_day)
-    return first.isoformat(), last.isoformat()
+    return first, last
+
+
+def _aggregate_profit(bookings: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Sum per-booking profit metrics. Each booking id counted once."""
+    revenue = 0.0
+    gst_amount = 0.0
+    net_revenue = 0.0
+    total_costs = 0.0
+    estimated_profit = 0.0
+    seen = set()
+    jobs = 0
+    for row in bookings:
+        try:
+            booking_id = int(row["id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if booking_id in seen:
+            continue
+        seen.add(booking_id)
+        jobs += 1
+        metrics = calculate_booking_profit(row)
+        revenue += metrics["revenue"]
+        gst_amount += metrics["gst_amount"]
+        net_revenue += metrics["net_revenue"]
+        total_costs += metrics["total_costs"]
+        estimated_profit += metrics["estimated_profit"]
+    paid_revenue = _money(revenue)
+    gst = _money(gst_amount)
+    net = _money(net_revenue)
+    costs = _money(total_costs)
+    profit = _money(estimated_profit)
+    return {
+        "revenue": paid_revenue,
+        "gst_amount": gst,
+        "net_revenue": net,
+        "total_costs": costs,
+        "estimated_profit": profit,
+        "margin_percent": net_margin_percent(profit, net),
+        "job_count": jobs,
+    }
 
 
 def build_monthly_profit_summary(
@@ -181,49 +229,79 @@ def build_monthly_profit_summary(
     status_filter: str = "all",
     paid_only: bool = False,
 ) -> Dict[str, Any]:
+    """
+    Read-only Actual (Paid) vs Projected (Booked) monthly performance.
+
+    Actual uses paid_at in Australia/Perth (same rule as Sales Dashboard).
+    Projected uses move_date. Outstanding is all unpaid invoices, not the month.
+    paid_only is ignored for Actual (always Paid) and kept for Projected if set.
+    """
     start, end = _month_bounds(month_key)
-    rows = [
-        dict(r)
-        for r in db.list_between_dates(start, end)
-        if is_included_in_monthly_summary(
-            dict(r),
+    rows = sales_dashboard.load_unique_bookings()
+
+    actual_bookings = sales_dashboard.paid_bookings_in_period(start, end, rows)
+    actual = _aggregate_profit(actual_bookings)
+
+    projected_bookings = []
+    seen_projected = set()
+    for row in rows:
+        try:
+            booking_id = int(row["id"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if booking_id in seen_projected:
+            continue
+        if not is_included_in_monthly_summary(
+            row,
             status_filter=status_filter,
             paid_only=paid_only,
-        )
-    ]
-    revenue = 0.0
-    gst_amount = 0.0
-    net_revenue = 0.0
-    total_costs = 0.0
-    estimated_profit = 0.0
-    margins: List[float] = []
-    charges_map = db.list_extra_charges_for_bookings(
-        [int(row["id"]) for row in rows if row.get("id")]
-    )
-    for row in rows:
-        row["extra_charges"] = charges_map.get(int(row["id"]), [])
-        metrics = calculate_booking_profit(row)
-        revenue += metrics["revenue"]
-        gst_amount += metrics["gst_amount"]
-        net_revenue += metrics["net_revenue"]
-        total_costs += metrics["total_costs"]
-        estimated_profit += metrics["estimated_profit"]
-        if metrics["revenue"] > 0:
-            margins.append(metrics["profit_margin_percent"])
-    rev = _money(revenue)
-    profit = _money(estimated_profit)
-    avg_margin = _money(sum(margins) / len(margins)) if margins else 0.0
+        ):
+            continue
+        move_on = sales_dashboard.booking_move_date(row)
+        if move_on is None or not (start <= move_on <= end):
+            continue
+        seen_projected.add(booking_id)
+        projected_bookings.append(row)
+    projected = _aggregate_profit(projected_bookings)
+
+    outstanding_amount, outstanding_count = sales_dashboard.outstanding_invoices(rows)
+
+    actual_block = {
+        "paid_revenue": actual["revenue"],
+        "gst_collected": actual["gst_amount"],
+        "net_revenue": actual["net_revenue"],
+        "actual_costs": actual["total_costs"],
+        "actual_profit": actual["estimated_profit"],
+        "actual_margin": actual["margin_percent"],
+        "paid_jobs": actual["job_count"],
+    }
+    projected_block = {
+        "booked_revenue": projected["revenue"],
+        "projected_gst": projected["gst_amount"],
+        "projected_net_revenue": projected["net_revenue"],
+        "projected_costs": projected["total_costs"],
+        "projected_profit": projected["estimated_profit"],
+        "projected_margin": projected["margin_percent"],
+        "booked_jobs": projected["job_count"],
+    }
+    outstanding_block = {
+        "amount": outstanding_amount,
+        "count": outstanding_count,
+    }
     return {
         "month": month_key,
-        "month_start": start,
-        "month_end": end,
-        "booking_count": len(rows),
-        "revenue": rev,
-        "gst_amount": _money(gst_amount),
-        "net_revenue": _money(net_revenue),
-        "total_costs": _money(total_costs),
-        "estimated_profit": profit,
-        "average_margin_percent": avg_margin,
+        "month_start": start.isoformat(),
+        "month_end": end.isoformat(),
+        "actual": actual_block,
+        "projected": projected_block,
+        "outstanding": outstanding_block,
+        "booking_count": projected_block["booked_jobs"],
+        "revenue": projected_block["booked_revenue"],
+        "gst_amount": projected_block["projected_gst"],
+        "net_revenue": projected_block["projected_net_revenue"],
+        "total_costs": projected_block["projected_costs"],
+        "estimated_profit": projected_block["projected_profit"],
+        "average_margin_percent": projected_block["projected_margin"],
         "status_filter": status_filter,
         "paid_only": paid_only,
         "exclude_pending": True,
