@@ -11,8 +11,6 @@
   <a href="{{ url_for('booking_calendar') }}" class="{% if request.endpoint == 'booking_calendar' %}active{% endif %}">Calendar</a>
   <a href="{{ url_for('new_booking') }}" class="nav-new {% if request.endpoint == 'new_booking' %}active{% endif %}">New</a>
   <a href="{{ url_for('crew_schedule') }}" class="{% if request.endpoint in crew_active_endpoints %}active{% endif %}">Crew</a>
-  <a href="{{ url_for('driver') }}" class="{% if request.endpoint in driver_active_endpoints %}active{% endif %}">Driver</a>
-  <a href="{{ url_for('outstanding_invoices') }}" class="{% if request.endpoint == 'outstanding_invoices' %}active{% endif %}">Invoices</a>
   <a href="{{ url_for('search_bookings') }}" class="{% if request.endpoint == 'search_bookings' %}active{% endif %}">Search</a>
   <a href="{{ url_for('settings') }}" class="{% if request.endpoint in settings_active_endpoints %}active{% endif %}">Settings</a>
   <a href="{{ url_for('logout') }}" class="nav-logout">Log out{% if g.user %} ({{ g.user.username }}){% endif %}</a>

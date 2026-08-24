@@ -22,13 +22,13 @@ DESKTOP_PRIMARY = [
     "Calendar",
     "New",
     "Crew",
-    "Driver",
-    "Invoices",
     "Search",
     "Settings",
     "Log out",
 ]
 DESKTOP_REMOVED = [
+    "Driver",
+    "Invoices",
     "Executive",
     "Profit",
     "Automation",
@@ -119,14 +119,13 @@ def test_desktop_nav_shows_primary_items_only():
     client = _admin_client()
     html = client.get("/dashboard").get_data(as_text=True)
     desktop = _extract_nav_block(html, "main-nav main-nav-desktop")
-    labels = _link_labels(desktop)
-    for item in DESKTOP_PRIMARY:
-        assert any(item in label for label in labels), item
+    labels = [label.strip() for label in _link_labels(desktop)]
+    normalized = [
+        "Log out" if label.startswith("Log out") else label for label in labels
+    ]
+    assert normalized == DESKTOP_PRIMARY, normalized
     for item in DESKTOP_REMOVED:
-        assert not any(item == label.strip() for label in labels), item
-    home_idx = next(i for i, label in enumerate(labels) if "Home" in label)
-    logout_idx = next(i for i, label in enumerate(labels) if "Log out" in label)
-    assert home_idx < logout_idx
+        assert item not in normalized, item
     return True
 
 
