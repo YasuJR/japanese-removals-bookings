@@ -111,9 +111,14 @@ def test_inv25_token_is_payment_reference():
     assert invoice_numbering.display_invoice_number(booking) == "INV25"
     assert bank_transfer_match.payment_reference_for_booking(booking) == "INV25"
     assert bank_transfer_match.extract_invoice_tokens("INV25") == ["INV25"]
+    assert bank_transfer_match.extract_invoice_tokens("Inv25") == ["INV25"]
+    assert bank_transfer_match.extract_invoice_tokens("inv25") == ["INV25"]
+    assert bank_transfer_match.extract_invoice_tokens("INV 25") == ["INV25"]
+    assert bank_transfer_match.extract_invoice_tokens("Inv 25") == ["INV25"]
     assert bank_transfer_match.extract_invoice_tokens("Payment INV25 received") == [
         "INV25"
     ]
+    assert bank_transfer_match.extract_invoice_tokens("INV33 INV33") == ["INV33"]
     doc = invoice_pdf.build_invoice_document({**booking, "extra_charges": []})
     assert doc["invoice_number"] == "INV25"
     assert doc["bank"]["payment_reference"] == "INV25"
@@ -268,6 +273,311 @@ def test_unauthenticated_bank_transfers_redirects():
     return True
 
 
+WESTPAC_EXAMPLES = [
+    "* DEPOSIT-OSKO PAYMENT 2217304 Prava Timilsina INV24",
+    "* DEPOSIT-OSKO PAYMENT 2478731 ALEISHA VO INV26",
+    "* DEPOSIT-OSKO PAYMENT 2986170 COBY GODWIN Japanese removals Inv 32 godwin",
+    "* DEPOSIT DENISE LICKFOLD Lickfold Inv25",
+    "* DEPOSIT-OSKO PAYMENT 2842555 JOANNA NG INV33 INV33",
+    "* DEPOSIT-OSKO PAYMENT 2313852 MR SEUNG HUN BAEK INV27 INV27",
+]
+
+
+def test_westpac_description_tokens():
+    expected = ["INV24", "INV26", "INV32", "INV25", "INV33", "INV27"]
+    for narrative, token in zip(WESTPAC_EXAMPLES, expected):
+        got = bank_transfer_match.extract_invoice_tokens(narrative)
+        assert got == [token], "{0} -> {1}".format(narrative, got)
+        empty_ref = bank_transfer_match.extract_invoice_tokens(
+            bank_transfer_match.invoice_search_text(
+                {"reference": "", "description": narrative}
+            )
+        )
+        assert empty_ref == [token]
+    return True
+
+
+def _westpac_csv(rows):
+    """rows: list of (date_ddmmyyyy, narrative, debit, credit)."""
+    lines = [
+        "Bank Account,Date,Narrative,Debit Amount,Credit Amount,Balance,Categories,Serial"
+    ]
+    for date_text, narrative, debit, credit in rows:
+        lines.append(
+            "032-000 123456,{0},{1},{2},{3},1000.00,,".format(
+                date_text, narrative, debit, credit
+            )
+        )
+    return "\n".join(lines) + "\n"
+
+
+def test_westpac_csv_pays_from_narrative():
+    """Westpac Credit in Narrative INV* with matching amount → Paid + Completed."""
+    client = _login_client()
+    booking_id, displayed, total, marker = _create_unpaid_invoice(
+        _next_invoice_number(), 500.00
+    )
+    control_id, _c_disp, _c_total, _c_marker = _create_unpaid_invoice(
+        _next_invoice_number(), 500.00
+    )
+    control_before = dict(db.get_booking(control_id))
+    number = displayed.replace("INV", "")
+    narrative = (
+        "* DEPOSIT-OSKO PAYMENT 2217304 Prava Timilsina INV{0}".format(number)
+    )
+    csv_text = _westpac_csv(
+        [("20/08/2026", narrative, "", "500.00")]
+    )
+    parsed = bank_transfer_match.parse_bank_csv(csv_text)
+    assert len(parsed) == 1
+    assert parsed[0]["reference"] == ""
+    assert parsed[0]["description"] == narrative
+    assert parsed[0]["amount"] == 500.00
+    assert parsed[0]["transaction_date"] == "2026-08-20"
+    resp = _post_csv(client, csv_text)
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    row = dict(db.get_booking(booking_id))
+    assert row["payment_status"] == "Paid"
+    assert row["status"] == "Completed"
+    control_after = dict(db.get_booking(control_id))
+    assert control_after["payment_status"] == control_before["payment_status"]
+    assert control_after["status"] == control_before["status"]
+    return displayed, booking_id
+
+
+def test_westpac_inv_space_and_duplicate_token():
+    _ensure_schema()
+    booking_a, disp_a, _t, _m = _create_unpaid_invoice(_next_invoice_number(), 500.00)
+    booking_b, disp_b, _t2, _m2 = _create_unpaid_invoice(_next_invoice_number(), 500.00)
+    num_a = disp_a.replace("INV", "")
+    num_b = disp_b.replace("INV", "")
+    csv_text = _westpac_csv(
+        [
+            (
+                "21/08/2026",
+                "* DEPOSIT-OSKO PAYMENT 2986170 COBY GODWIN Japanese removals Inv {0} godwin".format(
+                    num_a
+                ),
+                "",
+                "500.00",
+            ),
+            (
+                "22/08/2026",
+                "* DEPOSIT-OSKO PAYMENT 2842555 JOANNA NG INV{0} INV{0}".format(num_b),
+                "",
+                "500.00",
+            ),
+        ]
+    )
+    summary = bank_transfer_match.import_bank_transactions(
+        bank_transfer_match.parse_bank_csv(csv_text)
+    )
+    assert summary["imported"] == 2
+    assert summary["paid"] == 2
+    assert summary["unmatched"] == 0
+    assert dict(db.get_booking(booking_a))["payment_status"] == "Paid"
+    assert dict(db.get_booking(booking_a))["status"] == "Completed"
+    assert dict(db.get_booking(booking_b))["payment_status"] == "Paid"
+    assert dict(db.get_booking(booking_b))["status"] == "Completed"
+    return True
+
+
+def test_westpac_mismatch_and_negative_debit():
+    _ensure_schema()
+    booking_id, displayed, _t, _m = _create_unpaid_invoice(
+        _next_invoice_number(), 500.00
+    )
+    number = displayed.replace("INV", "")
+    csv_text = _westpac_csv(
+        [
+            (
+                "22/08/2026",
+                "* DEPOSIT-OSKO PAYMENT 2313852 MR SEUNG HUN BAEK INV{0} INV{0}".format(
+                    number
+                ),
+                "",
+                "400.00",
+            ),
+            (
+                "23/08/2026",
+                "EFTPOS MERCHANT WESTPAC CARD PURCHASE",
+                "25.00",
+                "",
+            ),
+            (
+                "23/08/2026",
+                "SALARY PAYMENT NO INVOICE TOKEN",
+                "",
+                "120.00",
+            ),
+        ]
+    )
+    summary = bank_transfer_match.import_bank_transactions(
+        bank_transfer_match.parse_bank_csv(csv_text)
+    )
+    assert summary["mismatches"] == 1
+    assert summary["paid"] == 0
+    row = dict(db.get_booking(booking_id))
+    assert row["payment_status"] == "Unpaid"
+    assert row["status"] == "Invoiced"
+    statuses = [item["match_status"] for item in summary["results"]]
+    assert "mismatch" in statuses
+    assert "skipped" in statuses
+    assert "unmatched" in statuses
+    return True
+
+
+def test_rematch_unmatched_westpac_rows_in_place():
+    """Previously unmatched Description rows can be re-matched without delete."""
+    _ensure_schema()
+    booking_id, displayed, _t, marker = _create_unpaid_invoice(
+        _next_invoice_number(), 500.00
+    )
+    control_id, _c, _ct, _cm = _create_unpaid_invoice(_next_invoice_number(), 500.00)
+    control_before = dict(db.get_booking(control_id))
+    number = displayed.replace("INV", "")
+    description = (
+        "* DEPOSIT DENISE LICKFOLD Lickfold Inv{0}".format(number)
+    )
+    parsed = {
+        "transaction_date": "2026-08-21",
+        "description": description,
+        "reference": "",
+        "amount": 500.00,
+    }
+    fingerprint = bank_transfer_match.fingerprint_for(
+        parsed["transaction_date"],
+        parsed["description"],
+        parsed["reference"],
+        parsed["amount"],
+    )
+    txn_id = db.insert_bank_transaction(
+        {
+            "fingerprint": fingerprint,
+            "transaction_date": parsed["transaction_date"],
+            "description": parsed["description"],
+            "reference": parsed["reference"],
+            "amount": parsed["amount"],
+            "match_status": "unmatched",
+            "message": "No invoice number in Reference.",
+        }
+    )
+    before_count = db.count_bank_transactions()
+    assert dict(db.get_booking(booking_id))["payment_status"] == "Unpaid"
+
+    summary = bank_transfer_match.rematch_unmatched_transactions()
+    assert summary["rematched"] >= 1
+    assert summary["paid"] >= 1
+    row = dict(db.get_booking(booking_id))
+    assert row["payment_status"] == "Paid"
+    assert row["status"] == "Completed"
+    stored = db.get_bank_transaction_by_fingerprint(fingerprint)
+    assert stored is not None
+    assert int(stored["id"]) == int(txn_id)
+    assert stored["match_status"] == "paid"
+    assert stored["invoice_token"] == displayed
+    assert db.count_bank_transactions() == before_count
+    control_after = dict(db.get_booking(control_id))
+    assert control_after["payment_status"] == control_before["payment_status"]
+    assert control_after["status"] == control_before["status"]
+
+    again = bank_transfer_match.import_bank_transactions([parsed])
+    assert again["skipped"] == 1
+    assert again["imported"] == 0
+    assert dict(db.get_booking(booking_id)).get("payment_status") == "Paid"
+    assert db.count_bank_transactions() == before_count
+    return True
+
+
+def test_reimport_rematches_unmatched_without_duplicate_row():
+    _ensure_schema()
+    booking_id, displayed, _t, _m = _create_unpaid_invoice(
+        _next_invoice_number(), 500.00
+    )
+    number = displayed.replace("INV", "")
+    narrative = "* DEPOSIT-OSKO PAYMENT 2478731 ALEISHA VO INV{0}".format(number)
+    parsed = {
+        "transaction_date": "2026-08-20",
+        "description": narrative,
+        "reference": "",
+        "amount": 500.00,
+    }
+    fingerprint = bank_transfer_match.fingerprint_for(
+        parsed["transaction_date"],
+        parsed["description"],
+        parsed["reference"],
+        parsed["amount"],
+    )
+    txn_id = db.insert_bank_transaction(
+        {
+            "fingerprint": fingerprint,
+            "transaction_date": parsed["transaction_date"],
+            "description": parsed["description"],
+            "reference": parsed["reference"],
+            "amount": parsed["amount"],
+            "match_status": "unmatched",
+            "message": "No invoice number in Reference.",
+        }
+    )
+    csv_text = _westpac_csv([("20/08/2026", narrative, "", "500.00")])
+    summary = bank_transfer_match.import_bank_transactions(
+        bank_transfer_match.parse_bank_csv(csv_text)
+    )
+    assert summary["imported"] == 0
+    assert summary["rematched"] == 1
+    assert summary["paid"] == 1
+    stored = db.get_bank_transaction_by_fingerprint(fingerprint)
+    assert int(stored["id"]) == int(txn_id)
+    assert stored["match_status"] == "paid"
+    assert dict(db.get_booking(booking_id))["payment_status"] == "Paid"
+    assert dict(db.get_booking(booking_id))["status"] == "Completed"
+    return True
+
+
+def test_rematch_button_on_bank_transfers_page():
+    client = _login_client()
+    booking_id, displayed, _t, _m = _create_unpaid_invoice(
+        _next_invoice_number(), 500.00
+    )
+    number = displayed.replace("INV", "")
+    description = "* DEPOSIT-OSKO PAYMENT 2313852 MR SEUNG HUN BAEK INV{0} INV{0}".format(
+        number
+    )
+    parsed = {
+        "transaction_date": "2026-08-22",
+        "description": description,
+        "reference": "",
+        "amount": 500.00,
+    }
+    db.insert_bank_transaction(
+        {
+            "fingerprint": bank_transfer_match.fingerprint_for(
+                parsed["transaction_date"],
+                parsed["description"],
+                parsed["reference"],
+                parsed["amount"],
+            ),
+            **parsed,
+            "match_status": "unmatched",
+            "message": "No invoice number in Reference.",
+        }
+    )
+    page = client.get("/settings/bank-transfers")
+    html = page.get_data(as_text=True)
+    assert "Re-match unmatched" in html
+    resp = client.post(
+        "/settings/bank-transfers",
+        data={"action": "rematch_unmatched"},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert "Re-matched" in resp.get_data(as_text=True)
+    row = dict(db.get_booking(booking_id))
+    assert row["payment_status"] == "Paid"
+    assert row["status"] == "Completed"
+    return True
+
+
 def main():
     tests = [
         ("inv25_token_payment_reference", test_inv25_token_is_payment_reference),
@@ -278,6 +588,13 @@ def main():
         ("mismatch_then_match", test_mismatch_then_matching_amount_pays),
         ("settings_bank_transfers_page", test_settings_and_bank_transfers_pages),
         ("unauthenticated_redirect", test_unauthenticated_bank_transfers_redirects),
+        ("westpac_description_tokens", test_westpac_description_tokens),
+        ("westpac_csv_pays_from_narrative", test_westpac_csv_pays_from_narrative),
+        ("westpac_inv_space_and_duplicate", test_westpac_inv_space_and_duplicate_token),
+        ("westpac_mismatch_and_negative", test_westpac_mismatch_and_negative_debit),
+        ("rematch_unmatched_in_place", test_rematch_unmatched_westpac_rows_in_place),
+        ("reimport_rematches_unmatched", test_reimport_rematches_unmatched_without_duplicate_row),
+        ("rematch_button", test_rematch_button_on_bank_transfers_page),
     ]
     failed = 0
     for name, fn in tests:

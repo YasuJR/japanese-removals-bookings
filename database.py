@@ -1958,12 +1958,16 @@ def find_bookings_by_invoice_display(display: str) -> List[Dict[str, Any]]:
 
 
 def bank_transaction_exists(fingerprint: str) -> bool:
+    return get_bank_transaction_by_fingerprint(fingerprint) is not None
+
+
+def get_bank_transaction_by_fingerprint(fingerprint: str) -> Optional[Dict[str, Any]]:
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT id FROM bank_transactions WHERE fingerprint = ?",
+            "SELECT * FROM bank_transactions WHERE fingerprint = ?",
             ((fingerprint or "").strip(),),
         ).fetchone()
-    return row is not None
+    return dict(row) if row else None
 
 
 def insert_bank_transaction(fields: Dict[str, Any]) -> int:
@@ -1991,6 +1995,48 @@ def insert_bank_transaction(fields: Dict[str, Any]) -> int:
         )
         conn.commit()
         return int(cursor.lastrowid)
+
+
+def update_bank_transaction(txn_id: int, fields: Dict[str, Any]) -> bool:
+    """Update match fields on an existing bank row. Never deletes the row."""
+    allowed = {
+        "match_status",
+        "matched_booking_id",
+        "invoice_total",
+        "invoice_token",
+        "message",
+    }
+    assignments = []
+    params: List[Any] = []
+    for key, value in fields.items():
+        if key not in allowed:
+            continue
+        assignments.append("{0} = ?".format(key))
+        params.append(value)
+    if not assignments:
+        return False
+    params.append(int(txn_id))
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "UPDATE bank_transactions SET {0} WHERE id = ?".format(
+                ", ".join(assignments)
+            ),
+            params,
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def count_bank_transactions(match_status: str = "") -> int:
+    sql = "SELECT COUNT(*) AS n FROM bank_transactions"
+    params: List[Any] = []
+    status = (match_status or "").strip()
+    if status:
+        sql += " WHERE match_status = ?"
+        params.append(status)
+    with get_connection() as conn:
+        row = conn.execute(sql, params).fetchone()
+    return int(row["n"] if row else 0)
 
 
 def list_bank_transactions(

@@ -13,7 +13,8 @@ import database as db
 import invoice
 import invoice_numbering
 
-INV_TOKEN_RE = re.compile(r"INV-?\d+", re.I)
+# INV / Inv / inv, optional spaces or hyphen, then digits. Case-insensitive.
+INV_TOKEN_RE = re.compile(r"INV[\s-]*(\d+)", re.I)
 AMOUNT_RE = re.compile(r"-?\d+(?:[.,]\d{1,2})?")
 
 STATUS_PAID = "paid"
@@ -58,14 +59,24 @@ def payment_reference_for_booking(booking: Dict[str, Any]) -> str:
 
 
 def extract_invoice_tokens(text: str) -> List[str]:
+    """Unique INV{n} tokens from text (case-insensitive, optional space)."""
     found = []
     seen = set()
-    for raw in INV_TOKEN_RE.findall(text or ""):
-        formatted = invoice_numbering.format_invoice_number(raw)
-        if formatted and formatted not in seen:
+    for match in INV_TOKEN_RE.finditer(text or ""):
+        formatted = "INV{0}".format(int(match.group(1)))
+        if formatted not in seen:
             seen.add(formatted)
             found.append(formatted)
     return found
+
+
+def invoice_search_text(parsed: Dict[str, Any]) -> str:
+    """Combine Reference and Description so Westpac Narrative can be matched."""
+    parts = [
+        str(parsed.get("reference") or "").strip(),
+        str(parsed.get("description") or "").strip(),
+    ]
+    return " ".join(part for part in parts if part)
 
 
 def parse_amount(value: Any) -> Optional[float]:
@@ -208,9 +219,8 @@ def _amounts_match(bank_amount: float, invoice_total: float) -> bool:
 
 def match_bank_transaction(parsed: Dict[str, Any]) -> Dict[str, Any]:
     """Return match fields for one imported bank row. Does not write bookings."""
-    reference = str(parsed.get("reference") or "")
     amount = round(float(parsed.get("amount") or 0), 2)
-    tokens = extract_invoice_tokens(reference)
+    tokens = extract_invoice_tokens(invoice_search_text(parsed))
     result = {
         "invoice_token": tokens[0] if tokens else "",
         "match_status": STATUS_UNMATCHED,
@@ -223,7 +233,7 @@ def match_bank_transaction(parsed: Dict[str, Any]) -> Dict[str, Any]:
         result["match_status"] = STATUS_SKIPPED
         return result
     if not tokens:
-        result["message"] = "No invoice number in Reference."
+        result["message"] = "No invoice number in Reference or Description."
         return result
 
     bookings: List[Dict[str, Any]] = []
@@ -289,12 +299,41 @@ def apply_paid_if_matched(match: Dict[str, Any]) -> bool:
     return True
 
 
+def _match_fields(match: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "match_status": match.get("match_status") or STATUS_UNMATCHED,
+        "matched_booking_id": match.get("matched_booking_id"),
+        "invoice_total": match.get("invoice_total"),
+        "invoice_token": match.get("invoice_token") or "",
+        "message": match.get("message") or "",
+    }
+
+
+def _apply_and_store_existing(txn_id: int, parsed: Dict[str, Any]) -> Dict[str, Any]:
+    """Re-match an existing unmatched row in place. Does not insert or delete."""
+    match = match_bank_transaction(parsed)
+    marked_paid = apply_paid_if_matched(match)
+    db.update_bank_transaction(int(txn_id), _match_fields(match))
+    return {**parsed, **match, "marked_paid": marked_paid, "id": int(txn_id)}
+
+
+def _increment_status(paid: int, mismatches: int, unmatched: int, status: str):
+    if status == STATUS_PAID:
+        return paid + 1, mismatches, unmatched
+    if status == STATUS_MISMATCH:
+        return paid, mismatches + 1, unmatched
+    if status == STATUS_UNMATCHED:
+        return paid, mismatches, unmatched + 1
+    return paid, mismatches, unmatched
+
+
 def import_bank_transactions(parsed_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     imported = 0
     skipped = 0
     paid = 0
     mismatches = 0
     unmatched = 0
+    rematched = 0
     results: List[Dict[str, Any]] = []
     for parsed in parsed_rows:
         fingerprint = fingerprint_for(
@@ -303,15 +342,25 @@ def import_bank_transactions(parsed_rows: List[Dict[str, Any]]) -> Dict[str, Any
             parsed["reference"],
             parsed["amount"],
         )
-        if db.bank_transaction_exists(fingerprint):
-            skipped += 1
-            results.append(
-                {
-                    **parsed,
-                    "match_status": STATUS_SKIPPED,
-                    "message": "Already imported.",
-                }
-            )
+        existing = db.get_bank_transaction_by_fingerprint(fingerprint)
+        if existing:
+            current_status = (existing.get("match_status") or "").strip()
+            if current_status == STATUS_UNMATCHED:
+                stored = _apply_and_store_existing(int(existing["id"]), parsed)
+                rematched += 1
+                paid, mismatches, unmatched = _increment_status(
+                    paid, mismatches, unmatched, stored["match_status"]
+                )
+                results.append(stored)
+            else:
+                skipped += 1
+                results.append(
+                    {
+                        **parsed,
+                        "match_status": STATUS_SKIPPED,
+                        "message": "Already imported.",
+                    }
+                )
             continue
         match = match_bank_transaction(parsed)
         marked_paid = apply_paid_if_matched(match)
@@ -322,20 +371,13 @@ def import_bank_transactions(parsed_rows: List[Dict[str, Any]]) -> Dict[str, Any
                 "description": parsed["description"],
                 "reference": parsed["reference"],
                 "amount": parsed["amount"],
-                "match_status": match["match_status"],
-                "matched_booking_id": match.get("matched_booking_id"),
-                "invoice_total": match.get("invoice_total"),
-                "invoice_token": match.get("invoice_token") or "",
-                "message": match.get("message") or "",
+                **_match_fields(match),
             }
         )
         imported += 1
-        if match["match_status"] == STATUS_PAID:
-            paid += 1
-        elif match["match_status"] == STATUS_MISMATCH:
-            mismatches += 1
-        elif match["match_status"] == STATUS_UNMATCHED:
-            unmatched += 1
+        paid, mismatches, unmatched = _increment_status(
+            paid, mismatches, unmatched, match["match_status"]
+        )
         results.append({**parsed, **match, "marked_paid": marked_paid})
     return {
         "imported": imported,
@@ -343,6 +385,45 @@ def import_bank_transactions(parsed_rows: List[Dict[str, Any]]) -> Dict[str, Any
         "paid": paid,
         "mismatches": mismatches,
         "unmatched": unmatched,
+        "rematched": rematched,
+        "results": results,
+    }
+
+
+def rematch_unmatched_transactions() -> Dict[str, Any]:
+    """Re-run matching on unmatched rows only. Never deletes bank_transactions."""
+    rows = db.list_bank_transactions(match_status=STATUS_UNMATCHED, limit=2000)
+    paid = 0
+    mismatches = 0
+    unmatched = 0
+    skipped = 0
+    rematched = 0
+    results: List[Dict[str, Any]] = []
+    for row in rows:
+        parsed = {
+            "transaction_date": row.get("transaction_date") or "",
+            "description": row.get("description") or "",
+            "reference": row.get("reference") or "",
+            "amount": row.get("amount") or 0,
+        }
+        stored = _apply_and_store_existing(int(row["id"]), parsed)
+        rematched += 1
+        if stored["match_status"] == STATUS_PAID:
+            paid += 1
+        elif stored["match_status"] == STATUS_MISMATCH:
+            mismatches += 1
+        elif stored["match_status"] == STATUS_UNMATCHED:
+            unmatched += 1
+        elif stored["match_status"] == STATUS_SKIPPED:
+            skipped += 1
+        results.append(stored)
+    return {
+        "imported": 0,
+        "skipped": skipped,
+        "paid": paid,
+        "mismatches": mismatches,
+        "unmatched": unmatched,
+        "rematched": rematched,
         "results": results,
     }
 

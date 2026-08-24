@@ -960,6 +960,20 @@ def sms_settings():
 @auth.login_required
 def bank_transfers():
     if request.method == "POST":
+        action = (request.form.get("action") or "import").strip()
+        if action == "rematch_unmatched":
+            summary = bank_transfer_match.rematch_unmatched_transactions()
+            flash(
+                "Re-matched {rematched} unmatched transaction(s): {paid} paid, "
+                "{mismatches} mismatch, {unmatched} still unmatched.".format(
+                    rematched=summary["rematched"],
+                    paid=summary["paid"],
+                    mismatches=summary["mismatches"],
+                    unmatched=summary["unmatched"],
+                ),
+                "warning" if summary["mismatches"] else "success",
+            )
+            return redirect(url_for("bank_transfers"))
         upload = request.files.get("csv_file")
         if upload is None or not (upload.filename or "").strip():
             flash("Choose a CSV file to import.", "error")
@@ -976,21 +990,24 @@ def bank_transfers():
         flash(
             "Imported {imported} transaction(s): {paid} paid, "
             "{mismatches} mismatch, {unmatched} unmatched, "
-            "{skipped} skipped (already processed).".format(
+            "{rematched} re-matched, {skipped} skipped (already processed).".format(
                 imported=summary["imported"],
                 paid=summary["paid"],
                 mismatches=summary["mismatches"],
                 unmatched=summary["unmatched"],
+                rematched=summary.get("rematched") or 0,
                 skipped=summary["skipped"],
             ),
             "warning" if summary["mismatches"] else "success",
         )
         return redirect(url_for("bank_transfers"))
 
+    unmatched_count = db.count_bank_transactions(match_status="unmatched")
     return render_template(
         "bank_transfers.html",
         transactions=db.list_bank_transactions(limit=100),
         import_summary=None,
+        unmatched_count=unmatched_count,
     )
 
 

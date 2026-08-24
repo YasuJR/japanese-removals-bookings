@@ -5,17 +5,36 @@
 <section class="panel">
   <h2>Bank transfers</h2>
   <p class="hint">
-    Import a bank CSV. When Reference contains an Invoice Number such as INV25
-    and the amount matches the invoice total, the invoice is marked Paid
-    and the booking becomes Completed. Amount mismatches stay unpaid and show
-    as Payment mismatch on the Dashboard.
+    Import a Westpac (or other bank) CSV. Invoice numbers are read from
+    <strong>Description / Narrative</strong> and Reference. Formats such as
+    INV25, Inv25, inv25, INV 25, and Inv 25 all match. When the credit amount
+    equals the invoice total, the invoice is marked Paid and the booking
+    becomes Completed. Amount mismatches stay unpaid and show as Payment
+    mismatch on the Dashboard.
   </p>
-  <p class="hint">Required columns: Transaction date, Description, Reference, Amount.</p>
+  <p class="hint">
+    Westpac columns: Date, Narrative, Debit Amount, Credit Amount.
+    Generic CSVs may use Transaction date, Description, Reference, Amount.
+  </p>
 
   <form method="post" enctype="multipart/form-data" class="search-bar">
+    <input type="hidden" name="action" value="import">
     <input type="file" name="csv_file" accept=".csv,text/csv" required>
     <button type="submit" class="btn-primary">Import CSV</button>
   </form>
+
+  {% if unmatched_count %}
+  <form method="post" class="search-bar" style="margin-top: 0.75rem;">
+    <input type="hidden" name="action" value="rematch_unmatched">
+    <button type="submit" class="btn-secondary">
+      Re-match unmatched ({{ unmatched_count }})
+    </button>
+  </form>
+  <p class="hint">
+    Re-matching updates unmatched rows in place. It does not delete bank
+    transactions or change invoices that have no matching credit.
+  </p>
+  {% endif %}
 </section>
 
 {% if import_summary %}
@@ -24,6 +43,7 @@
   <p>
     Imported {{ import_summary.imported }},
     skipped {{ import_summary.skipped }} (already processed),
+    re-matched {{ import_summary.rematched or 0 }},
     paid {{ import_summary.paid }},
     mismatch {{ import_summary.mismatches }},
     unmatched {{ import_summary.unmatched }}.
