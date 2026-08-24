@@ -263,6 +263,7 @@ def init_db() -> None:
             try:
                 for ddl in db_backend.postgres_ddl():
                     conn.execute(ddl)
+                _ensure_bank_transactions_table(conn)
                 _ensure_columns(conn)
                 _ensure_staff_columns(conn)
                 _ensure_invoice_sequence(conn)
@@ -433,6 +434,7 @@ def init_db() -> None:
             )
             """
         )
+        _ensure_bank_transactions_table(conn)
         _ensure_columns(conn)
         _ensure_staff_columns(conn)
         _ensure_invoice_sequence(conn)
@@ -470,6 +472,48 @@ def complete_existing_paid_jobs() -> int:
         return int(cursor.rowcount or 0)
 
 
+def _ensure_bank_transactions_table(conn) -> None:
+    """Create bank_transactions if missing. Never drops or rewrites booking data."""
+    if db_backend.is_postgres():
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bank_transactions (
+                id SERIAL PRIMARY KEY,
+                fingerprint TEXT NOT NULL UNIQUE,
+                transaction_date TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                reference TEXT NOT NULL DEFAULT '',
+                amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+                match_status TEXT NOT NULL DEFAULT 'unmatched',
+                matched_booking_id INTEGER,
+                invoice_total DOUBLE PRECISION,
+                invoice_token TEXT NOT NULL DEFAULT '',
+                message TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+    else:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bank_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fingerprint TEXT NOT NULL UNIQUE,
+                transaction_date TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                reference TEXT NOT NULL DEFAULT '',
+                amount REAL NOT NULL DEFAULT 0,
+                match_status TEXT NOT NULL DEFAULT 'unmatched',
+                matched_booking_id INTEGER,
+                invoice_total REAL,
+                invoice_token TEXT NOT NULL DEFAULT '',
+                message TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """
+        )
+
+
 def _ensure_indexes(conn) -> None:
     for sql in (
         "CREATE INDEX IF NOT EXISTS idx_bookings_move_date ON bookings(move_date)",
@@ -477,6 +521,10 @@ def _ensure_indexes(conn) -> None:
         (
             "CREATE INDEX IF NOT EXISTS idx_booking_extra_charges_booking_id "
             "ON booking_extra_charges(booking_id)"
+        ),
+        (
+            "CREATE INDEX IF NOT EXISTS idx_bank_transactions_status "
+            "ON bank_transactions(match_status)"
         ),
     ):
         conn.execute(sql)
@@ -1882,3 +1930,81 @@ def mark_lead_converted(lead_id: int, booking_id: int) -> bool:
         )
         conn.commit()
         return cursor.rowcount > 0
+
+
+def find_bookings_by_invoice_display(display: str) -> List[Dict[str, Any]]:
+    """Find bookings whose displayed invoice number matches INV{n}. Read-only."""
+    num = invoice_numbering.numeric_sequence_value(display)
+    if num <= 0:
+        return []
+    variants = [
+        str(num),
+        "INV{0}".format(num),
+        "INV-{0}".format(num),
+        "inv{0}".format(num),
+        "inv-{0}".format(num),
+        "INV-{0:04d}".format(num),
+        "INV{0:04d}".format(num),
+    ]
+    placeholders = ",".join("?" * len(variants))
+    sql = (
+        "SELECT * FROM bookings WHERE invoice_number IN ({0}) "
+        "OR ((invoice_number IS NULL OR TRIM(COALESCE(invoice_number, '')) = '') "
+        "AND id = ?)"
+    ).format(placeholders)
+    with get_connection() as conn:
+        rows = conn.execute(sql, variants + [num]).fetchall()
+    return [dict(row) for row in rows]
+
+
+def bank_transaction_exists(fingerprint: str) -> bool:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM bank_transactions WHERE fingerprint = ?",
+            ((fingerprint or "").strip(),),
+        ).fetchone()
+    return row is not None
+
+
+def insert_bank_transaction(fields: Dict[str, Any]) -> int:
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO bank_transactions (
+                fingerprint, transaction_date, description, reference, amount,
+                match_status, matched_booking_id, invoice_total, invoice_token,
+                message
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                (fields.get("fingerprint") or "").strip(),
+                (fields.get("transaction_date") or "").strip(),
+                (fields.get("description") or "").strip(),
+                (fields.get("reference") or "").strip(),
+                float(fields.get("amount") or 0),
+                (fields.get("match_status") or "unmatched").strip(),
+                fields.get("matched_booking_id"),
+                fields.get("invoice_total"),
+                (fields.get("invoice_token") or "").strip(),
+                (fields.get("message") or "").strip(),
+            ),
+        )
+        conn.commit()
+        return int(cursor.lastrowid)
+
+
+def list_bank_transactions(
+    match_status: str = "",
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
+    sql = "SELECT * FROM bank_transactions"
+    params: List[Any] = []
+    status = (match_status or "").strip()
+    if status:
+        sql += " WHERE match_status = ?"
+        params.append(status)
+    sql += " ORDER BY id DESC LIMIT ?"
+    params.append(int(limit))
+    with get_connection() as conn:
+        rows = conn.execute(sql, params).fetchall()
+    return [dict(row) for row in rows]

@@ -144,6 +144,9 @@ def build_dashboard(today: date = None) -> Dict[str, Any]:
             week_start_iso, week_end_iso
         ),
         "upcoming_jobs": db.list_upcoming(today_iso),
+        "payment_mismatches": db.list_bank_transactions(
+            match_status="mismatch", limit=20
+        ),
     }
 
 

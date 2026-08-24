@@ -63,6 +63,7 @@ SETTINGS_ADMIN_LINKS = [
     "Open Leads",
     "Upcoming list",
     "All bookings",
+    "Bank transfers",
 ]
 ROUTE_CHECKS = [
     ("/", "ceo_dashboard"),
@@ -74,6 +75,7 @@ ROUTE_CHECKS = [
     ("/invoices", "outstanding_invoices"),
     ("/bookings/search", "search_bookings"),
     ("/settings", "settings"),
+    ("/settings/bank-transfers", "bank_transfers"),
     ("/executive", "executive_dashboard"),
     ("/profit", "profit"),
     ("/automation", "automation_hub"),

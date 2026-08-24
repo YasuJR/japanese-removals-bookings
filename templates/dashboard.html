@@ -6,6 +6,24 @@
   <h2>Dashboard</h2>
   <p class="hint">Overview for Perth operations · {{ dash.today }}</p>
 
+  {% if dash.payment_mismatches %}
+  <ul class="crew-warnings" role="alert">
+    {% for item in dash.payment_mismatches %}
+    <li>
+      Payment mismatch
+      · {{ item.invoice_token or item.reference or 'Invoice' }}
+      · bank {{ item.amount|format_aud }}
+      {% if item.invoice_total is not none %}
+      vs invoice {{ item.invoice_total|format_aud }}
+      {% endif %}
+      {% if item.matched_booking_id %}
+      · <a href="{{ url_for('edit_booking', booking_id=item.matched_booking_id) }}">Booking #{{ item.matched_booking_id }}</a>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
   <div class="dashboard-stats">
     <article class="stat-card">
       <h3>Today</h3>

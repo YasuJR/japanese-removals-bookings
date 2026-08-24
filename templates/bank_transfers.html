@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Bank transfers{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Bank transfers</h2>
+  <p class="hint">
+    Import a bank CSV. When Reference contains an Invoice Number such as INV25
+    and the amount matches the invoice total, the invoice is marked Paid
+    and the booking becomes Completed. Amount mismatches stay unpaid and show
+    as Payment mismatch on the Dashboard.
+  </p>
+  <p class="hint">Required columns: Transaction date, Description, Reference, Amount.</p>
+
+  <form method="post" enctype="multipart/form-data" class="search-bar">
+    <input type="file" name="csv_file" accept=".csv,text/csv" required>
+    <button type="submit" class="btn-primary">Import CSV</button>
+  </form>
+</section>
+
+{% if import_summary %}
+<section class="panel">
+  <h3>Last import</h3>
+  <p>
+    Imported {{ import_summary.imported }},
+    skipped {{ import_summary.skipped }} (already processed),
+    paid {{ import_summary.paid }},
+    mismatch {{ import_summary.mismatches }},
+    unmatched {{ import_summary.unmatched }}.
+  </p>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h3>Recent bank transactions</h3>
+  {% if transactions %}
+  <div class="table-scroll">
+    <table class="sheet">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Reference</th>
+          <th>Description</th>
+          <th>Amount</th>
+          <th>Match</th>
+          <th>Invoice</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in transactions %}
+        <tr>
+          <td>{{ row.transaction_date }}</td>
+          <td>{{ row.reference }}</td>
+          <td>{{ row.description }}</td>
+          <td>{{ row.amount|format_aud }}</td>
+          <td>{{ row.match_status }}</td>
+          <td>
+            {% if row.matched_booking_id %}
+            <a href="{{ url_for('edit_booking', booking_id=row.matched_booking_id) }}">{{ row.invoice_token }}</a>
+            {% else %}
+            {{ row.invoice_token or '—' }}
+            {% endif %}
+          </td>
+          <td>{{ row.message }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty muted">No bank transactions imported yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -89,6 +89,7 @@ from display_dates import format_display_date, get_weekday_class
 import automation
 import invoice
 import invoice_numbering
+import bank_transfer_match
 from validators import parse_booking_form
 
 app = Flask(__name__)
@@ -952,6 +953,44 @@ def sms_settings():
         automation_logs=automation.recent_logs(
             30, automation_types=automation.SMS_AUTOMATION_TYPES
         ),
+    )
+
+
+@app.route("/settings/bank-transfers", methods=["GET", "POST"])
+@auth.login_required
+def bank_transfers():
+    if request.method == "POST":
+        upload = request.files.get("csv_file")
+        if upload is None or not (upload.filename or "").strip():
+            flash("Choose a CSV file to import.", "error")
+            return redirect(url_for("bank_transfers"))
+        raw = upload.read() or b""
+        if len(raw) > 5 * 1024 * 1024:
+            flash("CSV file is too large (max 5 MB).", "error")
+            return redirect(url_for("bank_transfers"))
+        parsed = bank_transfer_match.parse_bank_csv_bytes(raw)
+        if not parsed:
+            flash("No bank transactions found in that CSV.", "error")
+            return redirect(url_for("bank_transfers"))
+        summary = bank_transfer_match.import_bank_transactions(parsed)
+        flash(
+            "Imported {imported} transaction(s): {paid} paid, "
+            "{mismatches} mismatch, {unmatched} unmatched, "
+            "{skipped} skipped (already processed).".format(
+                imported=summary["imported"],
+                paid=summary["paid"],
+                mismatches=summary["mismatches"],
+                unmatched=summary["unmatched"],
+                skipped=summary["skipped"],
+            ),
+            "warning" if summary["mismatches"] else "success",
+        )
+        return redirect(url_for("bank_transfers"))
+
+    return render_template(
+        "bank_transfers.html",
+        transactions=db.list_bank_transactions(limit=100),
+        import_summary=None,
     )
 
 
@@ -2481,6 +2520,7 @@ if __name__ == "__main__":
         "sms_settings",
         "review_settings",
         "gmail_settings",
+        "bank_transfers",
     ):
         if name not in app.view_functions:
             raise RuntimeError("Missing route endpoint: {0}".format(name))

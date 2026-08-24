@@ -459,4 +459,20 @@ def postgres_ddl() -> List[str]:
             next_number INTEGER NOT NULL DEFAULT 1
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS bank_transactions (
+            id SERIAL PRIMARY KEY,
+            fingerprint TEXT NOT NULL UNIQUE,
+            transaction_date TEXT NOT NULL DEFAULT '',
+            description TEXT NOT NULL DEFAULT '',
+            reference TEXT NOT NULL DEFAULT '',
+            amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+            match_status TEXT NOT NULL DEFAULT 'unmatched',
+            matched_booking_id INTEGER,
+            invoice_total DOUBLE PRECISION,
+            invoice_token TEXT NOT NULL DEFAULT '',
+            message TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
     ]
