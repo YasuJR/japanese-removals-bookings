@@ -121,6 +121,12 @@ def week_range(today: date) -> tuple:
     return monday, sunday
 
 
+def _sales_summary(today: date) -> Dict[str, Any]:
+    import sales_dashboard
+
+    return sales_dashboard.build_sales_summary(today)
+
+
 def build_dashboard(today: date = None) -> Dict[str, Any]:
     if today is None:
         today = date.today()
@@ -147,6 +153,7 @@ def build_dashboard(today: date = None) -> Dict[str, Any]:
         "payment_mismatches": db.list_bank_transactions(
             match_status="mismatch", limit=20
         ),
+        "sales": _sales_summary(today),
     }
 
 

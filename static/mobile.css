@@ -548,6 +548,14 @@
     grid-template-columns: 1fr 1fr;
   }
 
+  .sales-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sales-stats .stat-value {
+    font-size: 1.15rem;
+  }
+
   .paste-enquiry-text {
     font-size: 16px;
   }

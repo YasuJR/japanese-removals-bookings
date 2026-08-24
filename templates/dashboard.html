@@ -24,6 +24,40 @@
   </ul>
   {% endif %}
 
+  <h3 class="sales-heading">Sales</h3>
+  <div class="dashboard-stats sales-stats">
+    <article class="stat-card">
+      <h3>Today Sales</h3>
+      <p class="stat-value">{{ dash.sales.today_sales|format_aud }}</p>
+      <p class="stat-label">{{ dash.sales.today_paid_jobs }} paid job{% if dash.sales.today_paid_jobs != 1 %}s{% endif %}</p>
+    </article>
+    <article class="stat-card">
+      <h3>This Week Sales</h3>
+      <p class="stat-value">{{ dash.sales.week_sales|format_aud }}</p>
+      <p class="stat-label">{{ dash.sales.week_start }} – {{ dash.sales.week_end }}</p>
+    </article>
+    <article class="stat-card">
+      <h3>This Month Sales</h3>
+      <p class="stat-value">{{ dash.sales.month_sales|format_aud }}</p>
+      <p class="stat-label">{{ dash.sales.month_start }} – {{ dash.sales.month_end }}</p>
+    </article>
+    <article class="stat-card">
+      <h3>Financial Year Sales</h3>
+      <p class="stat-value">{{ dash.sales.fy_sales|format_aud }}</p>
+      <p class="stat-label">{{ dash.sales.fy_start }} – {{ dash.sales.fy_end }}</p>
+    </article>
+    <article class="stat-card stat-card-unpaid">
+      <h3>Unpaid Amount</h3>
+      <p class="stat-value">{{ dash.sales.unpaid_amount|format_aud }}</p>
+      <p class="stat-label">{{ dash.sales.unpaid_count }} unpaid invoice{% if dash.sales.unpaid_count != 1 %}s{% endif %}</p>
+    </article>
+    <article class="stat-card stat-card-accent">
+      <h3>Average Job Value</h3>
+      <p class="stat-value">{{ dash.sales.average_job_value|format_aud }}</p>
+      <p class="stat-label">FY · {{ dash.sales.average_job_count }} paid job{% if dash.sales.average_job_count != 1 %}s{% endif %}</p>
+    </article>
+  </div>
+
   <div class="dashboard-stats">
     <article class="stat-card">
       <h3>Today</h3>
