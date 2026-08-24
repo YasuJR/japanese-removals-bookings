@@ -37,6 +37,7 @@ from integrations import (
     job_sheet,
     review_automation,
     sms,
+    weekly_schedule_pdf,
     xero,
 )
 from integrations import executive_config, review_config, sms_config, xero_config, company_config, xero_branding, stripe_config, gmail_config, google_oauth
@@ -82,6 +83,7 @@ from dashboard_data import (
     perth_today,
 )
 from daily_jobs_data import build_daily_jobs
+from weekly_schedule_data import build_weekly_schedule
 import calendar_data
 from display_dates import format_display_date, get_weekday_class
 import automation
@@ -1583,6 +1585,66 @@ def calendar_daily_jobs(date_iso):
     )
 
 
+def _weekly_calendar_params() -> dict:
+    return {
+        "view": request.args.get("view", "month"),
+        "year": request.args.get("year"),
+        "month": request.args.get("month"),
+        "day": request.args.get("day"),
+        "status": request.args.get("status"),
+        "crew": request.args.get("crew"),
+        "truck": request.args.get("truck"),
+        "payment": request.args.get("payment"),
+    }
+
+
+@app.route("/calendar/weekly", endpoint="calendar_weekly_schedule")
+@app.route("/calendar/weekly/<date_iso>", endpoint="calendar_weekly_schedule")
+@auth.login_required
+def calendar_weekly_schedule(date_iso=None):
+    raw = (date_iso or perth_today().isoformat())[:10]
+    try:
+        datetime.strptime(raw, "%Y-%m-%d")
+    except ValueError:
+        flash("Invalid date.", "error")
+        return redirect(url_for("booking_calendar"))
+
+    weekly = build_weekly_schedule(raw)
+    calendar_params = _weekly_calendar_params()
+    back_to_calendar_url = _calendar_back_url(**calendar_params)
+    return render_template(
+        "weekly_schedule.html",
+        weekly=weekly,
+        calendar_params=calendar_params,
+        back_to_calendar_url=back_to_calendar_url,
+    )
+
+
+@app.route(
+    "/calendar/weekly/<date_iso>/schedule.pdf",
+    endpoint="calendar_weekly_schedule_pdf",
+)
+@auth.login_required
+def calendar_weekly_schedule_pdf(date_iso):
+    raw = (date_iso or "")[:10]
+    try:
+        datetime.strptime(raw, "%Y-%m-%d")
+    except ValueError:
+        flash("Invalid date.", "error")
+        return redirect(url_for("booking_calendar"))
+
+    weekly = build_weekly_schedule(raw)
+    pdf_bytes = weekly_schedule_pdf.render_weekly_schedule_pdf(weekly)
+    filename = "weekly-schedule-{0}.pdf".format(weekly["week_start"])
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": "attachment; filename={0}".format(filename)
+        },
+    )
+
+
 @app.route("/settings/gmail", methods=["GET", "POST"])
 @auth.login_required
 def gmail_settings():
@@ -2410,6 +2472,8 @@ if __name__ == "__main__":
         "daily_checklist",
         "driver",
         "driver_run_sheet_pdf",
+        "calendar_weekly_schedule",
+        "calendar_weekly_schedule_pdf",
         "profit",
         "profit_export_csv",
         "outstanding_invoices",
