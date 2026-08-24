@@ -26,6 +26,8 @@ JOB_COST_FIELD_LABELS = {
 }
 
 STAFF_COST_RATE_PER_HOUR = 72.0
+STAFF_COST_THIRD_MOVER_EXTRA = 36.0
+STAFF_COST_RATE_THREE_MOVERS = STAFF_COST_RATE_PER_HOUR + STAFF_COST_THIRD_MOVER_EXTRA
 DEFAULT_FUEL_COST = 30.0
 
 PROFIT_STATUS_FILTERS = [
@@ -171,10 +173,32 @@ def parse_money_amount(raw: Any) -> Tuple[Optional[float], Optional[str]]:
     return value, None
 
 
-def default_staff_cost(hours: Optional[float]) -> float:
+def staff_cost_rate_per_hour(num_movers: Any = 2) -> float:
+    """$72/hr for 2 movers, $108/hr ($72+$36) for 3 movers."""
+    try:
+        count = int(num_movers)
+    except (TypeError, ValueError):
+        count = 2
+    if count >= 3:
+        return STAFF_COST_RATE_THREE_MOVERS
+    return STAFF_COST_RATE_PER_HOUR
+
+
+def default_staff_cost(hours: Optional[float], num_movers: Any = 2) -> float:
     if hours is None or hours <= 0:
         return 0.0
-    return _money(STAFF_COST_RATE_PER_HOUR * float(hours))
+    return _money(staff_cost_rate_per_hour(num_movers) * float(hours))
+
+
+def job_num_movers(booking_or_form: Optional[Any], default: int = 2) -> int:
+    raw = _row_get(booking_or_form, "num_movers")
+    try:
+        count = int(raw)
+    except (TypeError, ValueError):
+        return default
+    if count < 1:
+        return default
+    return count
 
 
 def job_duration_hours(booking_or_form: Optional[Any]) -> Optional[float]:
@@ -219,6 +243,7 @@ def job_cost_form_values(
     form = form or {}
     values: Dict[str, str] = {}
     hours = job_duration_hours(form) or job_duration_hours(booking)
+    movers = job_num_movers(form) if form.get("num_movers") not in (None, "") else job_num_movers(booking)
     for key in JOB_COST_FIELDS:
         if form.get(key) not in (None, ""):
             values[key] = str(form.get(key))
@@ -228,7 +253,7 @@ def job_cost_form_values(
             values[key] = _format_cost_input(stored)
             continue
         if is_new and key == "staff_cost":
-            staff = default_staff_cost(hours)
+            staff = default_staff_cost(hours, movers)
             values[key] = _format_cost_input(staff) if staff else ""
             continue
         if is_new and key == "fuel_cost":
@@ -318,14 +343,20 @@ def resolve_job_cost_fields_for_save(
     """Apply new-booking defaults and duration-based Staff Cost without clobbering saved costs."""
     current_hours = job_duration_hours(current) or job_duration_hours(form)
     previous_hours = job_duration_hours(previous) if previous is not None else None
-    new_default_staff = default_staff_cost(current_hours)
-    old_default_staff = default_staff_cost(previous_hours)
+    current_movers = job_num_movers(current) if current is not None else job_num_movers(form)
+    if form.get("num_movers") not in (None, ""):
+        current_movers = job_num_movers(form)
+    previous_movers = job_num_movers(previous) if previous is not None else current_movers
+    new_default_staff = default_staff_cost(current_hours, current_movers)
+    old_default_staff = default_staff_cost(previous_hours, previous_movers)
     duration_changed = (
         not is_new
         and previous_hours is not None
         and current_hours is not None
         and round(float(previous_hours), 2) != round(float(current_hours), 2)
     )
+    movers_changed = not is_new and previous_movers != current_movers
+    auto_inputs_changed = duration_changed or movers_changed
     staff_state, posted_staff = _form_cost_state(form, "staff_cost")
     stored_staff = _stored_cost(previous if previous is not None else current, "staff_cost")
     manual = _staff_cost_is_manual(form)
@@ -353,7 +384,7 @@ def resolve_job_cost_fields_for_save(
             )
             or (stored_staff is None and staff_state in ("empty", "omitted"))
         )
-        if duration_changed and matches_old_default:
+        if auto_inputs_changed and matches_old_default:
             fields["staff_cost"] = new_default_staff
             auto_staff = True
     if not auto_staff:

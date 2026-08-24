@@ -7,11 +7,14 @@
 <section class="job-costs-panel" id="job-costs-panel"
          data-new-booking="{{ '1' if is_new_job_costs else '0' }}"
          data-staff-rate="{{ STAFF_COST_RATE_PER_HOUR }}"
+         data-staff-rate-three="{{ STAFF_COST_RATE_THREE_MOVERS }}"
          data-default-fuel="{{ DEFAULT_FUEL_COST }}">
   <h3>Job Costs</h3>
   <p class="muted form-hint">
-    Staff Cost defaults to ${{ '%.0f'|format(STAFF_COST_RATE_PER_HOUR) }} × job duration
-    (Start to Finish). Fuel defaults to ${{ '%.0f'|format(DEFAULT_FUEL_COST) }} on new bookings.
+    Staff Cost defaults to ${{ '%.0f'|format(STAFF_COST_RATE_PER_HOUR) }}/hr for 2 movers,
+    or ${{ '%.0f'|format(STAFF_COST_RATE_THREE_MOVERS) }}/hr
+    (${{ '%.0f'|format(STAFF_COST_RATE_PER_HOUR) }} + ${{ '%.0f'|format(STAFF_COST_THIRD_MOVER_EXTRA) }})
+    for 3 movers, × job duration. Fuel defaults to ${{ '%.0f'|format(DEFAULT_FUEL_COST) }} on new bookings.
     Empty amounts save as $0.00. Total Job Cost is calculated automatically.
   </p>
   <div class="job-costs-grid">

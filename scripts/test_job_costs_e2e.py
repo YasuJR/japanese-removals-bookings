@@ -336,10 +336,18 @@ def _post_new_job(
 
 
 def test_staff_cost_rate_examples():
+    assert booking_profit.staff_cost_rate_per_hour(2) == 72.0
+    assert booking_profit.staff_cost_rate_per_hour(3) == 108.0
     assert booking_profit.default_staff_cost(2) == 144.0
     assert booking_profit.default_staff_cost(3) == 216.0
     assert booking_profit.default_staff_cost(3.5) == 252.0
     assert booking_profit.default_staff_cost(5) == 360.0
+    assert booking_profit.default_staff_cost(3, 2) == 216.0
+    assert booking_profit.default_staff_cost(3, 3) == 324.0
+    assert booking_profit.default_staff_cost(4, 2) == 288.0
+    assert booking_profit.default_staff_cost(4, 3) == 432.0
+    assert booking_profit.default_staff_cost(3.5, 2) == 252.0
+    assert booking_profit.default_staff_cost(3.5, 3) == 378.0
     return True
 
 
@@ -350,19 +358,24 @@ def test_new_booking_duration_defaults():
     assert 'value="30.00"' in new_html
 
     cases = [
-        ("08:00", "10:00", "2", 144.0, 30.0, 174.0),
-        ("08:00", "11:00", "3", 216.0, 30.0, 246.0),
-        ("08:00", "11:30", "3.5", 252.0, 30.0, 282.0),
-        ("08:00", "13:00", "5", 360.0, 30.0, 390.0),
+        ("08:00", "10:00", "2", "2", 144.0, 30.0, 174.0),
+        ("08:00", "11:00", "3", "2", 216.0, 30.0, 246.0),
+        ("08:00", "11:00", "3", "3", 324.0, 30.0, 354.0),
+        ("08:00", "11:30", "3.5", "2", 252.0, 30.0, 282.0),
+        ("08:00", "11:30", "3.5", "3", 378.0, 30.0, 408.0),
+        ("08:00", "12:00", "4", "2", 288.0, 30.0, 318.0),
+        ("08:00", "12:00", "4", "3", 432.0, 30.0, 462.0),
+        ("08:00", "13:00", "5", "2", 360.0, 30.0, 390.0),
     ]
-    for start, finish, duration, staff, fuel, total in cases:
+    for start, finish, duration, movers, staff, fuel, total in cases:
         row, _marker = _post_new_job(
             client,
             start_time=start,
             finish_time=finish,
             duration_hours=duration,
+            num_movers=movers,
         )
-        assert round(float(row.get("staff_cost") or 0), 2) == staff, (duration, row)
+        assert round(float(row.get("staff_cost") or 0), 2) == staff, (movers, duration, row)
         assert round(float(row.get("fuel_cost") or 0), 2) == fuel, duration
         assert round(float(row.get("truck_cost") or 0), 2) == 0.0
         assert round(float(row.get("parking_cost") or 0), 2) == 0.0
@@ -491,6 +504,95 @@ def test_duration_change_recalculates_auto_staff():
     return True
 
 
+def test_movers_change_recalculates_auto_staff():
+    client = _login_client()
+    row, marker = _post_new_job(
+        client,
+        start_time="08:00",
+        finish_time="11:00",
+        duration_hours="3",
+        num_movers="2",
+    )
+    assert round(float(row.get("staff_cost") or 0), 2) == 216.0
+    booking_id = int(row["id"])
+    to_three = _edit_form(
+        booking_id,
+        staff_cost="216",
+        fuel_cost="30",
+        truck_cost="0",
+        parking_cost="0",
+        other_costs="0",
+        staff_cost_manual="0",
+        num_movers="3",
+    )
+    resp = client.post(
+        "/bookings/{0}/edit".format(booking_id),
+        data=to_three,
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303), resp.status_code
+    after_three = dict(db.get_booking(booking_id))
+    assert int(after_three["num_movers"]) == 3
+    assert round(float(after_three.get("staff_cost") or 0), 2) == 324.0
+    assert round(float(after_three.get("fuel_cost") or 0), 2) == 30.0
+
+    to_two = _edit_form(
+        booking_id,
+        staff_cost="324",
+        fuel_cost="30",
+        truck_cost="0",
+        parking_cost="0",
+        other_costs="0",
+        staff_cost_manual="0",
+        num_movers="2",
+    )
+    resp = client.post(
+        "/bookings/{0}/edit".format(booking_id),
+        data=to_two,
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303), resp.status_code
+    after_two = dict(db.get_booking(booking_id))
+    assert after_two["customer_name"] == marker
+    assert int(after_two["num_movers"]) == 2
+    assert round(float(after_two.get("staff_cost") or 0), 2) == 216.0
+    return True
+
+
+def test_manual_staff_not_overwritten_when_movers_change():
+    client = _login_client()
+    row, _marker = _post_new_job(
+        client,
+        start_time="08:00",
+        finish_time="11:00",
+        duration_hours="3",
+        num_movers="2",
+        staff_cost="199.50",
+        fuel_cost="30",
+        staff_cost_manual="1",
+    )
+    form = _edit_form(
+        row["id"],
+        staff_cost="199.50",
+        fuel_cost="30",
+        truck_cost="0",
+        parking_cost="0",
+        other_costs="0",
+        staff_cost_manual="1",
+        num_movers="3",
+    )
+    resp = client.post(
+        "/bookings/{0}/edit".format(row["id"]),
+        data=form,
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303), resp.status_code
+    after = dict(db.get_booking(row["id"]))
+    assert int(after["num_movers"]) == 3
+    assert round(float(after.get("staff_cost") or 0), 2) == 199.5
+    return True
+
+
 def test_dashboard_uses_default_job_costs():
     client = _login_client()
     today = perth_today()
@@ -511,6 +613,23 @@ def test_dashboard_uses_default_job_costs():
     db.update_booking_status(booking_id, "Completed")
     after = booking_profit.build_monthly_profit_summary(month_key)
     assert after["actual"]["actual_costs"] - before["actual"]["actual_costs"] == 174.0
+
+    before_three = booking_profit.build_monthly_profit_summary(month_key)
+    row3, _m3 = _post_new_job(
+        client,
+        start_time="08:00",
+        finish_time="11:00",
+        duration_hours="3",
+        num_movers="3",
+    )
+    three = booking_profit.build_monthly_profit_summary(month_key)
+    assert three["projected"]["projected_costs"] - before_three["projected"]["projected_costs"] == 354.0
+    paid_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    invoice.set_payment_status(int(row3["id"]), True)
+    db.update_booking_invoice_fields(int(row3["id"]), {"paid_at": paid_at})
+    db.update_booking_status(int(row3["id"]), "Completed")
+    paid_three = booking_profit.build_monthly_profit_summary(month_key)
+    assert paid_three["actual"]["actual_costs"] - before_three["actual"]["actual_costs"] == 354.0
     return True
 
 
@@ -577,6 +696,8 @@ def main():
         ("manual_staff_kept", test_manual_staff_cost_is_kept),
         ("existing_costs_not_overwritten", test_existing_saved_costs_not_overwritten),
         ("duration_change_auto_staff", test_duration_change_recalculates_auto_staff),
+        ("movers_change_auto_staff", test_movers_change_recalculates_auto_staff),
+        ("manual_staff_movers_kept", test_manual_staff_not_overwritten_when_movers_change),
         ("dashboard_default_job_costs", test_dashboard_uses_default_job_costs),
         ("new_booking_optional_costs", test_new_booking_optional_job_costs),
     ]

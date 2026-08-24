@@ -133,6 +133,12 @@ app.jinja_env.globals["job_cost_form_values"] = booking_profit.job_cost_form_val
 app.jinja_env.globals["STAFF_COST_RATE_PER_HOUR"] = (
     booking_profit.STAFF_COST_RATE_PER_HOUR
 )
+app.jinja_env.globals["STAFF_COST_RATE_THREE_MOVERS"] = (
+    booking_profit.STAFF_COST_RATE_THREE_MOVERS
+)
+app.jinja_env.globals["STAFF_COST_THIRD_MOVER_EXTRA"] = (
+    booking_profit.STAFF_COST_THIRD_MOVER_EXTRA
+)
 app.jinja_env.globals["DEFAULT_FUEL_COST"] = booking_profit.DEFAULT_FUEL_COST
 app.jinja_env.filters["format_invoice_number"] = invoice_numbering.format_invoice_number
 app.jinja_env.filters["display_invoice_number"] = invoice_numbering.display_invoice_number

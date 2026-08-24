@@ -48,7 +48,8 @@
     var manualEl = panel.querySelector("#staff_cost_manual");
     if (!inputs.length || !display) return;
 
-    var staffRate = Number(panel.getAttribute("data-staff-rate") || "72");
+    var staffRateTwo = Number(panel.getAttribute("data-staff-rate") || "72");
+    var staffRateThree = Number(panel.getAttribute("data-staff-rate-three") || "108");
     var defaultFuel = Number(panel.getAttribute("data-default-fuel") || "30");
     var isNew = panel.getAttribute("data-new-booking") === "1";
     var applyingStaff = false;
@@ -62,10 +63,23 @@
       display.textContent = formatAud(Math.round(total * 100) / 100);
     }
 
+    function moverCount() {
+      var moversEl =
+        document.getElementById("num_movers") ||
+        document.querySelector('input[name="num_movers"]');
+      var count = parseInt(moversEl && moversEl.value, 10);
+      if (isNaN(count) || count < 1) return 2;
+      return count;
+    }
+
+    function staffRate() {
+      return moverCount() >= 3 ? staffRateThree : staffRateTwo;
+    }
+
     function defaultStaffForDuration() {
       var hours = durationHours();
       if (hours == null) return null;
-      return Math.round(staffRate * hours * 100) / 100;
+      return Math.round(staffRate() * hours * 100) / 100;
     }
 
     function setManual(flag) {
@@ -124,7 +138,7 @@
       setTimeout(applyStaffFromDuration, 0);
     }
 
-    ["start_time", "finish_time", "duration_hours", "pricing_duration_hours"].forEach(
+    ["start_time", "finish_time", "duration_hours", "pricing_duration_hours", "num_movers"].forEach(
       function (id) {
         var el = document.getElementById(id);
         if (!el) return;
