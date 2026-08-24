@@ -25,6 +25,9 @@ JOB_COST_FIELD_LABELS = {
     "other_costs": "Other Cost",
 }
 
+STAFF_COST_RATE_PER_HOUR = 72.0
+DEFAULT_FUEL_COST = 30.0
+
 PROFIT_STATUS_FILTERS = [
     ("all", "All statuses"),
     ("Confirmed", "Confirmed"),
@@ -168,6 +171,73 @@ def parse_money_amount(raw: Any) -> Tuple[Optional[float], Optional[str]]:
     return value, None
 
 
+def default_staff_cost(hours: Optional[float]) -> float:
+    if hours is None or hours <= 0:
+        return 0.0
+    return _money(STAFF_COST_RATE_PER_HOUR * float(hours))
+
+
+def job_duration_hours(booking_or_form: Optional[Any]) -> Optional[float]:
+    """Job duration from Start/Finish, then the duration_hours field."""
+    if not booking_or_form:
+        return None
+    from booking_times import duration_hours_from_times, parse_duration_hours
+
+    hours = duration_hours_from_times(
+        _row_get(booking_or_form, "start_time"),
+        _row_get(booking_or_form, "finish_time"),
+    )
+    if hours is not None:
+        return hours
+    return parse_duration_hours(_row_get(booking_or_form, "duration_hours"))
+
+
+def _row_get(row: Any, key: str, default: Any = None) -> Any:
+    if row is None:
+        return default
+    try:
+        value = row[key]
+    except (KeyError, IndexError, TypeError):
+        return default
+    if value is None:
+        return default
+    return value
+
+
+def _format_cost_input(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    return "{0:.2f}".format(_money(_float(value)))
+
+
+def job_cost_form_values(
+    form: Optional[Dict[str, Any]] = None,
+    booking: Any = None,
+    is_new: bool = False,
+) -> Dict[str, str]:
+    """Values to show in the Job Costs inputs."""
+    form = form or {}
+    values: Dict[str, str] = {}
+    hours = job_duration_hours(form) or job_duration_hours(booking)
+    for key in JOB_COST_FIELDS:
+        if form.get(key) not in (None, ""):
+            values[key] = str(form.get(key))
+            continue
+        stored = _row_get(booking, key)
+        if stored is not None:
+            values[key] = _format_cost_input(stored)
+            continue
+        if is_new and key == "staff_cost":
+            staff = default_staff_cost(hours)
+            values[key] = _format_cost_input(staff) if staff else ""
+            continue
+        if is_new and key == "fuel_cost":
+            values[key] = _format_cost_input(DEFAULT_FUEL_COST)
+            continue
+        values[key] = ""
+    return values
+
+
 def job_cost_fields_in_form(form: Dict[str, Any]) -> bool:
     return any(key in form for key in JOB_COST_FIELDS)
 
@@ -208,11 +278,142 @@ def parse_profit_cost_form(form: Dict[str, Any]) -> Dict[str, Any]:
     return fields
 
 
-def save_profit_cost_fields(booking_id: int, form: Dict[str, Any]) -> List[str]:
+def _form_cost_state(form: Dict[str, Any], key: str) -> Tuple[str, Optional[float]]:
+    """Return ('omitted'|'empty'|'set', value)."""
+    if key not in form:
+        return "omitted", None
+    raw = form.get(key)
+    if raw is None or str(raw).strip() == "":
+        return "empty", None
+    value, err = parse_money_amount(raw)
+    if err or value is None:
+        return "empty", None
+    return "set", value
+
+
+def _staff_cost_is_manual(form: Dict[str, Any]) -> bool:
+    raw = str(form.get("staff_cost_manual") or "").strip().lower()
+    return raw in ("1", "true", "on", "yes")
+
+
+def _stored_cost(row: Any, key: str) -> Optional[float]:
+    if row is None:
+        return None
+    try:
+        value = row[key]
+    except (KeyError, IndexError, TypeError):
+        return None
+    if value in (None, ""):
+        return None
+    return _money(_float(value))
+
+
+def resolve_job_cost_fields_for_save(
+    form: Dict[str, Any],
+    *,
+    current: Any = None,
+    previous: Any = None,
+    is_new: bool = False,
+) -> Dict[str, Any]:
+    """Apply new-booking defaults and duration-based Staff Cost without clobbering saved costs."""
+    current_hours = job_duration_hours(current) or job_duration_hours(form)
+    previous_hours = job_duration_hours(previous) if previous is not None else None
+    new_default_staff = default_staff_cost(current_hours)
+    old_default_staff = default_staff_cost(previous_hours)
+    duration_changed = (
+        not is_new
+        and previous_hours is not None
+        and current_hours is not None
+        and round(float(previous_hours), 2) != round(float(current_hours), 2)
+    )
+    staff_state, posted_staff = _form_cost_state(form, "staff_cost")
+    stored_staff = _stored_cost(previous if previous is not None else current, "staff_cost")
+    manual = _staff_cost_is_manual(form)
+
+    fields = parse_profit_cost_form(form)
+
+    if is_new:
+        if staff_state != "set":
+            fields["staff_cost"] = new_default_staff
+        if _form_cost_state(form, "fuel_cost")[0] != "set":
+            fields["fuel_cost"] = DEFAULT_FUEL_COST
+        for key in ("truck_cost", "parking_cost", "other_costs"):
+            if _form_cost_state(form, key)[0] != "set":
+                fields[key] = 0.0
+        return fields
+
+    auto_staff = False
+    if not manual:
+        matches_old_default = (
+            (posted_staff is not None and posted_staff == old_default_staff)
+            or (
+                stored_staff is not None
+                and stored_staff == old_default_staff
+                and (posted_staff is None or posted_staff == stored_staff)
+            )
+            or (stored_staff is None and staff_state in ("empty", "omitted"))
+        )
+        if duration_changed and matches_old_default:
+            fields["staff_cost"] = new_default_staff
+            auto_staff = True
+    if not auto_staff:
+        if staff_state == "set":
+            fields["staff_cost"] = posted_staff
+        elif staff_state == "empty" and stored_staff is not None:
+            fields["staff_cost"] = 0.0
+        elif stored_staff is not None:
+            fields["staff_cost"] = stored_staff
+        elif "staff_cost" in fields:
+            del fields["staff_cost"]
+
+    fuel_state, posted_fuel = _form_cost_state(form, "fuel_cost")
+    stored_fuel = _stored_cost(previous if previous is not None else current, "fuel_cost")
+    if fuel_state == "set":
+        fields["fuel_cost"] = posted_fuel
+    elif fuel_state == "empty":
+        if stored_fuel is not None:
+            fields["fuel_cost"] = 0.0
+        elif "fuel_cost" in fields:
+            del fields["fuel_cost"]
+    elif stored_fuel is not None:
+        fields["fuel_cost"] = stored_fuel
+    elif "fuel_cost" in fields:
+        del fields["fuel_cost"]
+
+    for key in ("truck_cost", "parking_cost", "other_costs"):
+        state, posted = _form_cost_state(form, key)
+        stored = _stored_cost(previous if previous is not None else current, key)
+        if state == "set":
+            fields[key] = posted
+        elif state == "empty":
+            if stored is not None:
+                fields[key] = 0.0
+            elif key in fields:
+                del fields[key]
+        elif stored is not None:
+            fields[key] = stored
+        elif key in fields:
+            del fields[key]
+    return fields
+
+
+def save_profit_cost_fields(
+    booking_id: int,
+    form: Dict[str, Any],
+    *,
+    is_new: bool = False,
+    previous: Any = None,
+) -> List[str]:
     errors = job_cost_form_errors(form)
     if errors:
         return errors
-    fields = parse_profit_cost_form(form)
+    current = db.get_booking(booking_id)
+    fields = resolve_job_cost_fields_for_save(
+        form,
+        current=current,
+        previous=previous if previous is not None else current,
+        is_new=is_new,
+    )
     if not fields:
         return []
     db.update_booking_profit_fields(booking_id, fields)

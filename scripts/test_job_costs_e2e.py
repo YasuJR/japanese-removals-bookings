@@ -288,6 +288,232 @@ def test_search_and_calendar_templates_unchanged():
     return True
 
 
+def _post_new_job(
+    client,
+    *,
+    start_time,
+    finish_time,
+    duration_hours,
+    marker=None,
+    **cost_fields,
+):
+    marker = marker or "JobCostDef-{0}-{1}".format(os.getpid(), time.time_ns())
+    data = {
+        "customer_name": marker,
+        "phone": "0412000222",
+        "email": "{0}@example.com".format(marker.lower()),
+        "pickup_address": "10 New Cost St, Perth WA",
+        "delivery_address": "20 New Profit Ave, Fremantle WA",
+        "move_date": perth_today().isoformat(),
+        "num_movers": "2",
+        "notes": "job cost defaults {0}".format(marker),
+        "start_time": start_time,
+        "finish_time": finish_time,
+        "duration_hours": duration_hours,
+        "hourly_rate": "220",
+        "callout_fee": "0",
+        "gst_enabled": "on",
+        "status": "Confirmed",
+        "action": "save",
+        "double_booking_override_confirm": "on",
+        "staff_cost": "",
+        "fuel_cost": "",
+        "truck_cost": "",
+        "parking_cost": "",
+        "other_costs": "",
+        "staff_cost_manual": "0",
+    }
+    data.update(cost_fields)
+    resp = client.post("/bookings/new", data=data, follow_redirects=False)
+    assert resp.status_code in (302, 303), resp.status_code
+    matches = [
+        dict(row)
+        for row in db.list_all()
+        if dict(row).get("customer_name") == marker
+    ]
+    assert matches, marker
+    return matches[0], marker
+
+
+def test_staff_cost_rate_examples():
+    assert booking_profit.default_staff_cost(2) == 144.0
+    assert booking_profit.default_staff_cost(3) == 216.0
+    assert booking_profit.default_staff_cost(3.5) == 252.0
+    assert booking_profit.default_staff_cost(5) == 360.0
+    return True
+
+
+def test_new_booking_duration_defaults():
+    client = _login_client()
+    new_html = client.get("/bookings/new").get_data(as_text=True)
+    assert 'name="fuel_cost"' in new_html
+    assert 'value="30.00"' in new_html
+
+    cases = [
+        ("08:00", "10:00", "2", 144.0, 30.0, 174.0),
+        ("08:00", "11:00", "3", 216.0, 30.0, 246.0),
+        ("08:00", "11:30", "3.5", 252.0, 30.0, 282.0),
+        ("08:00", "13:00", "5", 360.0, 30.0, 390.0),
+    ]
+    for start, finish, duration, staff, fuel, total in cases:
+        row, _marker = _post_new_job(
+            client,
+            start_time=start,
+            finish_time=finish,
+            duration_hours=duration,
+        )
+        assert round(float(row.get("staff_cost") or 0), 2) == staff, (duration, row)
+        assert round(float(row.get("fuel_cost") or 0), 2) == fuel, duration
+        assert round(float(row.get("truck_cost") or 0), 2) == 0.0
+        assert round(float(row.get("parking_cost") or 0), 2) == 0.0
+        assert round(float(row.get("other_costs") or 0), 2) == 0.0
+        metrics = _metrics(row["id"])
+        assert metrics["total_job_cost"] == total
+        assert metrics["staff_cost"] == staff
+        assert metrics["fuel_cost"] == fuel
+    return True
+
+
+def test_manual_staff_cost_is_kept():
+    client = _login_client()
+    row, marker = _post_new_job(
+        client,
+        start_time="08:00",
+        finish_time="10:00",
+        duration_hours="2",
+        staff_cost="199.50",
+        fuel_cost="30",
+        staff_cost_manual="1",
+    )
+    assert round(float(row.get("staff_cost") or 0), 2) == 199.5
+    assert round(float(row.get("fuel_cost") or 0), 2) == 30.0
+    form = _edit_form(
+        row["id"],
+        staff_cost="199.50",
+        fuel_cost="30",
+        truck_cost="0",
+        parking_cost="0",
+        other_costs="0",
+        staff_cost_manual="1",
+        finish_time="11:00",
+        duration_hours="3",
+    )
+    resp = client.post(
+        "/bookings/{0}/edit".format(row["id"]),
+        data=form,
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303), resp.status_code
+    after = dict(db.get_booking(row["id"]))
+    assert after["customer_name"] == marker
+    assert round(float(after.get("staff_cost") or 0), 2) == 199.5
+    assert round(float(after.get("fuel_cost") or 0), 2) == 30.0
+    return True
+
+
+def test_existing_saved_costs_not_overwritten():
+    client = _login_client()
+    booking_id, marker = _create_booking_a(
+        start_time="08:00",
+        finish_time="10:00",
+        duration_hours="2",
+    )
+    db.update_booking_profit_fields(
+        booking_id,
+        {
+            "staff_cost": 300.0,
+            "fuel_cost": 50.0,
+            "truck_cost": 10.0,
+            "parking_cost": 5.0,
+            "other_costs": 1.0,
+        },
+    )
+    before = dict(db.get_booking(booking_id))
+    form = _edit_form(
+        booking_id,
+        staff_cost="300",
+        fuel_cost="50",
+        truck_cost="10",
+        parking_cost="5",
+        other_costs="1",
+        staff_cost_manual="1",
+    )
+    resp = client.post(
+        "/bookings/{0}/edit".format(booking_id),
+        data=form,
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303), resp.status_code
+    after = dict(db.get_booking(booking_id))
+    assert after["customer_name"] == before["customer_name"] == marker
+    assert after["hourly_rate"] == before["hourly_rate"]
+    assert after["payment_status"] == before["payment_status"]
+    assert round(float(after["staff_cost"]), 2) == 300.0
+    assert round(float(after["fuel_cost"]), 2) == 50.0
+    assert round(float(after["truck_cost"]), 2) == 10.0
+    assert round(float(after["parking_cost"]), 2) == 5.0
+    assert round(float(after["other_costs"]), 2) == 1.0
+    return True
+
+
+def test_duration_change_recalculates_auto_staff():
+    client = _login_client()
+    booking_id, _marker = _create_booking_a(
+        start_time="08:00",
+        finish_time="10:00",
+        duration_hours="2",
+    )
+    db.update_booking_profit_fields(
+        booking_id,
+        {"staff_cost": 144.0, "fuel_cost": 30.0},
+    )
+    form = _edit_form(
+        booking_id,
+        staff_cost="144",
+        fuel_cost="30",
+        truck_cost="0",
+        parking_cost="0",
+        other_costs="0",
+        staff_cost_manual="0",
+        finish_time="11:00",
+        duration_hours="2",
+    )
+    resp = client.post(
+        "/bookings/{0}/edit".format(booking_id),
+        data=form,
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303), resp.status_code
+    after = dict(db.get_booking(booking_id))
+    assert str(after.get("finish_time") or "").startswith("11:00")
+    assert round(float(after.get("staff_cost") or 0), 2) == 216.0
+    assert round(float(after.get("fuel_cost") or 0), 2) == 30.0
+    return True
+
+
+def test_dashboard_uses_default_job_costs():
+    client = _login_client()
+    today = perth_today()
+    month_key = today.strftime("%Y-%m")
+    before = booking_profit.build_monthly_profit_summary(month_key)
+    row, _marker = _post_new_job(
+        client,
+        start_time="08:00",
+        finish_time="10:00",
+        duration_hours="2",
+    )
+    booking_id = int(row["id"])
+    projected = booking_profit.build_monthly_profit_summary(month_key)
+    assert projected["projected"]["projected_costs"] - before["projected"]["projected_costs"] == 174.0
+    paid_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    invoice.set_payment_status(booking_id, True)
+    db.update_booking_invoice_fields(booking_id, {"paid_at": paid_at})
+    db.update_booking_status(booking_id, "Completed")
+    after = booking_profit.build_monthly_profit_summary(month_key)
+    assert after["actual"]["actual_costs"] - before["actual"]["actual_costs"] == 174.0
+    return True
+
+
 def test_new_booking_optional_job_costs():
     client = _login_client()
     marker = "JobCostNew-{0}-{1}".format(os.getpid(), time.time_ns())
@@ -329,12 +555,12 @@ def test_new_booking_optional_job_costs():
     assert matches
     row = matches[0]
     assert round(float(row.get("staff_cost") or 0), 2) == 12.5
-    assert round(float(row.get("fuel_cost") or 0), 2) == 0.0
+    assert round(float(row.get("fuel_cost") or 0), 2) == 30.0
     assert round(float(row.get("truck_cost") or 0), 2) == 7.0
     assert round(float(row.get("parking_cost") or 0), 2) == 0.0
     assert round(float(row.get("other_costs") or 0), 2) == 0.0
     metrics = _metrics(row["id"])
-    assert metrics["total_job_cost"] == 19.5
+    assert metrics["total_job_cost"] == 49.5
     return True
 
 
@@ -346,6 +572,12 @@ def main():
         ("edit_view_save", test_edit_and_view_show_job_costs_and_save),
         ("dashboard_actual_projected", test_dashboard_actual_and_projected_use_job_cost),
         ("search_calendar_unchanged", test_search_and_calendar_templates_unchanged),
+        ("staff_rate_examples", test_staff_cost_rate_examples),
+        ("new_booking_duration_defaults", test_new_booking_duration_defaults),
+        ("manual_staff_kept", test_manual_staff_cost_is_kept),
+        ("existing_costs_not_overwritten", test_existing_saved_costs_not_overwritten),
+        ("duration_change_auto_staff", test_duration_change_recalculates_auto_staff),
+        ("dashboard_default_job_costs", test_dashboard_uses_default_job_costs),
         ("new_booking_optional_costs", test_new_booking_optional_job_costs),
     ]
     failed = 0

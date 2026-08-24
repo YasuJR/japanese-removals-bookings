@@ -129,6 +129,11 @@ app.jinja_env.filters["format_hm_12h"] = format_time_12h
 app.jinja_env.filters["format_display_date"] = format_display_date
 app.jinja_env.filters["weekday_class"] = get_weekday_class
 app.jinja_env.filters["format_aud"] = invoice.format_aud
+app.jinja_env.globals["job_cost_form_values"] = booking_profit.job_cost_form_values
+app.jinja_env.globals["STAFF_COST_RATE_PER_HOUR"] = (
+    booking_profit.STAFF_COST_RATE_PER_HOUR
+)
+app.jinja_env.globals["DEFAULT_FUEL_COST"] = booking_profit.DEFAULT_FUEL_COST
 app.jinja_env.filters["format_invoice_number"] = invoice_numbering.format_invoice_number
 app.jinja_env.filters["display_invoice_number"] = invoice_numbering.display_invoice_number
 app.jinja_env.filters["dashboard_invoice_number"] = (
@@ -457,7 +462,7 @@ def _update_booking_from_form(booking_id, form):
     )
     if ok:
         services._persist_booking_extras(booking_id, data)
-        _save_job_costs_from_form(booking_id, form)
+        _save_job_costs_from_form(booking_id, form, previous=existing_row)
     return ok, errors, data
 
 
@@ -465,13 +470,17 @@ def _copy_job_cost_form_values(target, form):
     for key in booking_profit.JOB_COST_FIELDS:
         if key in form:
             target[key] = form.get(key)
+    if "staff_cost_manual" in form:
+        target["staff_cost_manual"] = form.get("staff_cost_manual")
     return target
 
 
-def _save_job_costs_from_form(booking_id, form):
+def _save_job_costs_from_form(booking_id, form, *, is_new=False, previous=None):
     if not booking_profit.job_cost_fields_in_form(form):
         return []
-    return booking_profit.save_profit_cost_fields(booking_id, form)
+    return booking_profit.save_profit_cost_fields(
+        booking_id, form, is_new=is_new, previous=previous
+    )
 
 
 def _overlap_payload(data, booking_id=None):
@@ -1968,7 +1977,7 @@ def new_booking():
             )
         _flash_crew_warnings(crew_warnings)
         booking_id = _create_booking_from_data(data)
-        _save_job_costs_from_form(booking_id, request.form)
+        _save_job_costs_from_form(booking_id, request.form, is_new=True)
         _apply_new_booking_override(booking_id, override_applied, db_conflicts)
         _flash_integration_messages(services.after_booking_created(booking_id))
         flash("Booking saved (reference #{0}).".format(booking_id), "success")
@@ -2241,6 +2250,7 @@ def edit_booking(booking_id):
             flash(msg, "success" if ok else "error")
             return redirect(url_for("edit_booking", booking_id=booking_id))
         if action == "update_invoice":
+            previous_row = db.get_booking(booking_id)
             cost_errors = booking_profit.job_cost_form_errors(request.form)
             if cost_errors:
                 for err in cost_errors:
@@ -2274,7 +2284,9 @@ def edit_booking(booking_id):
                     **_edit_booking_extras(row),
                 )
             if ok:
-                _save_job_costs_from_form(booking_id, request.form)
+                _save_job_costs_from_form(
+                    booking_id, request.form, previous=previous_row
+                )
                 booking_profit.recalculate_and_save(booking_id)
             flash(msg, "success" if ok else "error")
             return redirect(url_for("edit_booking", booking_id=booking_id))
