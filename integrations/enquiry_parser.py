@@ -30,16 +30,20 @@ NAME_PATTERNS = (
         re.IGNORECASE,
     ),
 )
+ADDRESS_TAIL_STOP = (
+    r"(?:[.!?]|$|\n|\s+sometime|\s+please|\s+phone|\s+mobile|\s+email|"
+    r"\s+thanks|\s+regards)"
+)
 FROM_TO_LINE_RE = re.compile(
-    r"\bfrom\s+(.+?)\s+to\s+(.+?)(?:[.!?]|$|\n|\s+sometime|\s+please)",
+    r"\bfrom\s+(.+?)\s+to\s+(.+?)" + ADDRESS_TAIL_STOP,
     re.IGNORECASE,
 )
 STREET_TO_STREET_RE = re.compile(
-    r"\b(\d+[A-Za-z]?\s+.+?)\s+to\s+(\d+[A-Za-z]?\s+.+?)(?:[.!?]|$|\n|\s+email|\s+phone|\s+thanks|\s+regards)",
+    r"\b(\d{1,5}[A-Za-z]?\s+.+?)\s+to\s+(\d{1,5}[A-Za-z]?\s+.+?)" + ADDRESS_TAIL_STOP,
     re.IGNORECASE,
 )
 MOVING_FROM_TO_RE = re.compile(
-    r"\bmoving\s+from\s+(.+?)\s+to\s+(.+?)(?:[.!?]|$|\n|\s+sometime|\s+please)",
+    r"\bmoving\s+from\s+(.+?)\s+to\s+(.+?)" + ADDRESS_TAIL_STOP,
     re.IGNORECASE,
 )
 MOVING_TO_RE = re.compile(
@@ -48,14 +52,19 @@ MOVING_TO_RE = re.compile(
     re.IGNORECASE,
 )
 PICKUP_LABELS = (
-    r"(?:pickup(?:\s*address)?|pick\s*up|collection|collect(?:ing)?\s*from|current\s+address)"
-    r"\s*[:\-]\s*(.+)",
+    r"(?:pick[\s-]*up|pickup)(?:\s+address)?\s*(?:is|:|-)\s*(.+)",
+    r"(?:pick[\s-]*up|pickup|collect(?:ing)?)\s+from\s+(.+)",
+    r"(?:collection(?:\s+address)?|current\s+address)\s*(?:is|:|-)\s*(.+)",
+    r"(?:moving\s+from)\s+(.+)",
+    r"(?:from)\s*[:\-]\s*(.+)",
 )
 DELIVERY_LABELS = (
-    r"(?:delivery(?:\s*address)?|deliver(?:y)?\s*to|drop[\s-]?off|destination|new\s+place)"
-    r"\s*[:\-]?\s*(.+)",
+    r"(?:destination|delivery(?:\s+address)?|new\s+place)\s*(?:is|:|-)\s*(.+)",
+    r"(?:delivery(?:\s+address)?)\s*[:\-]?\s*(.+)",
+    r"(?:deliver(?:y)?\s+to|drop[\s-]?off(?:\s+(?:to|at|is))?|moving\s+to)\s*[:\-]?\s*(.+)",
+    r"(?:to)\s*[:\-]\s*(.+)",
 )
-STREET_NUMBER_START = r"(?:\d+[A-Za-z]?(?:\s*/\s*\d+)?|\d+\s*/\s*\d+)"
+STREET_NUMBER_START = r"(?:\d{1,5}[A-Za-z]?(?:\s*/\s*\d{1,5})?)"
 STREET_ADDRESS_FRAGMENT = (
     STREET_NUMBER_START + r"\s+[A-Za-z][^,\n]*(?:,\s*[^,\n]+)?"
 )
@@ -109,7 +118,7 @@ TIME_APPROX_RE = re.compile(
     re.IGNORECASE,
 )
 TIME_AFTER_RE = re.compile(
-    r"\b(?:after|from)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?|\d{1,2}(?::\d{2})?)\b",
+    r"\b(?:after|from)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b",
     re.IGNORECASE,
 )
 TIME_START_LABEL_RE = re.compile(
@@ -207,7 +216,117 @@ INVALID_NAMES = {
     "moving",
     "move",
     "mate",
+    "us on",
+    "you",
+    "us",
 }
+NAME_STOPWORDS = frozenset(
+    {
+        "i",
+        "me",
+        "my",
+        "we",
+        "us",
+        "you",
+        "he",
+        "she",
+        "it",
+        "they",
+        "them",
+        "their",
+        "this",
+        "that",
+        "here",
+        "there",
+        "on",
+        "in",
+        "at",
+        "to",
+        "from",
+        "for",
+        "of",
+        "and",
+        "or",
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "am",
+        "do",
+        "did",
+        "please",
+        "thanks",
+        "thank",
+        "hi",
+        "hello",
+        "hey",
+        "moving",
+        "move",
+        "moved",
+        "pickup",
+        "pick",
+        "up",
+        "drop",
+        "off",
+        "destination",
+        "delivery",
+        "deliver",
+        "address",
+        "phone",
+        "email",
+        "mobile",
+        "mate",
+        "looking",
+        "need",
+        "help",
+        "with",
+        "last",
+        "year",
+        "sms",
+        "enquiry",
+    }
+)
+STREET_TYPE_NORMAL = {
+    "st": "St",
+    "street": "Street",
+    "rd": "Rd",
+    "road": "Road",
+    "ave": "Ave",
+    "avenue": "Avenue",
+    "hwy": "Hwy",
+    "highway": "Highway",
+    "dr": "Dr",
+    "drive": "Drive",
+    "ct": "Ct",
+    "court": "Court",
+    "pl": "Pl",
+    "place": "Place",
+    "pde": "Pde",
+    "parade": "Parade",
+    "cres": "Cres",
+    "crescent": "Crescent",
+    "tce": "Tce",
+    "terrace": "Terrace",
+    "blvd": "Blvd",
+    "boulevard": "Boulevard",
+    "ln": "Ln",
+    "lane": "Lane",
+    "way": "Way",
+}
+STREET_TYPE_RE = re.compile(
+    r"\b(" + "|".join(sorted(STREET_TYPE_NORMAL, key=len, reverse=True)) + r")\b\.?",
+    re.IGNORECASE,
+)
+PARENTHETICAL_RE = re.compile(r"\(([^)]*)\)")
+ADDRESS_LEAD_RE = re.compile(
+    r"^\s*(?:pick[\s-]*up|pickup|destination|deliver(?:y)?|drop[\s-]?off|"
+    r"from|to|moving|collection|collect)\b",
+    re.IGNORECASE,
+)
 GREETING_LINE_RE = re.compile(
     r"^\s*(?:hi|hello|hey)(?:\s+there)?[\s,!.-]*$",
     re.IGNORECASE,
@@ -230,11 +349,31 @@ def _pick(*values: str) -> str:
     return ""
 
 
+def _is_plausible_person_name(value: str) -> bool:
+    name = _clean_name(value)
+    if not name:
+        return False
+    words = [word.strip(".,") for word in name.split() if word.strip(".,")]
+    if not 1 <= len(words) <= 3:
+        return False
+    if any(word.lower() in NAME_STOPWORDS for word in words):
+        return False
+    if re.search(r"\d", name):
+        return False
+    return bool(re.match(r"^[A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,2}$", name))
+
+
 def _clean_name(value: str) -> str:
-    name = (value or "").strip().splitlines()[0].strip(" ,.-")
+    text = (value or "").strip()
+    if not text:
+        return ""
+    name = text.splitlines()[0].strip(" ,.-")
     if not name:
         return ""
     if name.lower() in INVALID_NAMES:
+        return ""
+    words = [word.strip(".,") for word in name.split() if word.strip(".,")]
+    if any(word.lower() in NAME_STOPWORDS for word in words):
         return ""
     if len(name) < 2:
         return ""
@@ -250,25 +389,69 @@ def _extract_first_last_name(text: str) -> str:
     first = _clean_name(first_match.group(1)) if first_match else ""
     last = _clean_name(last_match.group(1)) if last_match else ""
     combined = _clean_name("{0} {1}".format(first, last).strip())
-    return combined
+    return combined if _is_plausible_person_name(combined) else ""
+
+
+def _name_prefix_from_line(line: str) -> str:
+    text = (line or "").strip()
+    if not text:
+        return ""
+    text = re.split(
+        r"(?:\+?61\d[\d\s\-]*|0\d[\d\s\-]*|"
+        r"pick[\s-]*up|pickup|destination|deliver(?:y)?|drop[\s-]?off|"
+        r"moving\s+from|phone|mobile|email|"
+        r"(?:from|to)\s*:)",
+        text,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    return text.strip(" -,")
+
+
+def _extract_leading_name(text: str) -> str:
+    for line in (text or "").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if GREETING_LINE_RE.match(stripped):
+            continue
+        if LABELLED_FIELD_LINE_RE.match(stripped):
+            break
+        prefix = _name_prefix_from_line(stripped)
+        if ADDRESS_LEAD_RE.match(prefix or stripped):
+            break
+        if gmail_parser.EMAIL_RE.search(prefix):
+            break
+        if gmail_parser._parse_move_date(prefix) or _parse_calendar_date(prefix, _perth_today()):
+            break
+        candidate = _clean_name(prefix)
+        if candidate and _is_plausible_person_name(candidate):
+            return candidate
+        if gmail_parser.PHONE_RE.search(stripped) or ADDRESS_LEAD_RE.search(stripped):
+            break
+        break
+    return ""
 
 
 def _extract_name(text: str) -> str:
     combined = _extract_first_last_name(text)
     if combined:
         return combined
+    leading = _extract_leading_name(text)
+    if leading:
+        return leading
     for pattern in NAME_PATTERNS:
         match = pattern.search(text or "")
         if match:
             name = _clean_name(match.group(1))
-            if name:
+            if _is_plausible_person_name(name):
                 return name
 
     labelled = gmail_parser._first_match(
         gmail_parser.FIELD_LABELS.get("customer_name", ()),
         text,
     )
-    if labelled:
+    if _is_plausible_person_name(labelled):
         return _clean_name(labelled)
 
     for line in (text or "").splitlines():
@@ -285,12 +468,14 @@ def _extract_name(text: str) -> str:
             continue
         if GREETING_LINE_RE.match(stripped):
             continue
+        if ADDRESS_LEAD_RE.match(stripped):
+            continue
         if gmail_parser._parse_move_date(stripped) or _parse_calendar_date(stripped, _perth_today()):
             continue
         if VAGUE_TIME_RE.search(stripped) or TIME_EXACT_RE.search(stripped):
             continue
         candidate = _clean_name(stripped)
-        if candidate and re.match(r"^[A-Za-z]+(?:\s+[A-Za-z]+)?$", candidate):
+        if _is_plausible_person_name(candidate):
             return candidate
     return ""
 
@@ -497,6 +682,41 @@ def _extract_move_date(text: str, reference: date) -> Tuple[str, bool]:
     return "", False
 
 
+def _split_parentheticals(value: str) -> Tuple[str, List[str]]:
+    notes = []
+    def _keep(match: re.Match) -> str:
+        aside = (match.group(1) or "").strip(" ,;")
+        if aside:
+            notes.append(aside)
+        return " "
+    cleaned = PARENTHETICAL_RE.sub(_keep, value or "")
+    return cleaned, notes
+
+
+def _normalize_street_types(value: str) -> str:
+    def _replace(match: re.Match) -> str:
+        raw = match.group(0)
+        key = raw.lower().rstrip(".")
+        mapped = STREET_TYPE_NORMAL.get(key)
+        if not mapped:
+            return raw
+        return mapped
+    return STREET_TYPE_RE.sub(_replace, value or "")
+
+
+def _cut_address_field_tail(value: str) -> str:
+    text = (value or "").strip()
+    text = re.split(
+        r"\s+(?:phone|mobile|email|e-mail|tel(?:ephone)?|destination|deliver(?:y)?|"
+        r"drop[\s-]?off|moving\s+to|\bto\b)\b",
+        text,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    text = re.sub(r"(?:\+?61|0)\d[\d\s]{7,}$", "", text).strip()
+    return text
+
+
 def _strip_address_schedule_tail(value: str) -> str:
     text = (value or "").strip()
     if not text:
@@ -507,13 +727,19 @@ def _strip_address_schedule_tail(value: str) -> str:
     return text
 
 
-def _clean_address(value: str) -> str:
+def _clean_address(value: str, asides: Optional[List[str]] = None) -> str:
     text = (value or "").strip()
+    text, found = _split_parentheticals(text)
+    if asides is not None:
+        asides.extend(found)
+    text = _cut_address_field_tail(text)
+    text = re.sub(r"^(?:is|at)\s+", "", text, flags=re.IGNORECASE)
     text = re.sub(r"[—–\-]+$", "", text).strip()
     text = text.rstrip(".,;")
     text = re.sub(r"\s+", " ", text)
     text = _strip_address_schedule_tail(text)
-    return text
+    text = _normalize_street_types(text)
+    return text.strip(" ,;")
 
 
 def _has_full_street_address(value: str) -> bool:
@@ -532,14 +758,16 @@ def _is_plausible_address(value: str) -> bool:
         return False
     if len(lowered.split()) == 1 and lowered in INVALID_ADDRESS_TOKENS:
         return False
+    if re.fullmatch(r"\+?\d[\d\s]{7,}", text):
+        return False
     return bool(STREET_HINT_RE.search(text)) or bool(SUBURB_ONLY_RE.match(text))
 
 
-def _labelled_address(text: str, patterns: Tuple[str, ...]) -> str:
+def _labelled_address(text: str, patterns: Tuple[str, ...], asides: Optional[List[str]] = None) -> str:
     for pattern in patterns:
         match = gmail_parser._first_match((pattern,), text)
         if match:
-            cleaned = _clean_address(match)
+            cleaned = _clean_address(match, asides)
             if _is_plausible_address(cleaned):
                 return cleaned
     return ""
@@ -550,62 +778,77 @@ def _strip_pickup_bridge_tail(value: str) -> str:
     return re.sub(r"\s+and\s*$", "", text, flags=re.IGNORECASE).strip()
 
 
-def _extract_dual_street_addresses(text: str) -> Tuple[str, str]:
+def _extract_dual_street_addresses(text: str, asides: Optional[List[str]] = None) -> Tuple[str, str]:
     body = text or ""
     for pattern in (NEW_ADDRESS_IS_RE, DELIVERY_INDICATOR_RE):
         match = pattern.search(body)
         if not match:
             continue
         pickup = _strip_pickup_bridge_tail(match.group("pickup"))
-        delivery = _clean_address(match.group("delivery"))
+        delivery = _clean_address(match.group("delivery"), asides)
+        pickup = _clean_address(pickup, asides)
         if _is_plausible_address(pickup) and _is_plausible_address(delivery):
+            if ADDRESS_LEAD_RE.match(pickup) or re.match(r"^\d{8,}", pickup):
+                continue
             return pickup, delivery
     return "", ""
 
 
-def _extract_locations(text: str) -> Tuple[str, str, bool, bool]:
-    pickup, delivery = _extract_dual_street_addresses(text)
-    if pickup or delivery:
-        return (
-            pickup,
-            delivery,
-            not _has_full_street_address(pickup),
-            not _has_full_street_address(delivery),
-        )
+def _location_result(
+    pickup: str, delivery: str, asides: Optional[List[str]] = None
+) -> Tuple[str, str, bool, bool, List[str]]:
+    return (
+        pickup,
+        delivery,
+        not _has_full_street_address(pickup),
+        not _has_full_street_address(delivery),
+        list(asides or []),
+    )
 
-    pickup = _labelled_address(text, PICKUP_LABELS)
-    delivery = _labelled_address(text, DELIVERY_LABELS)
+
+def _extract_locations(text: str) -> Tuple[str, str, bool, bool, List[str]]:
+    asides: List[str] = []
+    labelled_pickup = _labelled_address(text, PICKUP_LABELS, asides)
+    labelled_delivery = _labelled_address(text, DELIVERY_LABELS, asides)
+    if labelled_pickup and labelled_delivery:
+        return _location_result(labelled_pickup, labelled_delivery, asides)
+
+    pickup, delivery = _extract_dual_street_addresses(text, asides)
     if pickup or delivery:
-        return pickup, delivery, not _has_full_street_address(pickup), not _has_full_street_address(delivery)
+        pickup = pickup or labelled_pickup
+        delivery = delivery or labelled_delivery
+        return _location_result(pickup, delivery, asides)
 
     for pattern in (FROM_TO_LINE_RE, MOVING_FROM_TO_RE):
         match = pattern.search(text or "")
         if match:
-            pickup = _clean_address(match.group(1))
-            delivery = _clean_address(match.group(2))
-            return pickup, delivery, not _has_full_street_address(pickup), not _has_full_street_address(delivery)
+            pickup = _clean_address(match.group(1), asides) or labelled_pickup
+            delivery = _clean_address(match.group(2), asides) or labelled_delivery
+            return _location_result(pickup, delivery, asides)
 
     street_match = STREET_TO_STREET_RE.search(text or "")
     if street_match:
-        pickup = _clean_address(street_match.group(1))
-        delivery = _clean_address(street_match.group(2))
-        return pickup, delivery, not _has_full_street_address(pickup), not _has_full_street_address(delivery)
+        pickup = _clean_address(street_match.group(1), asides) or labelled_pickup
+        delivery = _clean_address(street_match.group(2), asides) or labelled_delivery
+        return _location_result(pickup, delivery, asides)
 
-    if not pickup and not delivery:
-        to_match = STANDALONE_TO_RE.search(text or "")
-        if to_match:
-            delivery = _clean_address(to_match.group(1))
-            return "", delivery, False, not _has_full_street_address(delivery)
+    if labelled_pickup or labelled_delivery:
+        return _location_result(labelled_pickup, labelled_delivery, asides)
+
+    to_match = STANDALONE_TO_RE.search(text or "")
+    if to_match:
+        delivery = _clean_address(to_match.group(1), asides)
+        return _location_result("", delivery, asides)
 
     sms_pickup, sms_delivery = sms_inbound_parser._extract_locations(text)
     if sms_pickup or sms_delivery:
-        pickup = _clean_address(sms_pickup.replace(", WA", ""))
-        delivery = _clean_address(sms_delivery.replace(", WA", ""))
-        return pickup, delivery, not _has_full_street_address(pickup), not _has_full_street_address(delivery)
+        pickup = _clean_address(sms_pickup.replace(", WA", ""), asides)
+        delivery = _clean_address(sms_delivery.replace(", WA", ""), asides)
+        return _location_result(pickup, delivery, asides)
 
     moving_match = MOVING_TO_RE.search(text or "")
     if moving_match:
-        delivery = _clean_address(moving_match.group(1))
+        delivery = _clean_address(moving_match.group(1), asides)
         before = (text or "")[: moving_match.start()].strip().splitlines()
         pickup = ""
         for line in reversed(before):
@@ -618,11 +861,11 @@ def _extract_locations(text: str) -> Tuple[str, str, bool, bool]:
                 continue
             if _parse_calendar_date(line, _perth_today()):
                 continue
-            pickup = _clean_address(line)
+            pickup = _clean_address(line, asides)
             break
-        return pickup, delivery, not _has_full_street_address(pickup), not _has_full_street_address(delivery)
+        return _location_result(pickup, delivery, asides)
 
-    return "", "", False, False
+    return _location_result("", "", asides)
 
 
 def _parse_start_time_24h(value: str) -> str:
@@ -765,7 +1008,7 @@ def _keyword_note_lines(text: str, parsed: Dict[str, Any]) -> List[str]:
     return deduped
 
 
-def _extract_notes(text: str, parsed: Dict[str, Any]) -> str:
+def _extract_notes(text: str, parsed: Dict[str, Any], asides: Optional[List[str]] = None) -> str:
     keyword_lines = _keyword_note_lines(text, parsed)
     remaining = []
     for line in (text or "").splitlines():
@@ -775,6 +1018,22 @@ def _extract_notes(text: str, parsed: Dict[str, Any]) -> str:
         if _structured_line(stripped, parsed):
             continue
         remaining.append(stripped)
+    for aside in asides or []:
+        cleaned = (aside or "").strip()
+        if not cleaned:
+            continue
+        if _structured_line(cleaned, parsed):
+            continue
+        duplicate = False
+        for key in ("customer_name", "phone", "email", "pickup_address", "delivery_address"):
+            value = (parsed.get(key) or "").strip()
+            if value and value.lower() == cleaned.lower():
+                duplicate = True
+                break
+        if duplicate:
+            continue
+        if cleaned not in remaining:
+            remaining.append(cleaned)
 
     sections = []
     if keyword_lines:
@@ -847,22 +1106,16 @@ def parse_pasted_text(
     if not message:
         return empty
 
-    sms_fields = sms_inbound_parser.parse_inbound_sms("", message)
-    customer_name = _pick(_extract_name(message), _clean_name(sms_fields.get("customer_name", "")))
-    phone = _pick(_extract_phone(message), normalize_au_mobile(sms_fields.get("phone", "")))
+    date_source, _paren_notes = _split_parentheticals(message)
+    sms_name = sms_inbound_parser._extract_name(message)
+    customer_name = _pick(_extract_name(message), _clean_name(sms_name))
+    phone = _extract_phone(message)
     email = _extract_email(message)
-    move_date, date_ambiguous = _extract_move_date(message, ref_date)
-    if not move_date and sms_fields.get("move_date") and not date_ambiguous:
-        sms_iso, sms_ambiguous = _parse_relative_date(sms_fields.get("move_date", ""), ref_date)
-        if sms_iso and not sms_ambiguous:
-            move_date = sms_iso
-        date_ambiguous = date_ambiguous or sms_ambiguous
+    move_date, date_ambiguous = _extract_move_date(date_source, ref_date)
 
-    pickup, delivery, pickup_suburb_only, delivery_suburb_only = _extract_locations(message)
-    pickup = _pick(pickup, sms_fields.get("pickup_address", "").replace("TBC — see SMS notes", ""))
-    delivery = _pick(delivery, sms_fields.get("delivery_address", "").replace("TBC — see SMS notes", ""))
+    pickup, delivery, pickup_suburb_only, delivery_suburb_only, asides = _extract_locations(message)
 
-    start_time, time_approximate, time_vague = _extract_start_time(message)
+    start_time, time_approximate, time_vague = _extract_start_time(date_source)
 
     interim = {
         "customer_name": customer_name,
@@ -872,7 +1125,7 @@ def parse_pasted_text(
         "pickup_address": pickup,
         "delivery_address": delivery,
     }
-    notes = _extract_notes(message, interim)
+    notes = _extract_notes(message, interim, asides + _paren_notes)
 
     fields = {
         "customer_name": customer_name,
@@ -906,7 +1159,7 @@ def apply_parsed_fields(form: Dict[str, Any], parsed: Dict[str, Any]) -> Dict[st
         "pickup_address": parsed.get("pickup_address") or "",
         "delivery_address": parsed.get("delivery_address") or "",
         "notes": parsed.get("notes") or "",
-        "start_time": parsed.get("start_time") or merged.get("start_time", ""),
+        "start_time": (parsed.get("start_time") or "").strip(),
     }
     merged.update(mapping)
     return merged
