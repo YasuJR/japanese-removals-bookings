@@ -176,7 +176,7 @@ def test_booking_details_pricing_css_keeps_value_column_wide():
     assert "minmax(0, 1fr)" in grid_block
     assert "width: 100%" in desktop.split(".booking-details-grid {")[1][:220]
     assert "9.5rem 1fr" not in grid_block
-    extras_block = desktop.split(".booking-details-extra-list li")[1][:280]
+    extras_block = desktop.split(".booking-details-extra-list li")[1][:400]
     assert "word-break: normal" in extras_block
     assert "overflow-wrap: break-word" in extras_block
     assert "white-space: normal" in extras_block
@@ -184,7 +184,27 @@ def test_booking_details_pricing_css_keeps_value_column_wide():
     invoice_summary = desktop.split(".invoice-summary {")[1][:280]
     assert "auto-fill" in invoice_summary
     assert "minmax(0, 1fr)" in mobile.split(".booking-details-grid > div")[1][:400]
-    assert "word-break: normal" in mobile.split(".booking-details-extra-list li")[1][:200]
+    assert "word-break: normal" in mobile.split(".booking-details-extra-list li")[1][:280]
+    return True
+
+
+def test_booking_details_pricing_css_keeps_amounts_horizontal():
+    desktop = (ROOT / "static" / "style.css").read_text()
+    mobile = (ROOT / "static" / "mobile.css").read_text()
+    pricing_start = desktop.find(".booking-details-pricing {")
+    extras_start = desktop.find(".booking-details-pricing .booking-details-extras dd")
+    assert pricing_start != -1 and extras_start != -1
+    pricing_block = desktop[pricing_start:extras_start]
+    assert "word-break: break-all" not in pricing_block
+    assert "white-space: nowrap" in desktop.split(".booking-details-pricing dd")[1][:220]
+    assert "white-space: nowrap" in desktop.split(".booking-details-pricing dt")[1][:220]
+    assert "white-space: nowrap" in desktop.split(".booking-details-pricing .status-pill")[1][:180]
+    assert "white-space: nowrap" in desktop.split(".booking-details-total dd")[1][:180]
+    assert "repeat(2, minmax(16rem, 1fr))" in desktop
+    assert "grid-template-columns: 1fr" in mobile.split(".booking-details-pricing {")[1][:220]
+    assert "white-space: nowrap" in mobile.split(".booking-details-pricing dd")[1][:220]
+    assert "white-space: nowrap" in mobile.split(".booking-details-pricing dt")[1][:180]
+    assert "word-break: break-all" not in mobile.split(".booking-details-pricing {")[1][:900]
     return True
 
 
@@ -248,6 +268,7 @@ def main():
         test_view_booking_page_shows_pricing_and_status_fields,
         test_view_booking_extra_charges_display_horizontally,
         test_booking_details_pricing_css_keeps_value_column_wide,
+        test_booking_details_pricing_css_keeps_amounts_horizontal,
         test_view_booking_action_links,
         test_edit_booking_still_works,
         test_view_booking_mobile_layout,

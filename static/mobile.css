@@ -351,13 +351,33 @@
   }
 
   .booking-details-pricing {
+    grid-template-columns: 1fr;
     padding: 0;
     background: transparent;
     border: none;
   }
 
-  .booking-details-extras dd,
-  .booking-details-extra-list li {
+  .booking-details-pricing > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .booking-details-pricing dt {
+    white-space: nowrap;
+  }
+
+  .booking-details-pricing dd {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  .booking-details-pricing .status-pill {
+    white-space: nowrap;
+  }
+
+  .booking-details-pricing .booking-details-extras dd,
+  .booking-details-pricing .booking-details-extra-list,
+  .booking-details-pricing .booking-details-extra-list li {
     overflow-wrap: break-word;
     word-break: normal;
     white-space: normal;
