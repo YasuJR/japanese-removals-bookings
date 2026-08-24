@@ -8,7 +8,7 @@
       "details": [
         "Profit calculated correctly for bank transfer booking."
       ],
-      "booking_id": 65,
+      "booking_id": 318,
       "metrics": {
         "revenue": 330.0,
         "gst_amount": 30.0,
@@ -17,19 +17,21 @@
         "staff_cost": 100.0,
         "fuel_cost": 50.0,
         "truck_cost": 80.0,
+        "parking_cost": 0.0,
         "other_costs": 0.0,
+        "total_job_cost": 230.0,
         "total_costs": 230.0,
         "estimated_profit": 70.0,
-        "profit_margin_percent": 21.21
+        "profit_margin_percent": 23.33
       }
     },
     {
-      "name": "Test B \u2014 Paid Stripe card payment includes surcharge",
+      "name": "Test B \u2014 Paid Stripe card payment tracks surcharge separately",
       "pass": true,
       "details": [
-        "Stripe fee included in profit calculation."
+        "Stripe fee tracked separately; Total Job Cost excludes Stripe."
       ],
-      "booking_id": 66,
+      "booking_id": 319,
       "metrics": {
         "revenue": 330.0,
         "gst_amount": 30.0,
@@ -38,10 +40,12 @@
         "staff_cost": 100.0,
         "fuel_cost": 50.0,
         "truck_cost": 80.0,
+        "parking_cost": 0.0,
         "other_costs": 0.0,
-        "total_costs": 239.9,
-        "estimated_profit": 60.1,
-        "profit_margin_percent": 18.21
+        "total_job_cost": 230.0,
+        "total_costs": 230.0,
+        "estimated_profit": 70.0,
+        "profit_margin_percent": 23.33
       }
     },
     {
@@ -50,9 +54,9 @@
       "details": [
         "Pending booking excluded by default."
       ],
-      "pending_id": 67,
-      "completed_id": 68,
-      "summary_booking_count": 32
+      "pending_id": 320,
+      "completed_id": 321,
+      "summary_booking_count": 94
     },
     {
       "name": "Test D \u2014 Completed booking included in monthly summary",
@@ -60,7 +64,7 @@
       "details": [
         "Completed booking included with revenue counted."
       ],
-      "booking_id": 69,
+      "booking_id": 322,
       "metrics": {
         "revenue": 330.0,
         "gst_amount": 30.0,
@@ -69,10 +73,12 @@
         "staff_cost": 0.0,
         "fuel_cost": 0.0,
         "truck_cost": 0.0,
+        "parking_cost": 0.0,
         "other_costs": 0.0,
+        "total_job_cost": 0.0,
         "total_costs": 0.0,
         "estimated_profit": 300.0,
-        "profit_margin_percent": 90.91
+        "profit_margin_percent": 100.0
       }
     },
     {
@@ -81,7 +87,7 @@
       "details": [
         "Profit recalculated after manual cost update."
       ],
-      "booking_id": 70,
+      "booking_id": 323,
       "before_profit": 70.0,
       "after_profit": 20.0
     }

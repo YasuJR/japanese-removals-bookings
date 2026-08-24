@@ -1,0 +1,15 @@
+<section class="booking-details-section job-costs-display">
+  <h3>Job Costs</h3>
+  <dl class="booking-details-grid booking-details-pricing job-costs-grid-display">
+    <div><dt>Staff Cost</dt><dd>{{ profit_summary.staff_cost|format_aud }}</dd></div>
+    <div><dt>Fuel Cost</dt><dd>{{ profit_summary.fuel_cost|format_aud }}</dd></div>
+    <div><dt>Truck Cost</dt><dd>{{ profit_summary.truck_cost|format_aud }}</dd></div>
+    <div><dt>Parking Cost</dt><dd>{{ profit_summary.parking_cost|format_aud }}</dd></div>
+    <div><dt>Other Cost</dt><dd>{{ profit_summary.other_costs|format_aud }}</dd></div>
+    <div class="booking-details-total"><dt>Total Job Cost</dt><dd>{{ profit_summary.total_job_cost|format_aud }}</dd></div>
+    <div><dt>Revenue</dt><dd>{{ profit_summary.revenue|format_aud }}{% if invoice_summary.gst_enabled %} <span class="muted">(incl. GST)</span>{% endif %}</dd></div>
+    <div><dt>Net Revenue</dt><dd>{{ profit_summary.net_revenue|format_aud }}</dd></div>
+    <div class="booking-details-total"><dt>Profit</dt><dd class="{% if profit_summary.estimated_profit < 0 %}profit-negative{% endif %}">{{ profit_summary.estimated_profit|format_aud }}</dd></div>
+    <div><dt>Margin</dt><dd>{{ profit_summary.profit_margin_percent|format_margin }}</dd></div>
+  </dl>
+</section>

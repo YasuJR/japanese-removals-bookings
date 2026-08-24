@@ -183,6 +183,8 @@
   <p class="invoice-send-blocked muted">{{ invoice_send.blocked_reason }}</p>
   {% endif %}
 
+  {% include '_job_costs_form.html' %}
+
   <div class="form-actions booking-save-actions">
     <button type="submit" name="action" value="save" class="btn-primary">Save changes</button>
     <a class="btn-secondary" href="{{ url_for('dashboard') }}">Cancel</a>

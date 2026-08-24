@@ -457,7 +457,21 @@ def _update_booking_from_form(booking_id, form):
     )
     if ok:
         services._persist_booking_extras(booking_id, data)
+        _save_job_costs_from_form(booking_id, form)
     return ok, errors, data
+
+
+def _copy_job_cost_form_values(target, form):
+    for key in booking_profit.JOB_COST_FIELDS:
+        if key in form:
+            target[key] = form.get(key)
+    return target
+
+
+def _save_job_costs_from_form(booking_id, form):
+    if not booking_profit.job_cost_fields_in_form(form):
+        return []
+    return booking_profit.save_profit_cost_fields(booking_id, form)
 
 
 def _overlap_payload(data, booking_id=None):
@@ -1926,10 +1940,12 @@ def new_booking():
             )
 
         data, errors = parse_booking_form(request.form)
+        _copy_job_cost_form_values(data, request.form)
         crew_warnings = _crew_warnings_for_data(data)
         db_errors, db_conflicts, override_applied = _validate_double_booking(data)
-        if errors or db_errors:
-            for msg in errors + db_errors:
+        cost_errors = booking_profit.job_cost_form_errors(request.form)
+        if errors or db_errors or cost_errors:
+            for msg in errors + db_errors + cost_errors:
                 flash(msg, "error")
             ctx = _double_booking_context(data)
             paste_text = request.form.get("paste_text", "")
@@ -1952,6 +1968,7 @@ def new_booking():
             )
         _flash_crew_warnings(crew_warnings)
         booking_id = _create_booking_from_data(data)
+        _save_job_costs_from_form(booking_id, request.form)
         _apply_new_booking_override(booking_id, override_applied, db_conflicts)
         _flash_integration_messages(services.after_booking_created(booking_id))
         flash("Booking saved (reference #{0}).".format(booking_id), "success")
@@ -2039,6 +2056,7 @@ def _view_booking_extras(row) -> dict:
     return {
         "duration_label": format_hours_label(booking_duration_hours(booking)),
         "invoice_summary": _invoice_summary_for_row(row),
+        "profit_summary": booking_profit.profit_summary_for_booking(booking),
         **_double_booking_context(booking),
     }
 
@@ -2223,14 +2241,13 @@ def edit_booking(booking_id):
             flash(msg, "success" if ok else "error")
             return redirect(url_for("edit_booking", booking_id=booking_id))
         if action == "update_invoice":
-            ok, errors, msg = services.update_booking_invoice(
-                booking_id, request.form
-            )
-            if errors:
-                for err in errors:
+            cost_errors = booking_profit.job_cost_form_errors(request.form)
+            if cost_errors:
+                for err in cost_errors:
                     flash(err, "error")
                 row = db.get_booking(booking_id)
                 data, _ = parse_booking_form(request.form)
+                _copy_job_cost_form_values(data, request.form)
                 return render_template(
                     "edit_booking.html",
                     booking=row,
@@ -2239,6 +2256,26 @@ def edit_booking(booking_id):
                     pricing_panel_mode=True,
                     **_edit_booking_extras(row),
                 )
+            ok, errors, msg = services.update_booking_invoice(
+                booking_id, request.form
+            )
+            if errors:
+                for err in errors:
+                    flash(err, "error")
+                row = db.get_booking(booking_id)
+                data, _ = parse_booking_form(request.form)
+                _copy_job_cost_form_values(data, request.form)
+                return render_template(
+                    "edit_booking.html",
+                    booking=row,
+                    form=data,
+                    status=_integration_status(),
+                    pricing_panel_mode=True,
+                    **_edit_booking_extras(row),
+                )
+            if ok:
+                _save_job_costs_from_form(booking_id, request.form)
+                booking_profit.recalculate_and_save(booking_id)
             flash(msg, "success" if ok else "error")
             return redirect(url_for("edit_booking", booking_id=booking_id))
         if action == "send_invoice":
@@ -2252,6 +2289,23 @@ def edit_booking(booking_id):
             return redirect(url_for("edit_booking", booking_id=booking_id))
 
         previous_status = job_status.display(services.booking_to_dict(row))
+        cost_errors = booking_profit.job_cost_form_errors(request.form)
+        if cost_errors:
+            data, _ = parse_booking_form(request.form)
+            _copy_job_cost_form_values(data, request.form)
+            for msg in cost_errors:
+                flash(msg, "error")
+            extras = _edit_booking_extras(row)
+            extras.update(_double_booking_context(data, booking_id=booking_id))
+            return render_template(
+                "edit_booking.html",
+                booking=row,
+                form=data,
+                status=_integration_status(),
+                crew_warnings=_crew_warnings_for_data(data, booking_id=booking_id),
+                pricing_panel_mode=True,
+                **extras,
+            )
         ok, errors, data = _update_booking_from_form(booking_id, request.form)
         crew_warnings = _crew_warnings_for_data(data, booking_id=booking_id)
         db_errors, db_conflicts, override_applied = _validate_double_booking(
@@ -2263,6 +2317,7 @@ def edit_booking(booking_id):
             row = db.get_booking(booking_id)
             extras = _edit_booking_extras(row)
             extras.update(_double_booking_context(data, booking_id=booking_id))
+            _copy_job_cost_form_values(data, request.form)
             return render_template(
                 "edit_booking.html",
                 booking=row,

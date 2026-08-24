@@ -60,6 +60,7 @@ def _create_job(
     fuel_cost=0.0,
     truck_cost=0.0,
     other_costs=0.0,
+    parking_cost=0.0,
 ):
     global _book_n
     _book_n += 1
@@ -92,6 +93,7 @@ def _create_job(
             "staff_cost": staff_cost,
             "fuel_cost": fuel_cost,
             "truck_cost": truck_cost,
+            "parking_cost": parking_cost,
             "other_costs": other_costs,
         },
     )

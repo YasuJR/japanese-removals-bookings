@@ -1,0 +1,70 @@
+{% set cost_src = booking if booking is defined else none %}
+{% macro job_cost_value(name) -%}
+{%- if form is defined and form.get(name) is not none and form.get(name) != '' -%}
+{{ form.get(name) }}
+{%- elif cost_src is not none and cost_src[name] is not none -%}
+{{ '%.2f'|format(cost_src[name]|float) }}
+{%- endif -%}
+{%- endmacro %}
+<section class="job-costs-panel" id="job-costs-panel">
+  <h3>Job Costs</h3>
+  <p class="muted form-hint">Optional. Empty amounts are saved as $0.00. Total Job Cost is calculated automatically.</p>
+  <div class="job-costs-grid">
+    <label class="job-cost-field">
+      Staff Cost
+      <span class="money-input">
+        <span class="money-prefix" aria-hidden="true">$</span>
+        <input type="number" name="staff_cost" class="job-cost-input" min="0" step="0.01"
+               inputmode="decimal" placeholder="0.00"
+               value="{{ job_cost_value('staff_cost') }}">
+      </span>
+    </label>
+    <label class="job-cost-field">
+      Fuel Cost
+      <span class="money-input">
+        <span class="money-prefix" aria-hidden="true">$</span>
+        <input type="number" name="fuel_cost" class="job-cost-input" min="0" step="0.01"
+               inputmode="decimal" placeholder="0.00"
+               value="{{ job_cost_value('fuel_cost') }}">
+      </span>
+    </label>
+    <label class="job-cost-field">
+      Truck Cost
+      <span class="money-input">
+        <span class="money-prefix" aria-hidden="true">$</span>
+        <input type="number" name="truck_cost" class="job-cost-input" min="0" step="0.01"
+               inputmode="decimal" placeholder="0.00"
+               value="{{ job_cost_value('truck_cost') }}">
+      </span>
+    </label>
+    <label class="job-cost-field">
+      Parking Cost
+      <span class="money-input">
+        <span class="money-prefix" aria-hidden="true">$</span>
+        <input type="number" name="parking_cost" class="job-cost-input" min="0" step="0.01"
+               inputmode="decimal" placeholder="0.00"
+               value="{{ job_cost_value('parking_cost') }}">
+      </span>
+    </label>
+    <label class="job-cost-field">
+      Other Cost
+      <span class="money-input">
+        <span class="money-prefix" aria-hidden="true">$</span>
+        <input type="number" name="other_costs" class="job-cost-input" min="0" step="0.01"
+               inputmode="decimal" placeholder="0.00"
+               value="{{ job_cost_value('other_costs') }}">
+      </span>
+    </label>
+    <div class="job-cost-field job-cost-total-field">
+      <span class="job-cost-total-label">Total Job Cost</span>
+      <strong class="job-cost-total-display" id="job-cost-total-display">
+        {% if profit_summary is defined %}
+        {{ profit_summary.total_job_cost|format_aud }}
+        {% else %}
+        $0.00
+        {% endif %}
+      </strong>
+    </div>
+  </div>
+</section>
+<script src="{{ url_for('static', filename='job_costs.js') }}"></script>

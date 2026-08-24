@@ -82,13 +82,15 @@ def test_a() -> dict:
     expected_gst = round(expected_revenue / 11.0, 2)
     expected_net = round(expected_revenue - expected_gst, 2)
     expected_profit = round(expected_net - 100 - 50 - 80, 2)
-    expected_margin = round(expected_profit / expected_revenue * 100.0, 2)
+    expected_margin = round(expected_profit / expected_net * 100.0, 2)
 
     checks = [
         ("revenue", metrics["revenue"], expected_revenue),
         ("gst_amount", metrics["gst_amount"], expected_gst),
         ("net_revenue", metrics["net_revenue"], expected_net),
         ("stripe_fee", metrics["stripe_fee"], 0.0),
+        ("parking_cost", metrics["parking_cost"], 0.0),
+        ("total_job_cost", metrics["total_job_cost"], 230.0),
         ("estimated_profit", metrics["estimated_profit"], expected_profit),
         ("profit_margin_percent", metrics["profit_margin_percent"], expected_margin),
     ]
@@ -131,12 +133,16 @@ def test_b() -> dict:
     expected_revenue = 330.0
     expected_gst = round(expected_revenue / 11.0, 2)
     expected_net = round(expected_revenue - expected_gst, 2)
-    expected_profit = round(expected_net - 100 - 50 - 80 - 9.90, 2)
+    expected_profit = round(expected_net - 100 - 50 - 80, 2)
 
     failed = []
     if round(metrics["stripe_fee"], 2) != 9.90:
         failed.append(
             "stripe_fee: got {0}, expected 9.90".format(metrics["stripe_fee"])
+        )
+    if round(metrics["total_job_cost"], 2) != 230.0:
+        failed.append(
+            "total_job_cost: got {0}, expected 230.00".format(metrics["total_job_cost"])
         )
     if round(metrics["estimated_profit"], 2) != expected_profit:
         failed.append(
@@ -145,9 +151,9 @@ def test_b() -> dict:
             )
         )
     return {
-        "name": "Test B — Paid Stripe card payment includes surcharge",
+        "name": "Test B — Paid Stripe card payment tracks surcharge separately",
         "pass": not failed,
-        "details": failed or ["Stripe fee included in profit calculation."],
+        "details": failed or ["Stripe fee tracked separately; Total Job Cost excludes Stripe."],
         "booking_id": booking_id,
         "metrics": metrics,
     }

@@ -420,9 +420,11 @@ def save_profit_costs(booking_id: int, form: Dict[str, Any]) -> Tuple[bool, str]
     row = db.get_booking(booking_id)
     if not row:
         return False, "Booking not found."
-    booking_profit.save_profit_cost_fields(booking_id, form)
+    errors = booking_profit.save_profit_cost_fields(booking_id, form)
+    if errors:
+        return False, " ".join(errors)
     booking_profit.recalculate_and_save(booking_id)
-    return True, "Profit costs saved and profit recalculated."
+    return True, "Job costs saved."
 
 
 def recalculate_booking_profit(booking_id: int) -> Tuple[bool, str]:

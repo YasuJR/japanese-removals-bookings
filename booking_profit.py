@@ -2,12 +2,28 @@
 
 from calendar import monthrange
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import database as db
 import invoice
 import job_status
 import sales_dashboard
+
+JOB_COST_FIELDS = (
+    "staff_cost",
+    "fuel_cost",
+    "truck_cost",
+    "parking_cost",
+    "other_costs",
+)
+
+JOB_COST_FIELD_LABELS = {
+    "staff_cost": "Staff Cost",
+    "fuel_cost": "Fuel Cost",
+    "truck_cost": "Truck Cost",
+    "parking_cost": "Parking Cost",
+    "other_costs": "Other Cost",
+}
 
 PROFIT_STATUS_FILTERS = [
     ("all", "All statuses"),
@@ -69,12 +85,15 @@ def calculate_booking_profit(booking: Dict[str, Any]) -> Dict[str, Any]:
     staff_cost = resolve_staff_cost(resolved)
     fuel_cost = _money(_float(resolved.get("fuel_cost")))
     truck_cost = _money(_float(resolved.get("truck_cost")))
+    parking_cost = _money(_float(resolved.get("parking_cost")))
     other_costs = _money(_float(resolved.get("other_costs")))
-    total_costs = _money(
-        stripe_fee + staff_cost + fuel_cost + truck_cost + other_costs
+    total_job_cost = _money(
+        staff_cost + fuel_cost + truck_cost + parking_cost + other_costs
     )
-    estimated_profit = _money(net_revenue - total_costs)
-    margin = profit_margin_percent(revenue, estimated_profit)
+    # Dashboard Actual/Projected Costs use Total Job Cost (not Stripe).
+    total_costs = total_job_cost
+    estimated_profit = _money(net_revenue - total_job_cost)
+    margin = net_margin_percent(estimated_profit, net_revenue)
     return {
         "revenue": revenue,
         "gst_amount": gst_amount,
@@ -83,7 +102,9 @@ def calculate_booking_profit(booking: Dict[str, Any]) -> Dict[str, Any]:
         "staff_cost": staff_cost,
         "fuel_cost": fuel_cost,
         "truck_cost": truck_cost,
+        "parking_cost": parking_cost,
         "other_costs": other_costs,
+        "total_job_cost": total_job_cost,
         "total_costs": total_costs,
         "estimated_profit": estimated_profit,
         "profit_margin_percent": margin,
@@ -131,6 +152,39 @@ def recalculate_and_save(booking_id: int) -> Optional[Dict[str, Any]]:
     return metrics
 
 
+def parse_money_amount(raw: Any) -> Tuple[Optional[float], Optional[str]]:
+    """Empty → $0. Reject negatives and non-numeric values."""
+    if raw is None:
+        return 0.0, None
+    text = str(raw).strip()
+    if not text:
+        return 0.0, None
+    try:
+        value = _money(float(text))
+    except (TypeError, ValueError):
+        return None, "Enter a valid amount."
+    if value < 0:
+        return None, "Amount cannot be negative."
+    return value, None
+
+
+def job_cost_fields_in_form(form: Dict[str, Any]) -> bool:
+    return any(key in form for key in JOB_COST_FIELDS)
+
+
+def job_cost_form_errors(form: Dict[str, Any]) -> List[str]:
+    if not job_cost_fields_in_form(form):
+        return []
+    errors = []
+    for key, label in JOB_COST_FIELD_LABELS.items():
+        if key not in form:
+            continue
+        _value, err = parse_money_amount(form.get(key))
+        if err:
+            errors.append("{0}: {1}".format(label, err))
+    return errors
+
+
 def parse_profit_cost_form(form: Dict[str, Any]) -> Dict[str, Any]:
     def _optional_float(key: str) -> Optional[float]:
         raw = (form.get(key) or "").strip()
@@ -141,19 +195,28 @@ def parse_profit_cost_form(form: Dict[str, Any]) -> Dict[str, Any]:
         except ValueError:
             return None
 
-    return {
-        "staff_cost": _optional_float("staff_cost") or 0.0,
-        "fuel_cost": _optional_float("fuel_cost") or 0.0,
-        "truck_cost": _optional_float("truck_cost") or 0.0,
-        "other_costs": _optional_float("other_costs") or 0.0,
-        "profit_crew_hours": _optional_float("profit_crew_hours"),
-        "profit_hourly_wage": _optional_float("profit_hourly_wage"),
-    }
+    fields: Dict[str, Any] = {}
+    for key in JOB_COST_FIELDS:
+        if key not in form:
+            continue
+        value, err = parse_money_amount(form.get(key))
+        fields[key] = 0.0 if err or value is None else value
+    if "profit_crew_hours" in form:
+        fields["profit_crew_hours"] = _optional_float("profit_crew_hours")
+    if "profit_hourly_wage" in form:
+        fields["profit_hourly_wage"] = _optional_float("profit_hourly_wage")
+    return fields
 
 
-def save_profit_cost_fields(booking_id: int, form: Dict[str, Any]) -> None:
+def save_profit_cost_fields(booking_id: int, form: Dict[str, Any]) -> List[str]:
+    errors = job_cost_form_errors(form)
+    if errors:
+        return errors
     fields = parse_profit_cost_form(form)
+    if not fields:
+        return []
     db.update_booking_profit_fields(booking_id, fields)
+    return []
 
 
 def is_included_in_monthly_summary(

@@ -2511,6 +2511,72 @@ a.driver-action-btn {
   margin-top: 0.75rem;
 }
 
+.job-costs-panel {
+  margin: 1.1rem 0 0.35rem;
+  padding: 0.9rem 0.95rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.job-costs-panel h3 {
+  margin: 0 0 0.35rem;
+}
+
+.job-costs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem 1rem;
+  margin-top: 0.7rem;
+}
+
+.job-cost-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.money-input {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 0.55rem;
+}
+
+.money-prefix {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.money-input .job-cost-input {
+  border: 0;
+  background: transparent;
+  width: 100%;
+  min-height: 2.4rem;
+  padding: 0.25rem 0;
+}
+
+.job-cost-total-field {
+  justify-content: center;
+}
+
+.job-cost-total-label {
+  font-weight: 700;
+}
+
+.job-cost-total-display {
+  font-size: 1.15rem;
+}
+
+.job-costs-display {
+  margin-top: 1rem;
+}
+
 .profit-summary-filters {
   display: flex;
   flex-wrap: wrap;

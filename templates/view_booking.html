@@ -80,6 +80,8 @@
     </dl>
   </section>
 
+  {% include '_job_costs_display.html' %}
+
   <div class="booking-details-footer-actions">
     <a class="btn-primary touch-action-btn touch-action-edit" href="{{ url_for('edit_booking', booking_id=booking.id) }}">Edit Booking</a>
     <a class="btn-secondary touch-action-btn" href="{{ url_for('dashboard') }}">Back to Dashboard</a>

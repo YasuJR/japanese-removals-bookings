@@ -388,6 +388,14 @@
     min-height: var(--touch);
   }
 
+  .job-costs-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .money-input .job-cost-input {
+    min-height: var(--touch);
+  }
+
   .touch-action-details {
     background: var(--white);
     color: var(--navy);

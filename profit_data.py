@@ -20,6 +20,7 @@ PROFIT_CSV_HEADERS = [
     "staff_cost",
     "fuel_cost",
     "truck_cost",
+    "parking_cost",
     "stripe_fee",
     "other_costs",
     "estimated_profit",
@@ -48,7 +49,8 @@ def _profit_row(booking: Dict[str, Any]) -> Dict[str, Any]:
         "gross_profit": metrics["net_revenue"]
         - metrics["staff_cost"]
         - metrics["fuel_cost"]
-        - metrics["truck_cost"],
+        - metrics["truck_cost"]
+        - metrics["parking_cost"],
         "margin_pct": metrics["profit_margin_percent"],
     }
 
@@ -66,6 +68,7 @@ def _sum_metrics(rows: List[Dict[str, Any]]) -> Dict[str, float]:
     staff_cost = 0.0
     fuel_cost = 0.0
     truck_cost = 0.0
+    parking_cost = 0.0
     for row in rows:
         metrics = calculate_booking_profit(row)
         revenue += metrics["revenue"]
@@ -76,6 +79,7 @@ def _sum_metrics(rows: List[Dict[str, Any]]) -> Dict[str, float]:
         staff_cost += metrics["staff_cost"]
         fuel_cost += metrics["fuel_cost"]
         truck_cost += metrics["truck_cost"]
+        parking_cost += metrics["parking_cost"]
     rev = _money(revenue)
     profit = _money(estimated_profit)
     net_rev = _money(net_revenue)
@@ -85,7 +89,9 @@ def _sum_metrics(rows: List[Dict[str, Any]]) -> Dict[str, float]:
         "net_revenue": net_rev,
         "total_costs": _money(total_costs),
         "estimated_profit": profit,
-        "gross_profit": _money(net_rev - staff_cost - fuel_cost - truck_cost),
+        "gross_profit": _money(
+            net_rev - staff_cost - fuel_cost - truck_cost - parking_cost
+        ),
         "net_profit": profit,
         "margin_pct": booking_profit.profit_margin_percent(rev, profit),
     }
@@ -165,9 +171,9 @@ def build_profit_dashboard(today: Optional[date] = None) -> Dict[str, Any]:
         "all_jobs": profit_rows,
         "job_count": len(profit_rows),
         "formula_hint": (
-            "Estimated profit = Revenue − GST − Stripe fee − Staff − Fuel − "
-            "Truck − Other costs. GST = total ÷ 11 when GST-inclusive. "
-            "Pending bookings excluded."
+            "Estimated profit = Net revenue − Total Job Cost "
+            "(Staff + Fuel + Truck + Parking + Other). "
+            "GST = total ÷ 11 when GST-inclusive. Pending bookings excluded."
         ),
     }
 
