@@ -1423,16 +1423,16 @@ def search_bookings(query: str) -> List[sqlite3.Row]:
         return list_all()
 
     safe = q.replace("%", "").replace("_", "")
-    pattern = "%" + safe + "%"
+    pattern = "%" + safe.lower() + "%"
     clauses = [
-        "customer_name LIKE ?",
-        "phone LIKE ?",
-        "email LIKE ?",
-        "pickup_address LIKE ?",
-        "delivery_address LIKE ?",
-        "move_date LIKE ?",
-        "notes LIKE ?",
-        "CAST(id AS TEXT) LIKE ?",
+        "LOWER(customer_name) LIKE ?",
+        "LOWER(phone) LIKE ?",
+        "LOWER(email) LIKE ?",
+        "LOWER(pickup_address) LIKE ?",
+        "LOWER(delivery_address) LIKE ?",
+        "LOWER(move_date) LIKE ?",
+        "LOWER(notes) LIKE ?",
+        "LOWER(CAST(id AS TEXT)) LIKE ?",
     ]
     params = [pattern] * len(clauses)
 
