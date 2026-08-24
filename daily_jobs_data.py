@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 import database as db
 import job_status
 from booking_times import (
+    duration_hours_from_times,
     effective_finish_hm,
     effective_start_hm,
     format_time_12h,
@@ -15,6 +16,24 @@ from booking_times import (
 )
 from crew import crew_from_storage
 from display_dates import normalize_move_date
+
+
+def format_job_duration_label(hours: Optional[float]) -> str:
+    """Display hours as 2hr / 2.5hr / 2.25hr from Start–Finish duration."""
+    if hours is None:
+        return ""
+    try:
+        value = float(hours)
+    except (TypeError, ValueError):
+        return ""
+    if value <= 0:
+        return ""
+    rounded = round(value, 2)
+    if abs(rounded - int(rounded)) < 1e-9:
+        text = str(int(rounded))
+    else:
+        text = "{0:.2f}".format(rounded).rstrip("0").rstrip(".")
+    return "{0}hr".format(text)
 
 
 def _time_to_minutes(hm: str) -> int:
@@ -46,6 +65,7 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
     finish_hm = normalize_time_input(row.get("finish_time")) or effective_finish_hm(row)
     start_display = format_time_12h(start_hm)
     finish_display = format_time_12h(finish_hm)
+    duration_hours = duration_hours_from_times(start_hm, finish_hm)
     crew_list = crew_from_storage(row.get("crew"))
     return {
         "id": int(row["id"]),
@@ -59,6 +79,7 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
         "crew_display": _crew_slash_display(row),
         "crew_list": crew_list,
         "time_range": "{0} – {1}".format(start_display, finish_display),
+        "duration_label": format_job_duration_label(duration_hours),
         "start_display": start_display,
         "finish_display": finish_display,
         "start_minutes": _time_to_minutes(start_hm),

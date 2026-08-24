@@ -39,7 +39,12 @@
     <article class="daily-job-card">
       <a class="daily-job-card-link" href="{{ url_for('view_booking', booking_id=job.id) }}">
         <p class="daily-job-label">{{ job.job_label }}</p>
-        <p class="daily-job-time">{{ job.time_range }}</p>
+        <p class="daily-job-time">
+          <span class="daily-job-time-range">{{ job.time_range }}</span>
+          {% if job.duration_label %}
+          <span class="daily-job-duration">{{ job.duration_label }}</span>
+          {% endif %}
+        </p>
         <h2 class="daily-job-customer">{{ job.customer_name }}</h2>
         <p class="daily-job-meta">{{ job.num_movers }} mover{% if job.num_movers != 1 %}s{% endif %}</p>
         <p class="daily-job-row"><span class="daily-job-field">Crew:</span> {{ job.crew_display }}</p>

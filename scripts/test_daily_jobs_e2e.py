@@ -90,6 +90,7 @@ def test_daily_jobs_page_renders_cards_and_links():
     assert "JOB 1" in html
     assert "Max Meredith" in html
     assert "8:00 AM – 12:00 PM" in html
+    assert "4hr" in html
     assert "Crew:" in html
     assert "Katsu / Will / Yasu" in html
     assert "Pickup Map" in html
@@ -97,6 +98,49 @@ def test_daily_jobs_page_renders_cards_and_links():
     assert 'href="/bookings/{0}"'.format(booking_id) in html
     assert "← Back to Calendar" in html
     assert "Total Jobs" in html
+    return True
+
+
+def test_daily_jobs_duration_from_start_finish_times():
+    assert daily_jobs_data.format_job_duration_label(2) == "2hr"
+    assert daily_jobs_data.format_job_duration_label(2.0) == "2hr"
+    assert daily_jobs_data.format_job_duration_label(2.5) == "2.5hr"
+    assert daily_jobs_data.format_job_duration_label(2.25) == "2.25hr"
+    assert daily_jobs_data.format_job_duration_label(6) == "6hr"
+    assert daily_jobs_data.format_job_duration_label(None) == ""
+
+    move_date = "2026-12-21"
+    _create_booking("Job One", move_date, "08:00", "10:00", crew="Yasu")
+    _create_booking("Job Two", move_date, "11:35", "17:35", crew="Yasu")
+    _create_booking("Job Three", move_date, "08:15", "10:45", crew="Yasu")
+    _create_booking("Job Four", move_date, "08:00", "10:15", crew="Yasu")
+    # Stored duration_hours is 4 in helper; display must still use Start/Finish.
+    daily = daily_jobs_data.build_daily_jobs(move_date)
+    by_name = {job["customer_name"]: job for job in daily["jobs"]}
+    assert by_name["Job One"]["time_range"] == "8:00 AM – 10:00 AM"
+    assert by_name["Job One"]["duration_label"] == "2hr"
+    assert by_name["Job Two"]["time_range"] == "11:35 AM – 5:35 PM"
+    assert by_name["Job Two"]["duration_label"] == "6hr"
+    assert by_name["Job Three"]["time_range"] == "8:15 AM – 10:45 AM"
+    assert by_name["Job Three"]["duration_label"] == "2.5hr"
+    assert by_name["Job Four"]["time_range"] == "8:00 AM – 10:15 AM"
+    assert by_name["Job Four"]["duration_label"] == "2.25hr"
+    return True
+
+
+def test_daily_jobs_page_shows_duration_beside_times():
+    move_date = "2026-12-22"
+    _create_booking("Side By Side", move_date, "08:00", "10:00")
+    client = _login_client()
+    html = client.get("/calendar/daily/{0}".format(move_date)).get_data(as_text=True)
+    assert 'class="daily-job-time-range"' in html
+    assert "8:00 AM – 10:00 AM" in html
+    assert 'class="daily-job-duration">2hr</span>' in html
+    css = (ROOT / "static" / "daily_jobs.css").read_text()
+    time_block = css.split(".daily-job-time {")[1][:400]
+    assert "flex" in time_block
+    assert "nowrap" in time_block
+    assert ".daily-job-duration" in css
     return True
 
 
@@ -114,6 +158,8 @@ def main():
         test_daily_jobs_sorted_by_start_time,
         test_daily_jobs_summary_times_and_crew,
         test_daily_jobs_page_renders_cards_and_links,
+        test_daily_jobs_duration_from_start_finish_times,
+        test_daily_jobs_page_shows_duration_beside_times,
         test_calendar_page_includes_daily_jobs_navigation,
     ]
     passed = 0

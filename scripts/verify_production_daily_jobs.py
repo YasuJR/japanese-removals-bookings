@@ -183,7 +183,9 @@ def _extract_job_cards(html: str) -> list[dict]:
     for card in cards:
         label = re.search(r'class="daily-job-label"[^>]*>([^<]+)<', card)
         customer = re.search(r'class="daily-job-customer"[^>]*>([^<]+)<', card)
-        time_range = re.search(r'class="daily-job-time"[^>]*>([^<]+)<', card)
+        time_range = re.search(r'class="daily-job-time-range"[^>]*>([^<]+)<', card)
+        if not time_range:
+            time_range = re.search(r'class="daily-job-time"[^>]*>([^<]+)<', card)
         start_text = ""
         if time_range:
             start_text = (time_range.group(1).split("–")[0].strip())
