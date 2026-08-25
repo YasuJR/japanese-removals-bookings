@@ -191,10 +191,16 @@ STRIPE_SECRET_KEY = _env("STRIPE_SECRET_KEY")
 STRIPE_WEBHOOK_SECRET = _env("STRIPE_WEBHOOK_SECRET")
 STRIPE_SETTINGS_JSON = _env("STRIPE_SETTINGS_JSON")
 
-# Staff bootstrap (optional — first deploy)
+# Staff bootstrap (optional — first deploy). Office/admin login only.
+# Do not reuse this value as the Staff Portal password.
 STAFF_USERNAME = _env("STAFF_USERNAME")
 STAFF_PASSWORD = _env("STAFF_PASSWORD")
 STAFF_DISPLAY_NAME = _env("STAFF_DISPLAY_NAME", "Admin")
+
+# Staff Portal login (/staff/login). Independent of office/admin passwords.
+# Always read from the environment at call time — do not cache at import.
+def staff_portal_password() -> str:
+    return os.environ.get("STAFF_PORTAL_PASSWORD", "").strip()
 
 # Background job auth (Render cron → web health optional)
 CRON_SECRET = _env("CRON_SECRET")
@@ -215,6 +221,8 @@ def production_checks() -> dict:
         "app_base_url": APP_BASE_URL,
         "https": parsed.scheme == "https",
         "secret_key_ok": SECRET_KEY != _DEFAULT_SECRET and len(SECRET_KEY) >= 32,
+        "staff_portal_password_set": bool(staff_portal_password())
+        and staff_portal_password() != STAFF_PASSWORD,
         "oauth_callbacks": {
             "google": GOOGLE_REDIRECT_URI,
             "xero": XERO_REDIRECT_URI,

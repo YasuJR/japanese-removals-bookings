@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1a2744">
+  <title>Staff Portal login — Japanese Removals</title>
+  {% include '_head_icons.html' %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='staff_portal.css') }}">
+</head>
+<body class="login-page">
+  <main class="login-panel">
+    <div class="brand brand-login">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <h1>Japanese Removals</h1>
+        <p class="tagline">Staff Portal login</p>
+      </div>
+    </div>
+
+    {% if error %}
+    <ul class="flash-list">
+      <li class="flash flash-error">{{ error }}</li>
+    </ul>
+    {% endif %}
+
+    <form method="post" class="booking-form login-form" action="{{ url_for('staff_login') }}">
+      {% if next_url and next_url != "/staff" %}
+      <input type="hidden" name="next" value="{{ next_url }}">
+      {% endif %}
+      <label>
+        Password
+        <input type="password" name="password" required autocomplete="current-password" autofocus>
+      </label>
+      <button type="submit" class="btn-primary btn-block">Log in</button>
+    </form>
+  </main>
+</body>
+</html>

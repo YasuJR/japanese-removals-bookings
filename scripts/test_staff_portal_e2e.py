@@ -13,8 +13,13 @@ sys.path.insert(0, str(ROOT))
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-local-tests-only")
 
+# Independent from office/admin bootstrap password (STAFF_PASSWORD).
+TEST_STAFF_PORTAL_PASSWORD = "jr-staff-portal-test-only"
+os.environ["STAFF_PORTAL_PASSWORD"] = TEST_STAFF_PORTAL_PASSWORD
+
 import auth
 import database as db
+import staff_auth
 from app import app
 from dashboard_data import perth_today, week_range
 
@@ -69,18 +74,31 @@ def _unique(prefix):
     return "{0}-{1}-{2}".format(prefix, os.getpid(), _book_n)
 
 
-def _login_client():
+def _admin_client():
     global _user_n
     _user_n += 1
     db.init_db()
     uid = db.create_staff_user(
-        "staff-portal-{0}-{1}".format(os.getpid(), _user_n),
-        auth.hash_password("test"),
-        "Staff Portal Test",
+        "staff-portal-admin-{0}-{1}".format(os.getpid(), _user_n),
+        auth.hash_password("office-admin-test-password"),
+        "Office Admin Test",
     )
     client = app.test_client()
     with client.session_transaction() as sess:
         sess["user_id"] = uid
+    return client
+
+
+def _staff_client():
+    db.init_db()
+    client = app.test_client()
+    response = client.post(
+        "/staff/login",
+        data={"password": TEST_STAFF_PORTAL_PASSWORD},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert "/staff" in (response.headers.get("Location") or "")
     return client
 
 
@@ -150,7 +168,8 @@ def test_staff_requires_login():
     client = app.test_client()
     response = client.get("/staff", follow_redirects=False)
     assert response.status_code == 302
-    assert "/login" in (response.headers.get("Location") or "")
+    location = response.headers.get("Location") or ""
+    assert "/staff/login" in location
     return True
 
 
@@ -158,7 +177,7 @@ def test_staff_page_defaults_to_today_and_shows_assigned_jobs():
     today = perth_today().isoformat()
     customer = _unique("StaffPortal Tanaka")
     _create_job(customer, today, crew="Yasu,Ken")
-    client = _login_client()
+    client = _staff_client()
     html = client.get("/staff").get_data(as_text=True)
 
     assert "Staff Portal" in html
@@ -196,7 +215,7 @@ def test_staff_filter_shows_only_selected_crew_jobs():
     _create_job(ken_customer, today, crew="Ken", start_time="09:00")
     _create_job(both_customer, today, crew="Yasu,Ken", start_time="10:00")
 
-    client = _login_client()
+    client = _staff_client()
     yasu_html = client.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
     ken_html = client.get("/staff?staff=Ken&range=today").get_data(as_text=True)
 
@@ -224,7 +243,7 @@ def test_today_and_tomorrow_hide_completed_and_cancelled():
     _create_job(tomorrow_live, tomorrow.isoformat(), crew="Yasu", status="Confirmed")
     _create_job(tomorrow_done, tomorrow.isoformat(), crew="Yasu", status="Completed")
 
-    client = _login_client()
+    client = _staff_client()
     today_html = client.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
     tomorrow_html = client.get("/staff?staff=Yasu&range=tomorrow").get_data(as_text=True)
 
@@ -245,7 +264,7 @@ def test_this_week_tab_includes_later_week_jobs():
     customer = _unique("WeekOnly")
     _create_job(customer, later.isoformat(), crew="Yasu", status="Confirmed")
 
-    client = _login_client()
+    client = _staff_client()
     today_html = client.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
     week_html = client.get("/staff?staff=Yasu&range=week").get_data(as_text=True)
 
@@ -261,7 +280,7 @@ def test_staff_portal_hides_financial_data_and_booking_admin_links():
     today = perth_today().isoformat()
     customer = _unique("NoMoney")
     booking_id = _create_job(customer, today, crew="Yasu")
-    client = _login_client()
+    client = _staff_client()
     html = client.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
 
     assert customer in html
@@ -291,7 +310,7 @@ def test_staff_portal_reflects_booking_updates():
         pickup="1 Old Pickup Rd, Perth WA 6000",
         notes="Original notes",
     )
-    client = _login_client()
+    client = _staff_client()
     before = client.get("/staff?staff=Ken&range=today").get_data(as_text=True)
     assert customer not in before
 
@@ -328,7 +347,7 @@ def test_staff_portal_reflects_booking_updates():
 
 
 def test_admin_desktop_nav_unchanged():
-    client = _login_client()
+    client = _admin_client()
     html = client.get("/dashboard").get_data(as_text=True)
     import re
 
@@ -347,6 +366,122 @@ def test_admin_desktop_nav_unchanged():
     return True
 
 
+def test_staff_login_uses_portal_password_not_admin_session():
+    client = _staff_client()
+    with client.session_transaction() as sess:
+        assert sess.get("user_id") is None
+        assert sess.get("username") is None
+    html = client.get("/staff").get_data(as_text=True)
+    assert "Staff Portal" in html
+    assert TEST_STAFF_PORTAL_PASSWORD not in html
+    assert 'href="/staff/logout"' in html
+    assert "/logout\"" not in html.replace("/staff/logout", "")
+    login_html = app.test_client().get("/staff/login").get_data(as_text=True)
+    assert TEST_STAFF_PORTAL_PASSWORD not in login_html
+    assert 'name="password"' in login_html
+    return True
+
+
+def test_admin_session_cannot_open_staff_portal():
+    client = _admin_client()
+    response = client.get("/staff", follow_redirects=False)
+    assert response.status_code == 302
+    assert "/staff/login" in (response.headers.get("Location") or "")
+    return True
+
+
+def test_staff_session_cannot_open_admin_pages():
+    client = _staff_client()
+    admin_paths = (
+        "/",
+        "/dashboard",
+        "/calendar",
+        "/invoices",
+        "/profit",
+        "/executive",
+        "/bookings/new",
+        "/bookings/all",
+        "/bookings/search",
+        "/driver",
+        "/settings",
+    )
+    for path in admin_paths:
+        response = client.get(path, follow_redirects=False)
+        assert response.status_code == 302, path
+        location = response.headers.get("Location") or ""
+        assert "/login" in location, path
+        assert "/staff/login" not in location, path
+    return True
+
+
+def test_staff_logout_is_separate_from_admin_logout():
+    staff = _staff_client()
+    logged_out = staff.get("/staff/logout", follow_redirects=False)
+    assert logged_out.status_code == 302
+    assert "/staff/login" in (logged_out.headers.get("Location") or "")
+    blocked = staff.get("/staff", follow_redirects=False)
+    assert blocked.status_code == 302
+    assert "/staff/login" in (blocked.headers.get("Location") or "")
+
+    admin = _admin_client()
+    admin_out = admin.get("/logout", follow_redirects=False)
+    assert admin_out.status_code == 302
+    location = admin_out.headers.get("Location") or ""
+    assert location.endswith("/login") or location.rstrip("/").endswith("/login")
+    assert "/staff/login" not in location
+    return True
+
+
+def test_wrong_password_and_admin_password_rejected():
+    client = app.test_client()
+    wrong = client.post(
+        "/staff/login",
+        data={"password": "office-admin-test-password"},
+        follow_redirects=False,
+    )
+    assert wrong.status_code == 200
+    html = wrong.get_data(as_text=True)
+    assert "Invalid password." in html
+    blocked = client.get("/staff", follow_redirects=False)
+    assert blocked.status_code == 302
+    assert "/staff/login" in (blocked.headers.get("Location") or "")
+
+    previous_admin = os.environ.get("STAFF_PASSWORD")
+    os.environ["STAFF_PASSWORD"] = TEST_STAFF_PORTAL_PASSWORD
+    try:
+        assert staff_auth.verify_staff_password(TEST_STAFF_PORTAL_PASSWORD) is False
+    finally:
+        if previous_admin is None:
+            os.environ.pop("STAFF_PASSWORD", None)
+        else:
+            os.environ["STAFF_PASSWORD"] = previous_admin
+    assert staff_auth.verify_staff_password(TEST_STAFF_PORTAL_PASSWORD) is True
+    return True
+
+
+def test_office_login_still_works_and_does_not_open_staff_portal():
+    db.init_db()
+    username = "office-login-{0}-{1}".format(os.getpid(), _user_n)
+    password = "office-admin-test-password"
+    db.create_staff_user(username, auth.hash_password(password), "Office Login Test")
+    client = app.test_client()
+    response = client.post(
+        "/login",
+        data={"username": username, "password": password},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    with client.session_transaction() as sess:
+        assert sess.get("user_id")
+        assert sess.get("username") == username
+    dashboard = client.get("/dashboard", follow_redirects=False)
+    assert dashboard.status_code == 200
+    staff = client.get("/staff", follow_redirects=False)
+    assert staff.status_code == 302
+    assert "/staff/login" in (staff.headers.get("Location") or "")
+    return True
+
+
 def main():
     tests = [
         test_staff_requires_login,
@@ -357,6 +492,12 @@ def main():
         test_staff_portal_hides_financial_data_and_booking_admin_links,
         test_staff_portal_reflects_booking_updates,
         test_admin_desktop_nav_unchanged,
+        test_staff_login_uses_portal_password_not_admin_session,
+        test_admin_session_cannot_open_staff_portal,
+        test_staff_session_cannot_open_admin_pages,
+        test_staff_logout_is_separate_from_admin_logout,
+        test_wrong_password_and_admin_password_rejected,
+        test_office_login_still_works_and_does_not_open_staff_portal,
     ]
     passed = 0
     for test in tests:

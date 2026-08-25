@@ -55,6 +55,7 @@ Copy `.env.production.example` into Render **Environment** (or an Environment Gr
 | `DATABASE_URL` | Auto-linked from Render PostgreSQL |
 | `APP_BASE_URL` | Public HTTPS URL |
 | `STAFF_USERNAME` / `STAFF_PASSWORD` | First admin user (created on first boot) |
+| `STAFF_PORTAL_PASSWORD` | Staff Portal login at `/staff/login` (must differ from the admin password) |
 
 **Integration secrets (env only — do not commit):**
 

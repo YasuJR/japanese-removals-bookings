@@ -45,6 +45,7 @@ from integrations import stripe as stripe_service
 from booking_helpers import apple_maps_url, mailto_href, sms_href, tel_href
 from driver_run_sheet_data import build_driver_run_sheet
 from staff_portal import build_staff_portal
+import staff_auth
 from outstanding_invoices_data import (
     INVOICE_FILTERS,
     build_outstanding_dashboard,
@@ -1828,8 +1829,38 @@ def profit_export_csv():
     )
 
 
+@app.route("/staff/login", methods=["GET", "POST"], endpoint="staff_login")
+def staff_login():
+    if staff_auth.is_staff_logged_in():
+        return redirect(staff_auth.safe_staff_next(request.args.get("next")))
+
+    error = ""
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if staff_auth.verify_staff_password(password):
+            dest = staff_auth.safe_staff_next(
+                request.args.get("next") or request.form.get("next")
+            )
+            response = redirect(dest)
+            staff_auth.attach_staff_session(response)
+            return response
+        error = "Invalid password."
+    return render_template(
+        "staff_login.html",
+        error=error,
+        next_url=staff_auth.safe_staff_next(request.args.get("next")),
+    )
+
+
+@app.route("/staff/logout", endpoint="staff_logout")
+def staff_logout():
+    response = redirect(url_for("staff_login"))
+    staff_auth.clear_staff_session(response)
+    return response
+
+
 @app.route("/staff", endpoint="staff_portal")
-@auth.login_required
+@staff_auth.staff_login_required
 def staff_portal():
     staff = request.args.get("staff", "").strip()
     range_key = request.args.get("range", "today").strip()
