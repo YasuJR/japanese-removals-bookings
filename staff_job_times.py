@@ -38,6 +38,49 @@ def format_worked_duration(minutes: Any) -> str:
     return "{0}min".format(mins)
 
 
+def format_weekly_worked(minutes: Any) -> str:
+    """Hours and minutes for weekly/day totals. Never decimal hours."""
+    try:
+        total = int(minutes)
+    except (TypeError, ValueError):
+        total = 0
+    if total <= 0:
+        return "0hr"
+    return format_worked_duration(total)
+
+
+def parse_actual_duration_minutes(value: Any) -> Optional[int]:
+    if value is None or str(value).strip() == "":
+        return None
+    try:
+        minutes = int(value)
+    except (TypeError, ValueError):
+        return None
+    if minutes <= 0:
+        return None
+    return minutes
+
+
+def worked_minutes(booking: Dict[str, Any]) -> int:
+    """Minutes that count toward this staff member's worked time.
+
+    Uses stored actual_duration only. Unset actual start/finish, missing
+    duration, or Cancelled jobs contribute 0. Does not split by crew size,
+    so the same job minutes apply to every assigned crew member.
+    """
+    if job_status.display(booking) == "Cancelled":
+        return 0
+    start = parse_actual_clock(booking.get("actual_start_time"))
+    finish = parse_actual_clock(booking.get("actual_finish_time"))
+    if not start or not finish:
+        return 0
+    return parse_actual_duration_minutes(booking.get("actual_duration")) or 0
+
+
+def sum_worked_minutes(jobs: List[Dict[str, Any]]) -> int:
+    return sum(worked_minutes(job) for job in jobs)
+
+
 def duration_minutes_between(start_value: Any, finish_value: Any) -> int:
     start_hm = parse_actual_clock(start_value)
     finish_hm = parse_actual_clock(finish_value)

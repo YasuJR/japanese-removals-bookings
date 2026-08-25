@@ -58,11 +58,18 @@
     </section>
 
     {% if portal.range == "week" %}
+    {% if portal.weekly_worked %}
+    <section class="staff-weekly-worked" aria-label="Weekly worked hours for {{ portal.staff }}">
+      <p class="staff-weekly-worked-label">WEEKLY WORKED</p>
+      <p class="staff-weekly-worked-value">{{ portal.weekly_worked.display }}</p>
+    </section>
+    {% endif %}
     <div class="staff-week-schedule">
       {% for day in portal.week_days %}
       <section class="staff-week-day{% if day.is_today %} staff-week-day-today{% endif %}">
         <h2 class="staff-week-heading">{{ day.heading }}</h2>
         <p class="staff-week-date">{{ day.date_display }}</p>
+        <p class="staff-week-day-worked">Worked: {{ day.worked_display }}</p>
         {% if day.jobs %}
         <div class="staff-job-list">
           {% for job in day.jobs %}

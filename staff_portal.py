@@ -171,13 +171,17 @@ def _week_days(
     )
     while current <= end:
         iso = current.isoformat()
+        day_jobs = by_date.get(iso, [])
+        day_minutes = staff_job_times.sum_worked_minutes(day_jobs)
         days.append(
             {
                 "date_iso": iso,
                 "heading": weekdays[current.weekday()],
                 "date_display": _date_display(iso),
                 "is_today": iso == today_iso,
-                "jobs": by_date.get(iso, []),
+                "jobs": day_jobs,
+                "worked_minutes": day_minutes,
+                "worked_display": staff_job_times.format_weekly_worked(day_minutes),
             }
         )
         current += timedelta(days=1)
@@ -240,6 +244,22 @@ def build_staff_portal(
     else:
         jobs_label = "{0} Job{1} This Week".format(count, "" if count == 1 else "s")
 
+    week_days = (
+        _week_days(jobs, start_iso, end_iso, today)
+        if active_range == RANGE_WEEK
+        else []
+    )
+    weekly_minutes = staff_job_times.sum_worked_minutes(jobs)
+    weekly_worked = None
+    if active_range == RANGE_WEEK:
+        weekly_worked = {
+            "staff": staff,
+            "week_start": start_iso,
+            "week_end": end_iso,
+            "minutes": weekly_minutes,
+            "display": staff_job_times.format_weekly_worked(weekly_minutes),
+        }
+
     return {
         "staff": staff,
         "staff_options": crew_names,
@@ -251,7 +271,6 @@ def build_staff_portal(
         "jobs": jobs,
         "job_count": count,
         "jobs_label": jobs_label,
-        "week_days": _week_days(jobs, start_iso, end_iso, today)
-        if active_range == RANGE_WEEK
-        else [],
+        "week_days": week_days,
+        "weekly_worked": weekly_worked,
     }

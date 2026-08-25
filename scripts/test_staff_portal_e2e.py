@@ -737,6 +737,117 @@ def test_weekly_schedule_shows_completed_not_cancelled():
     return True
 
 
+def _set_actual(booking_id, start, finish, minutes):
+    db.save_booking_actual_times(booking_id, start, finish, minutes)
+
+
+def test_this_week_weekly_worked_hours():
+    from datetime import date as date_cls
+    from staff_portal import build_staff_portal
+
+    monday = date_cls(2100, 1, 4)
+    while monday.weekday() != 0:
+        monday += timedelta(days=1)
+    monday = monday + timedelta(weeks=(os.getpid() % 40) + 1)
+    wednesday = monday + timedelta(days=2)
+    sunday = monday + timedelta(days=6)
+    previous_sunday = monday - timedelta(days=1)
+    next_monday = monday + timedelta(days=7)
+
+    yasu_mon_a = _create_job(
+        _unique("YasuMonA"), monday.isoformat(), crew="Yasu",
+        start_time="08:00", status="Completed",
+    )
+    yasu_mon_b = _create_job(
+        _unique("YasuMonB"), monday.isoformat(), crew="Yasu",
+        start_time="13:00", status="Confirmed",
+    )
+    yasu_tue = _create_job(
+        _unique("YasuTue"), (monday + timedelta(days=1)).isoformat(),
+        crew="Yasu", start_time="08:00", status="Completed",
+    )
+    _create_job(
+        _unique("YasuWedNone"), (monday + timedelta(days=2)).isoformat(),
+        crew="Yasu", start_time="08:00", status="Confirmed",
+    )
+    cancelled_id = _create_job(
+        _unique("YasuThuCancel"), (monday + timedelta(days=3)).isoformat(),
+        crew="Yasu", start_time="08:00", status="Cancelled",
+    )
+    ken_only = _create_job(
+        _unique("KenOnlyFri"), (monday + timedelta(days=4)).isoformat(),
+        crew="Ken", start_time="08:00", status="Completed",
+    )
+    shared = _create_job(
+        _unique("SharedThree"), (monday + timedelta(days=4)).isoformat(),
+        crew="Yasu,Ken,Tom", start_time="13:00", status="Completed",
+    )
+    outside_prev = _create_job(
+        _unique("OutsidePrev"), previous_sunday.isoformat(),
+        crew="Yasu", start_time="08:00", status="Completed",
+    )
+    outside_next = _create_job(
+        _unique("OutsideNext"), next_monday.isoformat(),
+        crew="Yasu", start_time="08:00", status="Completed",
+    )
+    _set_actual(yasu_mon_a, "08:00", "11:35", 215)
+    _set_actual(yasu_mon_b, "13:00", "16:00", 180)
+    _set_actual(yasu_tue, "08:00", "10:35", 155)
+    _set_actual(cancelled_id, "08:00", "09:40", 100)
+    _set_actual(ken_only, "08:00", "14:40", 400)
+    _set_actual(shared, "13:00", "17:00", 240)
+    _set_actual(outside_prev, "08:00", "09:30", 90)
+    _set_actual(outside_next, "08:00", "09:30", 90)
+
+    yasu = build_staff_portal("Yasu", "week", wednesday)
+    ken = build_staff_portal("Ken", "week", wednesday)
+    tom = build_staff_portal("Tom", "week", wednesday)
+
+    assert yasu["start_date"] == monday.isoformat()
+    assert yasu["end_date"] == sunday.isoformat()
+    assert yasu["weekly_worked"]["staff"] == "Yasu"
+    assert yasu["weekly_worked"]["minutes"] == 215 + 180 + 155 + 240
+    assert yasu["weekly_worked"]["display"] == "13hr 10min"
+    assert ken["weekly_worked"]["minutes"] == 400 + 240
+    assert ken["weekly_worked"]["display"] == "10hr 40min"
+    assert tom["weekly_worked"]["minutes"] == 240
+    assert tom["weekly_worked"]["display"] == "4hr"
+
+    by_heading = {day["heading"]: day for day in yasu["week_days"]}
+    assert by_heading["MONDAY"]["worked_display"] == "6hr 35min"
+    assert by_heading["TUESDAY"]["worked_display"] == "2hr 35min"
+    assert by_heading["WEDNESDAY"]["worked_display"] == "0hr"
+    assert by_heading["THURSDAY"]["worked_display"] == "0hr"
+    assert by_heading["FRIDAY"]["worked_display"] == "4hr"
+
+    today_portal = build_staff_portal("Yasu", "today", wednesday)
+    tomorrow_portal = build_staff_portal("Yasu", "tomorrow", wednesday)
+    assert today_portal["weekly_worked"] is None
+    assert tomorrow_portal["weekly_worked"] is None
+
+    client = _staff_client()
+    live_week = client.get("/staff?staff=Yasu&range=week").get_data(as_text=True)
+    live_today = client.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
+    live_tomorrow = client.get("/staff?staff=Yasu&range=tomorrow").get_data(as_text=True)
+    assert "WEEKLY WORKED" in live_week
+    assert "WEEKLY WORKED" not in live_today
+    assert "WEEKLY WORKED" not in live_tomorrow
+    assert "9.17hr" not in live_week
+    assert "Hourly Rate" not in live_week
+    assert "Staff Cost" not in live_week
+    return True
+
+
+def test_weekly_worked_format_examples():
+    import staff_job_times
+
+    assert staff_job_times.format_weekly_worked(550) == "9hr 10min"
+    assert staff_job_times.format_weekly_worked(1880) == "31hr 20min"
+    assert staff_job_times.format_weekly_worked(0) == "0hr"
+    assert staff_job_times.format_weekly_worked(None) == "0hr"
+    return True
+
+
 def main():
     tests = [
         test_staff_requires_login,
@@ -758,6 +869,8 @@ def main():
         test_staff_portal_shows_actual_times_read_only,
         test_staff_hides_actual_when_not_set,
         test_weekly_schedule_shows_completed_not_cancelled,
+        test_this_week_weekly_worked_hours,
+        test_weekly_worked_format_examples,
     ]
     passed = 0
     for test in tests:

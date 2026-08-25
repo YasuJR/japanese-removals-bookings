@@ -271,6 +271,30 @@ a.staff-job-btn:active {
   margin-right: 0.3rem;
 }
 
+.staff-weekly-worked {
+  margin: 0 0 1rem;
+  padding: 1.15rem 1rem 1.05rem;
+  background: var(--navy);
+  color: #fff;
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.staff-weekly-worked-label {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.staff-weekly-worked-value {
+  margin: 0.35rem 0 0;
+  font-size: 2.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
 .staff-week-schedule {
   display: flex;
   flex-direction: column;
@@ -298,9 +322,16 @@ a.staff-job-btn:active {
 }
 
 .staff-week-date {
-  margin: 0.15rem 0 0.75rem;
+  margin: 0.15rem 0 0;
   font-size: 0.9rem;
   color: var(--muted);
+}
+
+.staff-week-day-worked {
+  margin: 0.2rem 0 0.75rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--navy);
 }
 
 .staff-week-empty {
