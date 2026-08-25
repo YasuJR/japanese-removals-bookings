@@ -319,6 +319,16 @@ a.staff-job-btn:active {
   text-align: center;
 }
 
+.staff-weekly-totals {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.staff-weekly-totals-item + .staff-weekly-totals-item {
+  padding-top: 0.95rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+}
+
 .staff-weekly-worked-label {
   margin: 0;
   font-size: 0.82rem;
@@ -328,10 +338,11 @@ a.staff-job-btn:active {
 
 .staff-weekly-worked-value {
   margin: 0.35rem 0 0;
-  font-size: 2.35rem;
+  font-size: 2.15rem;
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .staff-week-schedule {

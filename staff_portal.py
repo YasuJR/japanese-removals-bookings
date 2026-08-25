@@ -126,6 +126,9 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
         actual_worked_display = staff_job_times.format_worked_duration(actual_minutes)
     else:
         actual_worked_display = "Not set"
+    estimated_minutes = staff_job_times.duration_hours_to_minutes(
+        row.get("duration_hours")
+    )
     estimated_duration = staff_job_times.format_hours_as_worked(
         row.get("duration_hours")
     ) or "—"
@@ -144,6 +147,7 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
         "dropoff_label": dropoff_label or dropoff,
         "crew": _crew_slash_display(row),
         "estimated_duration": estimated_duration,
+        "estimated_minutes": estimated_minutes,
         "actual_worked_display": actual_worked_display,
         "has_actual_worked": actual_worked_display != "Not set",
         "phone": phone,
@@ -263,6 +267,7 @@ def build_staff_portal(
         else []
     )
     weekly_minutes = staff_job_times.sum_worked_minutes(jobs)
+    weekly_estimated_minutes = staff_job_times.sum_estimated_minutes(jobs)
     weekly_worked = None
     if active_range == RANGE_WEEK:
         weekly_worked = {
@@ -271,6 +276,10 @@ def build_staff_portal(
             "week_end": end_iso,
             "minutes": weekly_minutes,
             "display": staff_job_times.format_weekly_worked(weekly_minutes),
+            "estimated_minutes": weekly_estimated_minutes,
+            "estimated_display": staff_job_times.format_weekly_worked(
+                weekly_estimated_minutes
+            ),
         }
 
     return {
