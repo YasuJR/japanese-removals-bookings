@@ -44,6 +44,7 @@ from integrations import executive_config, review_config, sms_config, xero_confi
 from integrations import stripe as stripe_service
 from booking_helpers import apple_maps_url, mailto_href, sms_href, tel_href
 from driver_run_sheet_data import build_driver_run_sheet
+from staff_portal import build_staff_portal
 from outstanding_invoices_data import (
     INVOICE_FILTERS,
     build_outstanding_dashboard,
@@ -1825,6 +1826,15 @@ def profit_export_csv():
             "Content-Disposition": "attachment; filename=japanese-removals-profit.csv"
         },
     )
+
+
+@app.route("/staff", endpoint="staff_portal")
+@auth.login_required
+def staff_portal():
+    staff = request.args.get("staff", "").strip()
+    range_key = request.args.get("range", "today").strip()
+    portal = build_staff_portal(staff, range_key, perth_today())
+    return render_template("staff_portal.html", portal=portal)
 
 
 @app.route("/driver", endpoint="driver")

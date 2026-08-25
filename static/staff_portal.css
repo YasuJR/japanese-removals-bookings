@@ -1,0 +1,201 @@
+/* Staff Portal — mobile-first job cards. Separate from admin screens. */
+
+.staff-portal-page {
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+}
+
+.staff-portal-header {
+  align-items: center;
+}
+
+.staff-portal-logout {
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.staff-portal {
+  max-width: 40rem;
+  margin: 0 auto 2rem;
+}
+
+.staff-portal-controls {
+  margin-bottom: 1rem;
+}
+
+.staff-portal-staff-form {
+  margin: 0 0 0.85rem;
+}
+
+.staff-portal-select-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.staff-portal-select-label select {
+  min-height: 52px;
+  width: 100%;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--navy);
+}
+
+.staff-portal-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.staff-portal-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.5rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none;
+  text-align: center;
+  color: var(--navy);
+  background: var(--cream-dark);
+  border: 1px solid var(--border);
+}
+
+.staff-portal-tab.active {
+  color: #fff;
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+.staff-portal-summary {
+  margin: 0.85rem 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.staff-job-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.staff-job-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem 0.9rem 0.9rem;
+}
+
+.staff-job-headline {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--navy);
+}
+
+.staff-job-date {
+  margin: 0.4rem 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.staff-job-date span {
+  font-weight: 700;
+  color: var(--navy);
+  margin-right: 0.35rem;
+}
+
+.staff-job-meta {
+  margin: 0.85rem 0 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.staff-job-meta div {
+  margin: 0;
+}
+
+.staff-job-meta dt {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.staff-job-meta dd {
+  margin: 0.15rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.staff-job-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.95rem;
+}
+
+.staff-job-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50px;
+  padding: 0.5rem 0.45rem;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-decoration: none;
+  text-align: center;
+  color: var(--navy);
+  background: var(--cream-dark);
+  border: 1px solid var(--border);
+  -webkit-tap-highlight-color: transparent;
+}
+
+a.staff-job-btn:active {
+  background: var(--border);
+}
+
+.staff-job-btn-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.staff-job-notes {
+  margin: 0.85rem 0 0;
+  padding: 0.7rem 0.75rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  background: var(--cream);
+  border-radius: 8px;
+  border-left: 3px solid var(--navy-light);
+}
+
+.staff-job-notes span {
+  display: block;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 0.2rem;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}

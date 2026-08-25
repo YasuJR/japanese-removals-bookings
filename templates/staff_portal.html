@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1a2744">
+  <title>Staff Portal — Japanese Removals</title>
+  {% include '_head_icons.html' %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='staff_portal.css') }}">
+</head>
+<body class="staff-portal-page">
+  <header class="site-header">
+    <div class="wrap header-inner staff-portal-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <h1>Japanese Removals</h1>
+          <p class="tagline">Staff Portal</p>
+        </div>
+      </div>
+      <a class="staff-portal-logout" href="{{ url_for('logout') }}">Log out{% if g.user %} ({{ g.user.username }}){% endif %}</a>
+    </div>
+  </header>
+
+  <main class="wrap staff-portal">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flash-list">
+          {% for category, message in messages %}
+            <li class="flash flash-{{ category }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <section class="panel staff-portal-controls">
+      <form method="get" action="{{ url_for('staff_portal') }}" class="staff-portal-staff-form">
+        <input type="hidden" name="range" value="{{ portal.range }}">
+        <label class="staff-portal-select-label">
+          <span>Staff</span>
+          <select name="staff" onchange="this.form.submit()" aria-label="Select staff">
+            {% for name in portal.staff_options %}
+            <option value="{{ name }}"{% if portal.staff == name %} selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </form>
+
+      <nav class="staff-portal-tabs" aria-label="Date range">
+        {% for key, label in portal.range_tabs %}
+        <a href="{{ url_for('staff_portal', staff=portal.staff, range=key) }}"
+           class="staff-portal-tab{% if portal.range == key %} active{% endif %}">{{ label }}</a>
+        {% endfor %}
+      </nav>
+
+      <p class="staff-portal-summary">{{ portal.jobs_label }}</p>
+    </section>
+
+    {% if portal.jobs %}
+    <div class="staff-job-list">
+      {% for job in portal.jobs %}
+      <article class="staff-job-card">
+        <p class="staff-job-headline">{{ job.start_time }} — {{ job.customer_name }}</p>
+        <p class="staff-job-date"><span>Date</span> {{ job.date_display }}</p>
+
+        <dl class="staff-job-meta">
+          <div>
+            <dt>Pickup</dt>
+            <dd>{{ job.pickup_address or "—" }}</dd>
+          </div>
+          <div>
+            <dt>Drop-off</dt>
+            <dd>{{ job.dropoff_address or "—" }}</dd>
+          </div>
+          <div>
+            <dt>Crew</dt>
+            <dd>{{ job.crew }}</dd>
+          </div>
+          <div>
+            <dt>Estimated</dt>
+            <dd>{{ job.estimated_duration }}</dd>
+          </div>
+          <div>
+            <dt>Phone Number</dt>
+            <dd>{{ job.phone or "—" }}</dd>
+          </div>
+        </dl>
+
+        <div class="staff-job-actions">
+          {% if job.tel_href %}
+          <a class="staff-job-btn" href="{{ job.tel_href }}">Call Customer</a>
+          {% else %}
+          <span class="staff-job-btn staff-job-btn-disabled">Call Customer</span>
+          {% endif %}
+          {% if job.sms_href %}
+          <a class="staff-job-btn" href="{{ job.sms_href }}">Text Customer</a>
+          {% else %}
+          <span class="staff-job-btn staff-job-btn-disabled">Text Customer</span>
+          {% endif %}
+          {% if job.pickup_map_url %}
+          <a class="staff-job-btn" href="{{ job.pickup_map_url }}" target="_blank" rel="noopener noreferrer">Pickup Map</a>
+          {% else %}
+          <span class="staff-job-btn staff-job-btn-disabled">Pickup Map</span>
+          {% endif %}
+          {% if job.dropoff_map_url %}
+          <a class="staff-job-btn" href="{{ job.dropoff_map_url }}" target="_blank" rel="noopener noreferrer">Drop-off Map</a>
+          {% else %}
+          <span class="staff-job-btn staff-job-btn-disabled">Drop-off Map</span>
+          {% endif %}
+        </div>
+
+        {% if job.notes %}
+        <p class="staff-job-notes"><span>Notes</span> {{ job.notes }}</p>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <section class="panel">
+      <p class="empty">No jobs for {{ portal.staff or "this staff member" }}{% if portal.range == "today" %} today{% elif portal.range == "tomorrow" %} tomorrow{% else %} this week{% endif %}.</p>
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>
