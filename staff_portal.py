@@ -11,7 +11,13 @@ import re
 import database as db
 import job_status
 from booking_helpers import apple_maps_url, pickup_suburb, sms_href, tel_href
-from booking_times import display_start_time, duration_hours_from_times, effective_finish_hm, effective_start_hm
+from booking_times import (
+    display_start_time,
+    duration_hours_from_times,
+    effective_finish_hm,
+    effective_start_hm,
+    normalize_time_input,
+)
 from crew import CREW_OPTIONS, active_crew_names, crew_from_storage
 from daily_jobs_data import format_job_duration_label
 from dashboard_data import perth_today, week_range
@@ -126,6 +132,8 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
         "date_display": _date_display(move_date) if move_date else "—",
         "start_time": display_start_time(row),
         "start_hm": start_hm,
+        "owner_start_hm": normalize_time_input(row.get("start_time")),
+        "owner_finish_hm": normalize_time_input(row.get("finish_time")),
         "customer_name": str(row.get("customer_name") or "").strip() or "—",
         "pickup_address": pickup,
         "pickup_label": pickup_label or pickup,

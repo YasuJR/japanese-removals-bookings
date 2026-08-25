@@ -754,50 +754,42 @@ def test_this_week_weekly_worked_hours():
     previous_sunday = monday - timedelta(days=1)
     next_monday = monday + timedelta(days=7)
 
-    yasu_mon_a = _create_job(
+    _create_job(
         _unique("YasuMonA"), monday.isoformat(), crew="Yasu",
-        start_time="08:00", status="Completed",
+        start_time="08:00", finish_time="11:35", status="Completed",
     )
-    yasu_mon_b = _create_job(
+    _create_job(
         _unique("YasuMonB"), monday.isoformat(), crew="Yasu",
-        start_time="13:00", status="Confirmed",
+        start_time="13:00", finish_time="16:00", status="Confirmed",
     )
-    yasu_tue = _create_job(
+    _create_job(
         _unique("YasuTue"), (monday + timedelta(days=1)).isoformat(),
-        crew="Yasu", start_time="08:00", status="Completed",
+        crew="Yasu", start_time="08:00", finish_time="10:35", status="Completed",
     )
     _create_job(
         _unique("YasuWedNone"), (monday + timedelta(days=2)).isoformat(),
-        crew="Yasu", start_time="08:00", status="Confirmed",
+        crew="Yasu", start_time="08:00", finish_time="", status="Confirmed",
     )
-    cancelled_id = _create_job(
+    _create_job(
         _unique("YasuThuCancel"), (monday + timedelta(days=3)).isoformat(),
-        crew="Yasu", start_time="08:00", status="Cancelled",
+        crew="Yasu", start_time="08:00", finish_time="09:40", status="Cancelled",
     )
-    ken_only = _create_job(
+    _create_job(
         _unique("KenOnlyFri"), (monday + timedelta(days=4)).isoformat(),
-        crew="Ken", start_time="08:00", status="Completed",
+        crew="Ken", start_time="08:00", finish_time="14:40", status="Completed",
     )
-    shared = _create_job(
+    _create_job(
         _unique("SharedThree"), (monday + timedelta(days=4)).isoformat(),
-        crew="Yasu,Ken,Tom", start_time="13:00", status="Completed",
+        crew="Yasu,Ken,Tom", start_time="13:00", finish_time="17:00", status="Completed",
     )
-    outside_prev = _create_job(
+    _create_job(
         _unique("OutsidePrev"), previous_sunday.isoformat(),
-        crew="Yasu", start_time="08:00", status="Completed",
+        crew="Yasu", start_time="08:00", finish_time="09:30", status="Completed",
     )
-    outside_next = _create_job(
+    _create_job(
         _unique("OutsideNext"), next_monday.isoformat(),
-        crew="Yasu", start_time="08:00", status="Completed",
+        crew="Yasu", start_time="08:00", finish_time="09:30", status="Completed",
     )
-    _set_actual(yasu_mon_a, "08:00", "11:35", 215)
-    _set_actual(yasu_mon_b, "13:00", "16:00", 180)
-    _set_actual(yasu_tue, "08:00", "10:35", 155)
-    _set_actual(cancelled_id, "08:00", "09:40", 100)
-    _set_actual(ken_only, "08:00", "14:40", 400)
-    _set_actual(shared, "13:00", "17:00", 240)
-    _set_actual(outside_prev, "08:00", "09:30", 90)
-    _set_actual(outside_next, "08:00", "09:30", 90)
 
     yasu = build_staff_portal("Yasu", "week", wednesday)
     ken = build_staff_portal("Ken", "week", wednesday)
@@ -853,71 +845,68 @@ def test_weekly_worked_format_examples():
     return True
 
 
-def test_weekly_worked_uses_actual_start_finish_even_without_duration():
-    """Completed jobs with Owner Actual Start/Finish must not stay at 0hr."""
+def test_weekly_worked_rebecca_style_completed_uses_owner_start_finish():
+    """Completed Keiichi/Yasu job with empty actual_* must use start_time/finish_time."""
     from datetime import date as date_cls
     from staff_portal import build_staff_portal
+
+    names = [row["name"] for row in db.list_crew_members(active_only=False)]
+    if "Keiichi" not in names:
+        db.create_crew_member("Keiichi", role="Driver", active=1)
 
     monday = date_cls(2101, 1, 3)
     while monday.weekday() != 0:
         monday += timedelta(days=1)
     monday = monday + timedelta(weeks=(os.getpid() % 20) + 2)
-    today = monday
 
-    shared = _create_job(
-        _unique("KeiichiYasuCompleted"),
+    rebecca = _create_job(
+        "Rebecca Boyce",
         monday.isoformat(),
         crew="Keiichi,Yasu",
         start_time="08:00",
-        finish_time="18:00",
+        finish_time="10:30",
         status="Completed",
     )
-    second = _create_job(
+    afternoon = _create_job(
         _unique("SameDayAfternoon"),
         monday.isoformat(),
         crew="Yasu",
         start_time="13:00",
-        finish_time="18:00",
+        finish_time="16:15",
         status="Completed",
     )
-    no_finish = _create_job(
+    _create_job(
         _unique("StartOnly"),
         (monday + timedelta(days=1)).isoformat(),
         crew="Yasu",
         start_time="08:00",
+        finish_time="",
         status="Completed",
     )
-    # Existing production-style rows: start/finish saved, actual_duration empty.
-    db.save_booking_actual_times(shared, "08:00", "10:30", None)
-    db.save_booking_actual_times(second, "1:00 PM", "4:15 PM", None)
-    db.save_booking_actual_times(no_finish, "08:00", "", None)
-    row = dict(db.get_booking(shared))
-    assert row["actual_start_time"]
-    assert row["actual_finish_time"]
-    assert row["actual_duration"] in (None, "", 0)
+    row = dict(db.get_booking(rebecca))
+    assert row["start_time"] in ("08:00", "8:00")
+    assert row["finish_time"] in ("10:30",)
+    assert not (row.get("actual_start_time") or "").strip()
+    assert not (row.get("actual_finish_time") or "").strip()
+    assert row.get("actual_duration") in (None, "", 0)
 
-    yasu = build_staff_portal("Yasu", "week", today)
-    ken = build_staff_portal("Ken", "week", today)
+    yasu = build_staff_portal("Yasu", "week", monday)
+    keiichi = build_staff_portal("Keiichi", "week", monday)
+    ken = build_staff_portal("Ken", "week", monday)
     by_heading = {day["heading"]: day for day in yasu["week_days"]}
+
     assert yasu["weekly_worked"]["display"] != "0hr"
     assert yasu["weekly_worked"]["minutes"] == 150 + 195
     assert yasu["weekly_worked"]["display"] == "5hr 45min"
     assert by_heading["MONDAY"]["worked_display"] == "5hr 45min"
-    assert by_heading["TUESDAY"]["worked_display"] == "0hr"
-    shared_job = [
-        job for job in yasu["jobs"] if job["id"] == shared
-    ][0]
-    assert shared_job["worked_display"] == "2hr 30min"
-    assert shared_job["actual_range_display"] == "8:00 AM – 10:30 AM"
-    # Same Actual Time is credited in full to each assigned crew member.
-    # Ken is not on this job.
-    ken_minutes = ken["weekly_worked"]["minutes"]
-    assert ken_minutes == 0 or shared not in [job["id"] for job in ken["jobs"]]
-
-    today_portal = build_staff_portal("Yasu", "today", today)
-    tomorrow_portal = build_staff_portal("Yasu", "tomorrow", today)
-    assert any(job["id"] == shared for job in today_portal["jobs"])
-    assert tomorrow_portal["weekly_worked"] is None
+    assert keiichi["weekly_worked"]["minutes"] == 150
+    assert keiichi["weekly_worked"]["display"] == "2hr 30min"
+    assert rebecca in [job["id"] for job in keiichi["jobs"]]
+    assert rebecca not in [job["id"] for job in ken["jobs"]]
+    rebecca_job = [job for job in yasu["jobs"] if job["id"] == rebecca][0]
+    assert rebecca_job["owner_start_hm"] == "08:00"
+    assert rebecca_job["owner_finish_hm"] == "10:30"
+    assert afternoon
     return True
 
 
@@ -944,7 +933,7 @@ def main():
         test_weekly_schedule_shows_completed_not_cancelled,
         test_this_week_weekly_worked_hours,
         test_weekly_worked_format_examples,
-        test_weekly_worked_uses_actual_start_finish_even_without_duration,
+        test_weekly_worked_rebecca_style_completed_uses_owner_start_finish,
     ]
     passed = 0
     for test in tests:

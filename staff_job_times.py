@@ -1,7 +1,6 @@
 """Actual work times — admin-entered, separate from scheduled/invoice times.
 
-Staff Portal worked hours come from Actual start/finish (Owner/Admin).
-actual_duration is still stored on save for later pay calculations.
+Staff Portal WEEKLY WORKED uses Owner Edit Booking start_time / finish_time.
 Staff Portal is read-only.
 """
 
@@ -98,21 +97,26 @@ def parse_actual_duration_minutes(value: Any) -> Optional[int]:
 
 
 def worked_minutes(booking: Dict[str, Any]) -> int:
-    """Minutes from Owner/Admin Actual finish − Actual start.
+    """Minutes from Owner/Admin Edit Booking Start time − Finish time.
 
-    Does not use scheduled start/finish or estimated duration. Missing
-    actual start or finish, or Cancelled jobs, contribute 0. Does not
-    split by crew size — the same job minutes apply to every assigned
-    crew member. Existing bookings with start/finish already stored are
-    counted without requiring actual_duration to be pre-filled.
+    Source of truth is bookings.start_time / bookings.finish_time — the
+    fields the Owner edits on Edit Booking and Invoice pricing. The newer
+    actual_start_time / actual_finish_time columns are not used here
+    because existing Completed jobs leave them empty.
+
+    Does not use duration_hours, estimated duration, or 08:00/18:00
+    defaults. Cancelled jobs and jobs missing start or finish are 0.
+    Does not split by crew size.
     """
     if job_status.display(booking) == "Cancelled":
         return 0
     start = parse_actual_clock(
-        booking.get("actual_start_time") or booking.get("actual_start_hm")
+        booking.get("owner_start_hm")
+        or booking.get("start_time")
     )
     finish = parse_actual_clock(
-        booking.get("actual_finish_time") or booking.get("actual_finish_hm")
+        booking.get("owner_finish_hm")
+        or booking.get("finish_time")
     )
     if not start or not finish:
         return 0
