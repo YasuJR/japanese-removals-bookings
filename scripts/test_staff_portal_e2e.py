@@ -232,7 +232,72 @@ def test_staff_filter_shows_only_selected_crew_jobs():
     return True
 
 
-def test_today_and_tomorrow_hide_completed_and_cancelled():
+def test_today_shows_all_assigned_jobs_including_completed():
+    """Today = selected staff in crew + that calendar date; Cancelled only is excluded."""
+    from datetime import date as date_cls
+    from staff_portal import build_staff_portal
+
+    today = date_cls(2099, 1, 1) + timedelta(
+        days=(os.getpid() + int(time.time() * 1000)) % 3000
+    )
+    tomorrow = today + timedelta(days=1)
+    first = _unique("Justin")
+    second = _unique("Senna Yao")
+    third = _unique("Another Customer")
+    cancelled = _unique("CancelledToday")
+    ken_only = _unique("KenOnlyToday")
+    tomorrow_live = _unique("LiveTomorrow")
+    _create_job(first, today.isoformat(), crew="Yasu", start_time="08:00", status="Confirmed")
+    completed_id = _create_job(
+        second, today.isoformat(), crew="Yasu,Ken", start_time="15:00", status="Completed"
+    )
+    _create_job(third, today.isoformat(), crew="Yasu", start_time="17:00", status="Confirmed")
+    _create_job(cancelled, today.isoformat(), crew="Yasu", start_time="09:00", status="Cancelled")
+    _create_job(ken_only, today.isoformat(), crew="Ken", start_time="10:00", status="Confirmed")
+    _create_job(tomorrow_live, tomorrow.isoformat(), crew="Yasu", start_time="08:00", status="Confirmed")
+    db.save_booking_actual_times(completed_id, "15:10", "18:00", 170)
+
+    portal = build_staff_portal("Yasu", "today", today)
+    names = [job["customer_name"] for job in portal["jobs"]]
+    assert names == [first, second, third]
+    assert portal["job_count"] == 3
+    assert portal["jobs_label"] == "3 Jobs Today"
+    assert [job["start_time"] for job in portal["jobs"]] == [
+        "8:00 AM",
+        "3:00 PM",
+        "5:00 PM",
+    ]
+    assert portal["jobs"][1]["status_display"] == "COMPLETED"
+    assert portal["jobs"][1]["has_actual"] is True
+    assert portal["jobs"][1]["actual_range_display"] == "3:10 PM – 6:00 PM"
+    assert portal["jobs"][1]["worked_display"] == "2hr 50min"
+    assert portal["jobs"][0]["has_actual"] is False
+    assert portal["jobs"][2]["has_actual"] is False
+    assert cancelled not in names
+    assert ken_only not in names
+    assert tomorrow_live not in names
+
+    real_today = perth_today()
+    live = _unique("HttpLive")
+    done = _unique("HttpDone")
+    cancelled_today = _unique("HttpCancelled")
+    _create_job(live, real_today.isoformat(), crew="Yasu", start_time="08:00", status="Confirmed")
+    _create_job(done, real_today.isoformat(), crew="Yasu", start_time="15:00", status="Completed")
+    _create_job(
+        cancelled_today, real_today.isoformat(), crew="Yasu", start_time="09:00", status="Cancelled"
+    )
+    client = _staff_client()
+    today_html = client.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
+    assert live in today_html
+    assert done in today_html
+    assert cancelled_today not in today_html
+    assert today_html.find(live) < today_html.find(done)
+    assert "COMPLETED" in today_html
+    assert build_staff_portal("Yasu", "today", real_today)["jobs_label"] in today_html
+    return True
+
+
+def test_today_and_tomorrow_status_filters():
     today = perth_today()
     tomorrow = today + timedelta(days=1)
     live = _unique("LiveToday")
@@ -251,7 +316,8 @@ def test_today_and_tomorrow_hide_completed_and_cancelled():
     tomorrow_html = client.get("/staff?staff=Yasu&range=tomorrow").get_data(as_text=True)
 
     assert live in today_html
-    assert done not in today_html
+    assert done in today_html
+    assert "COMPLETED" in today_html
     assert cancelled not in today_html
     assert tomorrow_live not in today_html
 
@@ -652,7 +718,7 @@ def test_weekly_schedule_shows_completed_not_cancelled():
     today_html = client.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
     assert live in week_html
     assert done in week_html
-    assert "Completed" in week_html
+    assert "COMPLETED" in week_html
     assert cancelled not in week_html
     if later != today:
         assert done not in today_html
@@ -676,7 +742,8 @@ def main():
         test_staff_requires_login,
         test_staff_page_defaults_to_today_and_shows_assigned_jobs,
         test_staff_filter_shows_only_selected_crew_jobs,
-        test_today_and_tomorrow_hide_completed_and_cancelled,
+        test_today_shows_all_assigned_jobs_including_completed,
+        test_today_and_tomorrow_status_filters,
         test_this_week_tab_includes_later_week_jobs,
         test_staff_portal_hides_financial_data_and_booking_admin_links,
         test_staff_portal_reflects_booking_updates,

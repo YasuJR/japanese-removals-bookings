@@ -1,6 +1,6 @@
 <article class="staff-job-card{% if compact %} staff-job-card-week{% endif %}">
   {% if job.status_display %}
-  <p class="staff-job-status">{{ job.status_display }}</p>
+  <p class="staff-job-status{% if job.is_completed_status %} staff-job-status-completed{% endif %}">{{ job.status_display }}</p>
   {% endif %}
   {% if compact %}
   <p class="staff-job-headline">{{ job.start_time }}</p>

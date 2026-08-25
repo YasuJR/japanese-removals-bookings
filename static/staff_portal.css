@@ -237,6 +237,12 @@ a.staff-job-btn:active {
   background: var(--muted);
 }
 
+.staff-job-status-completed {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+  background: var(--success);
+}
+
 .staff-job-customer {
   margin: 0.3rem 0 0;
   font-size: 1.2rem;

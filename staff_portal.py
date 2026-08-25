@@ -84,7 +84,9 @@ def _should_hide_status(booking: Dict[str, Any], range_key: str) -> bool:
     status = job_status.display(booking)
     if status == "Cancelled":
         return True
-    if status == "Completed" and range_key in {RANGE_TODAY, RANGE_TOMORROW}:
+    # Today shows Completed jobs with a COMPLETED label. Tomorrow keeps
+    # hiding them so that tab stays a forward-looking list.
+    if status == "Completed" and range_key == RANGE_TOMORROW:
         return True
     return False
 
@@ -139,6 +141,8 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
         "dropoff_map_url": apple_maps_url(dropoff),
     }
     payload.update(times)
+    if payload.get("is_completed_status"):
+        payload["status_display"] = "COMPLETED"
     return payload
 
 
@@ -180,12 +184,21 @@ def _week_days(
     return days
 
 
+def _booking_date_iso(booking: Dict[str, Any]) -> str:
+    return normalize_move_date(booking.get("move_date")) or str(
+        booking.get("move_date") or ""
+    ).strip()[:10]
+
+
 def _load_rows(start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
-    if start_iso == end_iso:
-        rows = db.list_by_date(start_iso)
-    else:
-        rows = db.list_between_dates(start_iso, end_iso)
-    return [dict(row) for row in rows]
+    """Same date query as This Week so Today does not miss jobs This Week shows."""
+    rows = [dict(row) for row in db.list_between_dates(start_iso, end_iso)]
+    matched: List[Dict[str, Any]] = []
+    for row in rows:
+        move_iso = _booking_date_iso(row)
+        if move_iso and start_iso <= move_iso <= end_iso:
+            matched.append(row)
+    return matched
 
 
 def build_staff_portal(
