@@ -1,0 +1,108 @@
+<article class="staff-job-card{% if compact %} staff-job-card-week{% endif %}">
+  {% if job.status_display %}
+  <p class="staff-job-status">{{ job.status_display }}</p>
+  {% endif %}
+  {% if compact %}
+  <p class="staff-job-headline">{{ job.start_time }}</p>
+  <p class="staff-job-customer">{{ job.customer_name }}</p>
+  <p class="staff-job-route">{{ job.pickup_label or "—" }} → {{ job.dropoff_label or "—" }}</p>
+  <p class="staff-job-crew-line"><span>Crew</span> {{ job.crew }}</p>
+  {% else %}
+  <p class="staff-job-headline">{{ job.start_time }} — {{ job.customer_name }}</p>
+  <p class="staff-job-date"><span>Date</span> {{ job.date_display }}</p>
+  {% endif %}
+
+  {% if job.started_display or job.finished_display %}
+  <p class="staff-job-actual">
+    {% if job.started_display %}<span>Started: {{ job.started_display }}</span>{% endif %}
+    {% if job.finished_display %}<span>Finished: {{ job.finished_display }}</span>{% endif %}
+    {% if job.worked_display %}<span>Worked: {{ job.worked_display }}</span>{% endif %}
+  </p>
+  {% endif %}
+
+  {% if not compact %}
+  <dl class="staff-job-meta">
+    <div>
+      <dt>Pickup</dt>
+      <dd>{{ job.pickup_address or "—" }}</dd>
+    </div>
+    <div>
+      <dt>Drop-off</dt>
+      <dd>{{ job.dropoff_address or "—" }}</dd>
+    </div>
+    <div>
+      <dt>Crew</dt>
+      <dd>{{ job.crew }}</dd>
+    </div>
+    <div>
+      <dt>Estimated</dt>
+      <dd>{{ job.estimated_duration }}</dd>
+    </div>
+    <div>
+      <dt>Phone Number</dt>
+      <dd>{{ job.phone or "—" }}</dd>
+    </div>
+  </dl>
+  {% else %}
+  <dl class="staff-job-meta staff-job-meta-week">
+    <div>
+      <dt>Pickup</dt>
+      <dd>{{ job.pickup_address or "—" }}</dd>
+    </div>
+    <div>
+      <dt>Drop-off</dt>
+      <dd>{{ job.dropoff_address or "—" }}</dd>
+    </div>
+    <div>
+      <dt>Estimated</dt>
+      <dd>{{ job.estimated_duration }}</dd>
+    </div>
+    <div>
+      <dt>Phone Number</dt>
+      <dd>{{ job.phone or "—" }}</dd>
+    </div>
+  </dl>
+  {% endif %}
+
+  {% if job.can_start or job.can_finish %}
+  <div class="staff-job-time-actions">
+    {% if job.can_start %}
+    <form method="post" action="{{ url_for('staff_start_job', booking_id=job.id) }}" class="staff-job-time-form">
+      <input type="hidden" name="staff" value="{{ portal.staff }}">
+      <input type="hidden" name="range" value="{{ portal.range }}">
+      <button type="submit" class="staff-job-btn staff-job-btn-start">START JOB</button>
+    </form>
+    {% endif %}
+    {% if job.can_finish %}
+    <a class="staff-job-btn staff-job-btn-finish" href="{{ url_for('staff_finish_job', booking_id=job.id, staff=portal.staff, range=portal.range) }}">FINISH JOB</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="staff-job-actions">
+    {% if job.tel_href %}
+    <a class="staff-job-btn" href="{{ job.tel_href }}">Call Customer</a>
+    {% else %}
+    <span class="staff-job-btn staff-job-btn-disabled">Call Customer</span>
+    {% endif %}
+    {% if job.sms_href %}
+    <a class="staff-job-btn" href="{{ job.sms_href }}">Text Customer</a>
+    {% else %}
+    <span class="staff-job-btn staff-job-btn-disabled">Text Customer</span>
+    {% endif %}
+    {% if job.pickup_map_url %}
+    <a class="staff-job-btn" href="{{ job.pickup_map_url }}" target="_blank" rel="noopener noreferrer">Pickup Map</a>
+    {% else %}
+    <span class="staff-job-btn staff-job-btn-disabled">Pickup Map</span>
+    {% endif %}
+    {% if job.dropoff_map_url %}
+    <a class="staff-job-btn" href="{{ job.dropoff_map_url }}" target="_blank" rel="noopener noreferrer">Drop-off Map</a>
+    {% else %}
+    <span class="staff-job-btn staff-job-btn-disabled">Drop-off Map</span>
+    {% endif %}
+  </div>
+
+  {% if job.notes %}
+  <p class="staff-job-notes"><span>Notes</span> {{ job.notes }}</p>
+  {% endif %}
+</article>

@@ -57,63 +57,32 @@
       <p class="staff-portal-summary">{{ portal.jobs_label }}</p>
     </section>
 
-    {% if portal.jobs %}
+    {% if portal.range == "week" %}
+    <div class="staff-week-schedule">
+      {% for day in portal.week_days %}
+      <section class="staff-week-day{% if day.is_today %} staff-week-day-today{% endif %}">
+        <h2 class="staff-week-heading">{{ day.heading }}</h2>
+        <p class="staff-week-date">{{ day.date_display }}</p>
+        {% if day.jobs %}
+        <div class="staff-job-list">
+          {% for job in day.jobs %}
+          {% with compact=true %}
+          {% include "_staff_job_card.html" %}
+          {% endwith %}
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="staff-week-empty">No Jobs</p>
+        {% endif %}
+      </section>
+      {% endfor %}
+    </div>
+    {% elif portal.jobs %}
     <div class="staff-job-list">
       {% for job in portal.jobs %}
-      <article class="staff-job-card">
-        <p class="staff-job-headline">{{ job.start_time }} — {{ job.customer_name }}</p>
-        <p class="staff-job-date"><span>Date</span> {{ job.date_display }}</p>
-
-        <dl class="staff-job-meta">
-          <div>
-            <dt>Pickup</dt>
-            <dd>{{ job.pickup_address or "—" }}</dd>
-          </div>
-          <div>
-            <dt>Drop-off</dt>
-            <dd>{{ job.dropoff_address or "—" }}</dd>
-          </div>
-          <div>
-            <dt>Crew</dt>
-            <dd>{{ job.crew }}</dd>
-          </div>
-          <div>
-            <dt>Estimated</dt>
-            <dd>{{ job.estimated_duration }}</dd>
-          </div>
-          <div>
-            <dt>Phone Number</dt>
-            <dd>{{ job.phone or "—" }}</dd>
-          </div>
-        </dl>
-
-        <div class="staff-job-actions">
-          {% if job.tel_href %}
-          <a class="staff-job-btn" href="{{ job.tel_href }}">Call Customer</a>
-          {% else %}
-          <span class="staff-job-btn staff-job-btn-disabled">Call Customer</span>
-          {% endif %}
-          {% if job.sms_href %}
-          <a class="staff-job-btn" href="{{ job.sms_href }}">Text Customer</a>
-          {% else %}
-          <span class="staff-job-btn staff-job-btn-disabled">Text Customer</span>
-          {% endif %}
-          {% if job.pickup_map_url %}
-          <a class="staff-job-btn" href="{{ job.pickup_map_url }}" target="_blank" rel="noopener noreferrer">Pickup Map</a>
-          {% else %}
-          <span class="staff-job-btn staff-job-btn-disabled">Pickup Map</span>
-          {% endif %}
-          {% if job.dropoff_map_url %}
-          <a class="staff-job-btn" href="{{ job.dropoff_map_url }}" target="_blank" rel="noopener noreferrer">Drop-off Map</a>
-          {% else %}
-          <span class="staff-job-btn staff-job-btn-disabled">Drop-off Map</span>
-          {% endif %}
-        </div>
-
-        {% if job.notes %}
-        <p class="staff-job-notes"><span>Notes</span> {{ job.notes }}</p>
-        {% endif %}
-      </article>
+      {% with compact=false %}
+      {% include "_staff_job_card.html" %}
+      {% endwith %}
       {% endfor %}
     </div>
     {% else %}

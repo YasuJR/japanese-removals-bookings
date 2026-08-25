@@ -117,6 +117,7 @@ def _create_job(
     hourly_rate=185.0,
     callout_fee=90.0,
 ):
+    db.init_db()
     booking_id = db.create_booking(
         customer,
         phone,
@@ -203,6 +204,7 @@ def test_staff_page_defaults_to_today_and_shows_assigned_jobs():
     assert quote("12 Test St, Cannington WA 6107") in html
     assert quote("8 River Ave, Como WA 6152") in html
     assert 'name="staff"' in html
+    assert "START JOB" in html
     return True
 
 
@@ -273,6 +275,17 @@ def test_this_week_tab_includes_later_week_jobs():
     assert customer in week_html
     assert "staff-portal-tab active" in week_html
     assert ">This Week</a>" in week_html
+    for heading in (
+        "MONDAY",
+        "TUESDAY",
+        "WEDNESDAY",
+        "THURSDAY",
+        "FRIDAY",
+        "SATURDAY",
+        "SUNDAY",
+    ):
+        assert heading in week_html
+    assert "No Jobs" in week_html
     return True
 
 
@@ -482,6 +495,170 @@ def test_office_login_still_works_and_does_not_open_staff_portal():
     return True
 
 
+def test_start_and_finish_job_saved_on_server_not_browser():
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    import staff_job_times
+
+    today = perth_today().isoformat()
+    customer = _unique("ActualTimes")
+    booking_id = _create_job(
+        customer, today, crew="Yasu", start_time="08:00", finish_time="12:00"
+    )
+    perth = ZoneInfo("Australia/Perth")
+    started = staff_job_times.start_job(
+        booking_id, "Yasu", now=datetime(2026, 8, 25, 8, 7, tzinfo=perth)
+    )
+    assert started is True
+    row = dict(db.get_booking(booking_id))
+    assert row["start_time"] in ("08:00", "8:00")
+    assert row["finish_time"] in ("12:00", "12:00")
+    assert row["duration_hours"] == "4"
+    first_start = row["actual_start_time"]
+    assert "T08:07:00" in first_start
+
+    again = staff_job_times.start_job(
+        booking_id, "Yasu", now=datetime(2026, 8, 25, 9, 0, tzinfo=perth)
+    )
+    assert again is False
+    row = dict(db.get_booking(booking_id))
+    assert row["actual_start_time"] == first_start
+
+    assert staff_job_times.finish_job(booking_id, "Ken") is False
+    finished = staff_job_times.finish_job(
+        booking_id, "Yasu", now=datetime(2026, 8, 25, 11, 42, tzinfo=perth)
+    )
+    assert finished is True
+    row = dict(db.get_booking(booking_id))
+    assert "T11:42:00" in row["actual_finish_time"]
+    assert int(row["actual_duration"]) == 215
+    assert staff_job_times.format_worked_duration(row["actual_duration"]) == "3hr 35min"
+    assert staff_job_times.finish_job(
+        booking_id, "Yasu", now=datetime(2026, 8, 25, 12, 0, tzinfo=perth)
+    ) is False
+    row = dict(db.get_booking(booking_id))
+    assert "T11:42:00" in row["actual_finish_time"]
+    assert int(row["actual_duration"]) == 215
+    assert row["start_time"] in ("08:00", "8:00")
+    return True
+
+
+def test_staff_portal_start_finish_buttons_and_confirm():
+    today = perth_today().isoformat()
+    customer = _unique("StartFinishUi")
+    booking_id = _create_job(customer, today, crew="Yasu")
+    client = _staff_client()
+    html = client.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
+    assert "START JOB" in html
+    assert "/staff/jobs/{0}/start".format(booking_id) in html
+    assert customer in html
+
+    started = client.post(
+        "/staff/jobs/{0}/start".format(booking_id),
+        data={"staff": "Yasu", "range": "today"},
+        follow_redirects=False,
+    )
+    assert started.status_code == 302
+    html = client.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
+    assert "Started:" in html
+    assert "/staff/jobs/{0}/start".format(booking_id) not in html
+    assert "/staff/jobs/{0}/finish".format(booking_id) in html
+    row = dict(db.get_booking(booking_id))
+    assert row["actual_start_time"]
+    assert not row["actual_finish_time"]
+
+    confirm = client.get(
+        "/staff/jobs/{0}/finish?staff=Yasu&range=today".format(booking_id)
+    )
+    confirm_html = confirm.get_data(as_text=True)
+    assert confirm.status_code == 200
+    assert "Finish this job?" in confirm_html
+    assert customer in confirm_html
+    assert "Yes, finish" in confirm_html
+
+    finished = client.post(
+        "/staff/jobs/{0}/finish".format(booking_id),
+        data={"staff": "Yasu", "range": "today"},
+        follow_redirects=False,
+    )
+    assert finished.status_code == 302
+    html = client.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
+    assert "Started:" in html
+    assert "Finished:" in html
+    assert "Worked:" in html
+    assert "/staff/jobs/{0}/start".format(booking_id) not in html
+    assert "/staff/jobs/{0}/finish".format(booking_id) not in html
+    row = dict(db.get_booking(booking_id))
+    assert row["actual_finish_time"]
+    assert row["actual_duration"] is not None
+    return True
+
+
+def test_cannot_finish_before_start_or_start_other_crew_job():
+    today = perth_today().isoformat()
+    yasu_job = _create_job(_unique("YasuStartOnly"), today, crew="Yasu")
+    ken_job = _create_job(_unique("KenStartOnly"), today, crew="Ken")
+    client = _staff_client()
+    finish_first = client.post(
+        "/staff/jobs/{0}/finish".format(yasu_job),
+        data={"staff": "Yasu", "range": "today"},
+        follow_redirects=False,
+    )
+    assert finish_first.status_code in (302, 200)
+    row = dict(db.get_booking(yasu_job))
+    assert not row.get("actual_finish_time")
+
+    other = client.post(
+        "/staff/jobs/{0}/start".format(ken_job),
+        data={"staff": "Yasu", "range": "today"},
+        follow_redirects=False,
+    )
+    assert other.status_code == 302
+    row = dict(db.get_booking(ken_job))
+    assert not row.get("actual_start_time")
+    return True
+
+
+def test_weekly_schedule_shows_completed_not_cancelled():
+    today = perth_today()
+    later = _later_this_week(today)
+    live = _unique("WeekLive")
+    done = _unique("WeekDone")
+    cancelled = _unique("WeekCancelled")
+    _create_job(live, later.isoformat(), crew="Yasu", status="Confirmed")
+    _create_job(done, later.isoformat(), crew="Yasu", status="Completed")
+    _create_job(cancelled, later.isoformat(), crew="Yasu", status="Cancelled")
+    client = _staff_client()
+    week_html = client.get("/staff?staff=Yasu&range=week").get_data(as_text=True)
+    today_html = client.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
+    assert live in week_html
+    assert done in week_html
+    assert "Completed" in week_html
+    assert cancelled not in week_html
+    if later != today:
+        assert done not in today_html
+    assert "Cannington → Como" in week_html or "Cannington" in week_html
+    assert "START JOB" in week_html
+    return True
+
+
+def test_guest_cannot_start_job():
+    today = perth_today().isoformat()
+    booking_id = _create_job(_unique("GuestStart"), today, crew="Yasu")
+    client = app.test_client()
+    response = client.post(
+        "/staff/jobs/{0}/start".format(booking_id),
+        data={"staff": "Yasu", "range": "today"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    assert "/staff/login" in (response.headers.get("Location") or "")
+    row = dict(db.get_booking(booking_id))
+    assert not row.get("actual_start_time")
+    return True
+
+
 def main():
     tests = [
         test_staff_requires_login,
@@ -498,6 +675,11 @@ def main():
         test_staff_logout_is_separate_from_admin_logout,
         test_wrong_password_and_admin_password_rejected,
         test_office_login_still_works_and_does_not_open_staff_portal,
+        test_start_and_finish_job_saved_on_server_not_browser,
+        test_staff_portal_start_finish_buttons_and_confirm,
+        test_cannot_finish_before_start_or_start_other_crew_job,
+        test_weekly_schedule_shows_completed_not_cancelled,
+        test_guest_cannot_start_job,
     ]
     passed = 0
     for test in tests:

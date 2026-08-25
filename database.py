@@ -83,6 +83,9 @@ BOOKING_EXTRA_COLUMNS = [
     ("invoice_sent_at", "TEXT"),
     ("invoice_sent_to", "TEXT"),
     ("invoice_sent_method", "TEXT"),
+    ("actual_start_time", "TEXT"),
+    ("actual_finish_time", "TEXT"),
+    ("actual_duration", "INTEGER"),
 ]
 
 STAFF_EXTRA_COLUMNS = [
@@ -883,6 +886,54 @@ def update_booking_on_route_fields(
     booking_id: int, fields: Dict[str, Any]
 ) -> None:
     update_booking_integration_fields(booking_id, fields)
+
+
+def try_set_actual_start(booking_id: int, iso_text: str) -> bool:
+    """Set actual_start_time once. Does not change booked start_time."""
+    stamp = str(iso_text or "").strip()
+    if not stamp:
+        return False
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE bookings
+            SET actual_start_time = ?
+            WHERE id = ?
+              AND (actual_start_time IS NULL OR actual_start_time = '')
+            """,
+            (stamp, booking_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def try_set_actual_finish(
+    booking_id: int, iso_text: str, duration_minutes: int
+) -> bool:
+    """Set actual finish and duration once, only after start. Does not change booked times."""
+    stamp = str(iso_text or "").strip()
+    if not stamp:
+        return False
+    try:
+        minutes = int(duration_minutes)
+    except (TypeError, ValueError):
+        return False
+    if minutes < 0:
+        minutes = 0
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE bookings
+            SET actual_finish_time = ?, actual_duration = ?
+            WHERE id = ?
+              AND actual_start_time IS NOT NULL
+              AND actual_start_time != ''
+              AND (actual_finish_time IS NULL OR actual_finish_time = '')
+            """,
+            (stamp, minutes, booking_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
 
 
 def update_booking_status(booking_id: int, status: str) -> None:

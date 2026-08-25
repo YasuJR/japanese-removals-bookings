@@ -46,6 +46,7 @@ from booking_helpers import apple_maps_url, mailto_href, sms_href, tel_href
 from driver_run_sheet_data import build_driver_run_sheet
 from staff_portal import build_staff_portal
 import staff_auth
+import staff_job_times
 from outstanding_invoices_data import (
     INVOICE_FILTERS,
     build_outstanding_dashboard,
@@ -1866,6 +1867,55 @@ def staff_portal():
     range_key = request.args.get("range", "today").strip()
     portal = build_staff_portal(staff, range_key, perth_today())
     return render_template("staff_portal.html", portal=portal)
+
+
+def _staff_portal_return():
+    staff = (request.form.get("staff") or request.args.get("staff") or "").strip()
+    range_key = (request.form.get("range") or request.args.get("range") or "today").strip()
+    return redirect(url_for("staff_portal", staff=staff, range=range_key))
+
+
+@app.route(
+    "/staff/jobs/<int:booking_id>/start",
+    methods=["POST"],
+    endpoint="staff_start_job",
+)
+@staff_auth.staff_login_required
+def staff_start_job(booking_id: int):
+    staff = (request.form.get("staff") or "").strip()
+    staff_job_times.start_job(booking_id, staff)
+    return _staff_portal_return()
+
+
+@app.route(
+    "/staff/jobs/<int:booking_id>/finish",
+    methods=["GET", "POST"],
+    endpoint="staff_finish_job",
+)
+@staff_auth.staff_login_required
+def staff_finish_job(booking_id: int):
+    from staff_portal import _serialize_job
+
+    staff = (request.form.get("staff") or request.args.get("staff") or "").strip()
+    range_key = (request.form.get("range") or request.args.get("range") or "today").strip()
+    row = db.get_booking(booking_id)
+    if not row:
+        return redirect(url_for("staff_portal", staff=staff, range=range_key))
+    booking = dict(row)
+    if not staff_job_times.staff_can_update_job(booking, staff):
+        return redirect(url_for("staff_portal", staff=staff, range=range_key))
+    state = staff_job_times.job_time_state(booking)
+    if not state["can_finish"]:
+        return redirect(url_for("staff_portal", staff=staff, range=range_key))
+    if request.method == "GET":
+        return render_template(
+            "staff_finish_confirm.html",
+            job=_serialize_job(booking),
+            staff=staff,
+            range_key=range_key,
+        )
+    staff_job_times.finish_job(booking_id, staff)
+    return redirect(url_for("staff_portal", staff=staff, range=range_key))
 
 
 @app.route("/driver", endpoint="driver")

@@ -6,6 +6,7 @@ never copies pricing, invoice, cost, or profit data into the page payload.
 
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+import re
 
 import database as db
 import job_status
@@ -15,6 +16,7 @@ from crew import CREW_OPTIONS, active_crew_names, crew_from_storage
 from daily_jobs_data import format_job_duration_label
 from dashboard_data import perth_today, week_range
 from display_dates import format_display_date, normalize_move_date
+import staff_job_times
 
 RANGE_TODAY = "today"
 RANGE_TOMORROW = "tomorrow"
@@ -25,8 +27,6 @@ RANGE_TABS: List[Tuple[str, str]] = [
     (RANGE_TOMORROW, "Tomorrow"),
     (RANGE_WEEK, "This Week"),
 ]
-
-HIDDEN_STATUSES = frozenset({"Completed", "Cancelled"})
 
 
 def normalize_range(value: Any) -> str:
@@ -81,9 +81,24 @@ def _notes_text(booking: Dict[str, Any]) -> str:
 
 
 def _should_hide_status(booking: Dict[str, Any], range_key: str) -> bool:
-    if job_status.display(booking) not in HIDDEN_STATUSES:
-        return False
-    return range_key in {RANGE_TODAY, RANGE_TOMORROW, RANGE_WEEK}
+    status = job_status.display(booking)
+    if status == "Cancelled":
+        return True
+    if status == "Completed" and range_key in {RANGE_TODAY, RANGE_TOMORROW}:
+        return True
+    return False
+
+
+def _suburb_label(address: str) -> str:
+    if not address:
+        return ""
+    label = pickup_suburb(address)
+    if not label or label == "—":
+        return address
+    cleaned = re.sub(r"\s*W\.?A\.?\s*$", "", label, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*\d{4}\s*$", "", cleaned).strip()
+    cleaned = re.sub(r"\s*W\.?A\.?\s*$", "", cleaned, flags=re.IGNORECASE).strip()
+    return cleaned or label
 
 
 def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
@@ -100,18 +115,20 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
     duration_label = format_job_duration_label(
         duration_hours_from_times(start_hm, finish_hm)
     )
-    pickup_label = pickup_suburb(pickup) if pickup else ""
-    dropoff_label = pickup_suburb(dropoff) if dropoff else ""
-    return {
+    pickup_label = _suburb_label(pickup) if pickup else ""
+    dropoff_label = _suburb_label(dropoff) if dropoff else ""
+    times = staff_job_times.job_time_state(row)
+    payload = {
+        "id": int(row["id"]),
         "date_iso": move_date,
         "date_display": _date_display(move_date) if move_date else "—",
         "start_time": display_start_time(row),
         "start_hm": start_hm,
         "customer_name": str(row.get("customer_name") or "").strip() or "—",
         "pickup_address": pickup,
-        "pickup_label": pickup_label if pickup_label != "—" else pickup,
+        "pickup_label": pickup_label or pickup,
         "dropoff_address": dropoff,
-        "dropoff_label": dropoff_label if dropoff_label != "—" else dropoff,
+        "dropoff_label": dropoff_label or dropoff,
         "crew": _crew_slash_display(row),
         "estimated_duration": duration_label or "—",
         "phone": phone,
@@ -121,6 +138,46 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
         "pickup_map_url": apple_maps_url(pickup),
         "dropoff_map_url": apple_maps_url(dropoff),
     }
+    payload.update(times)
+    return payload
+
+
+def _week_days(
+    jobs: List[Dict[str, Any]], start_iso: str, end_iso: str, today: date
+) -> List[Dict[str, Any]]:
+    by_date: Dict[str, List[Dict[str, Any]]] = {}
+    for job in jobs:
+        by_date.setdefault(job.get("date_iso") or "", []).append(job)
+    try:
+        start = date.fromisoformat(start_iso)
+        end = date.fromisoformat(end_iso)
+    except ValueError:
+        return []
+    days: List[Dict[str, Any]] = []
+    current = start
+    today_iso = today.isoformat()
+    weekdays = (
+        "MONDAY",
+        "TUESDAY",
+        "WEDNESDAY",
+        "THURSDAY",
+        "FRIDAY",
+        "SATURDAY",
+        "SUNDAY",
+    )
+    while current <= end:
+        iso = current.isoformat()
+        days.append(
+            {
+                "date_iso": iso,
+                "heading": weekdays[current.weekday()],
+                "date_display": _date_display(iso),
+                "is_today": iso == today_iso,
+                "jobs": by_date.get(iso, []),
+            }
+        )
+        current += timedelta(days=1)
+    return days
 
 
 def _load_rows(start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
@@ -181,4 +238,7 @@ def build_staff_portal(
         "jobs": jobs,
         "job_count": count,
         "jobs_label": jobs_label,
+        "week_days": _week_days(jobs, start_iso, end_iso, today)
+        if active_range == RANGE_WEEK
+        else [],
     }
