@@ -38,6 +38,9 @@
       <div><dt>Start time</dt><dd>{{ booking|booking_start_time }}</dd></div>
       <div><dt>Finish time</dt><dd>{{ booking|booking_finish_time }}</dd></div>
       <div><dt>Duration</dt><dd>{{ duration_label }}</dd></div>
+      <div><dt>Actual start</dt><dd>{{ actual_times.started_display or 'Not set' }}</dd></div>
+      <div><dt>Actual finish</dt><dd>{{ actual_times.finished_display or 'Not set' }}</dd></div>
+      <div><dt>Actual duration</dt><dd>{{ actual_times.worked_display or '—' }}</dd></div>
       <div><dt>Number of movers</dt><dd>{{ booking.num_movers }}</dd></div>
       <div><dt>Crew</dt><dd>{{ booking|booking_crew }}</dd></div>
       <div><dt>Truck assigned</dt><dd>{{ booking.truck_assigned or 'Not assigned' }}</dd></div>

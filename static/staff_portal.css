@@ -200,55 +200,16 @@ a.staff-job-btn:active {
   letter-spacing: 0.02em;
 }
 
-button.staff-job-btn {
-  width: 100%;
-  appearance: none;
-  font-family: inherit;
-  cursor: pointer;
+.staff-job-scheduled {
+  margin: 0.4rem 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
 }
 
-.staff-job-time-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-  margin-top: 0.95rem;
-}
-
-.staff-job-time-actions:has(> :only-child) {
-  grid-template-columns: 1fr;
-}
-
-.staff-job-time-form {
-  margin: 0;
-}
-
-.staff-job-btn-start,
-.staff-job-btn-finish {
-  min-height: 54px;
-  font-size: 1rem;
-  letter-spacing: 0.02em;
-}
-
-.staff-job-btn-start {
-  color: #fff;
-  background: var(--navy);
-  border-color: var(--navy);
-}
-
-.staff-job-btn-finish {
-  color: #fff;
-  background: var(--crimson);
-  border-color: var(--crimson);
-}
-
-a.staff-job-btn-start:active,
-button.staff-job-btn-start:active {
-  background: var(--navy-light);
-}
-
-a.staff-job-btn-finish:active,
-button.staff-job-btn-finish:active {
-  background: var(--crimson-dark);
+.staff-job-scheduled span {
+  font-weight: 700;
+  color: var(--navy);
+  margin-right: 0.35rem;
 }
 
 .staff-job-actual {
@@ -351,27 +312,4 @@ button.staff-job-btn-finish:active {
 
 .staff-job-card-week .staff-job-headline {
   font-size: 1.7rem;
-}
-
-.staff-finish-confirm h2 {
-  margin: 0;
-  font-size: 1.45rem;
-}
-
-.staff-finish-customer {
-  margin: 0.65rem 0 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-
-.staff-finish-meta {
-  margin: 0.35rem 0 0;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.staff-finish-actions {
-  display: grid;
-  gap: 0.55rem;
-  margin-top: 1.15rem;
 }

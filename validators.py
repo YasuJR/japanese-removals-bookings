@@ -3,7 +3,7 @@
 from typing import Any, Dict, List, Tuple
 
 import job_status
-from booking_times import validate_times
+from booking_times import normalize_time_input, validate_times
 from crew import crew_storage_value, merge_crew_for_edit, parse_crew_from_form
 from extra_charges import parse_extra_charges_from_form
 
@@ -119,6 +119,8 @@ def parse_booking_form(
         "extra_charges": extra_charges,
         "truck_assigned": (form.get("truck_assigned") or "").strip(),
         "status": status or job_status.DEFAULT_STATUS,
+        "actual_start_time": normalize_time_input(form.get("actual_start_time")),
+        "actual_finish_time": normalize_time_input(form.get("actual_finish_time")),
     }
     if hourly_rate is not None and callout_fee is not None:
         import invoice as invoice_mod

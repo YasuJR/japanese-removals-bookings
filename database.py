@@ -888,52 +888,35 @@ def update_booking_on_route_fields(
     update_booking_integration_fields(booking_id, fields)
 
 
-def try_set_actual_start(booking_id: int, iso_text: str) -> bool:
-    """Set actual_start_time once. Does not change booked start_time."""
-    stamp = str(iso_text or "").strip()
-    if not stamp:
-        return False
+def save_booking_actual_times(
+    booking_id: int,
+    start_time: str,
+    finish_time: str,
+    duration_minutes: Optional[int],
+) -> None:
+    """Save owner-entered actual times. Does not change scheduled start/finish."""
+    start_value = str(start_time or "").strip()
+    finish_value = str(finish_time or "").strip()
+    duration_value: Optional[int]
+    if duration_minutes is None or duration_minutes == "":
+        duration_value = None
+    else:
+        try:
+            duration_value = int(duration_minutes)
+        except (TypeError, ValueError):
+            duration_value = None
+        if duration_value is not None and duration_value < 0:
+            duration_value = 0
     with get_connection() as conn:
-        cursor = conn.execute(
+        conn.execute(
             """
             UPDATE bookings
-            SET actual_start_time = ?
+            SET actual_start_time = ?, actual_finish_time = ?, actual_duration = ?
             WHERE id = ?
-              AND (actual_start_time IS NULL OR actual_start_time = '')
             """,
-            (stamp, booking_id),
+            (start_value, finish_value, duration_value, booking_id),
         )
         conn.commit()
-        return cursor.rowcount > 0
-
-
-def try_set_actual_finish(
-    booking_id: int, iso_text: str, duration_minutes: int
-) -> bool:
-    """Set actual finish and duration once, only after start. Does not change booked times."""
-    stamp = str(iso_text or "").strip()
-    if not stamp:
-        return False
-    try:
-        minutes = int(duration_minutes)
-    except (TypeError, ValueError):
-        return False
-    if minutes < 0:
-        minutes = 0
-    with get_connection() as conn:
-        cursor = conn.execute(
-            """
-            UPDATE bookings
-            SET actual_finish_time = ?, actual_duration = ?
-            WHERE id = ?
-              AND actual_start_time IS NOT NULL
-              AND actual_start_time != ''
-              AND (actual_finish_time IS NULL OR actual_finish_time = '')
-            """,
-            (stamp, minutes, booking_id),
-        )
-        conn.commit()
-        return cursor.rowcount > 0
 
 
 def update_booking_status(booking_id: int, status: str) -> None:

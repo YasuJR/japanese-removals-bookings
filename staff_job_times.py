@@ -1,49 +1,26 @@
-"""Actual start/finish times for Staff Portal jobs.
+"""Actual work times — admin-entered, separate from scheduled/invoice times.
 
-Stores Perth clock time on the server. Never overwrites booked start/finish
-or estimated duration. actual_duration is minutes for later pay calculations.
+actual_duration is stored as minutes for later pay calculations.
+Staff Portal is read-only.
 """
 
 from datetime import datetime
-from typing import Any, Dict, Optional
-from zoneinfo import ZoneInfo
+from typing import Any, Dict, List, Optional, Tuple
 
-import config
-import database as db
 import job_status
-from booking_times import format_time_12h
-from crew import crew_from_storage
+from booking_times import format_time_12h, normalize_time_input
 
 
-def perth_now(now: Optional[datetime] = None) -> datetime:
-    tz = ZoneInfo(config.TIMEZONE)
-    if now is None:
-        return datetime.now(tz)
-    if now.tzinfo is None:
-        return now.replace(tzinfo=tz)
-    return now.astimezone(tz)
-
-
-def to_iso(moment: datetime) -> str:
-    return perth_now(moment).isoformat(timespec="seconds")
-
-
-def parse_actual_datetime(value: Any) -> Optional[datetime]:
-    text = str(value or "").strip()
-    if not text:
-        return None
-    try:
-        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    return perth_now(parsed)
+def parse_actual_clock(value: Any) -> str:
+    """Normalize stored actual times (HH:MM or ISO datetime) to HH:MM."""
+    return normalize_time_input(value)
 
 
 def format_actual_clock(value: Any) -> str:
-    parsed = parse_actual_datetime(value)
-    if parsed is None:
+    hm = parse_actual_clock(value)
+    if not hm:
         return ""
-    return format_time_12h("{0:02d}:{1:02d}".format(parsed.hour, parsed.minute))
+    return format_time_12h(hm)
 
 
 def format_worked_duration(minutes: Any) -> str:
@@ -61,87 +38,71 @@ def format_worked_duration(minutes: Any) -> str:
     return "{0}min".format(mins)
 
 
-def duration_minutes_between(start_iso: Any, finish_iso: Any) -> int:
-    start = parse_actual_datetime(start_iso)
-    finish = parse_actual_datetime(finish_iso)
-    if start is None or finish is None:
+def duration_minutes_between(start_value: Any, finish_value: Any) -> int:
+    start_hm = parse_actual_clock(start_value)
+    finish_hm = parse_actual_clock(finish_value)
+    if not start_hm or not finish_hm:
         return 0
+    start = datetime.strptime(start_hm, "%H:%M")
+    finish = datetime.strptime(finish_hm, "%H:%M")
     seconds = (finish - start).total_seconds()
     if seconds < 0:
         return 0
     return int(round(seconds / 60.0))
 
 
-def _has_value(value: Any) -> bool:
-    return bool(str(value or "").strip())
+def parse_actual_times_from_form(form: Any) -> Tuple[str, str, Optional[int], List[str]]:
+    """Read admin Actual Start / Finish. Does not touch scheduled times."""
+    start = parse_actual_clock(form.get("actual_start_time") if hasattr(form, "get") else "")
+    finish = parse_actual_clock(form.get("actual_finish_time") if hasattr(form, "get") else "")
+    errors: List[str] = []
+    duration: Optional[int] = None
+    if finish and not start:
+        errors.append("Actual start time is required when actual finish time is set.")
+        return start, finish, duration, errors
+    if start and finish:
+        minutes = duration_minutes_between(start, finish)
+        if minutes <= 0:
+            errors.append("Actual finish time must be after actual start time.")
+        else:
+            duration = minutes
+    return start, finish, duration, errors
 
 
 def job_time_state(booking: Dict[str, Any]) -> Dict[str, Any]:
-    start_iso = str(booking.get("actual_start_time") or "").strip()
-    finish_iso = str(booking.get("actual_finish_time") or "").strip()
-    started = _has_value(start_iso)
-    finished = _has_value(finish_iso)
+    start_raw = str(booking.get("actual_start_time") or "").strip()
+    finish_raw = str(booking.get("actual_finish_time") or "").strip()
+    start_hm = parse_actual_clock(start_raw)
+    finish_hm = parse_actual_clock(finish_raw)
+    started = bool(start_hm)
+    finished = bool(finish_hm)
     duration = booking.get("actual_duration")
-    worked = format_worked_duration(duration) if duration is not None and str(duration) != "" else ""
-    if finished and not worked:
-        worked = format_worked_duration(duration_minutes_between(start_iso, finish_iso))
+    worked = (
+        format_worked_duration(duration)
+        if duration is not None and str(duration) != ""
+        else ""
+    )
+    if started and finished and not worked:
+        worked = format_worked_duration(duration_minutes_between(start_hm, finish_hm))
+    started_display = format_actual_clock(start_hm) if started else ""
+    finished_display = format_actual_clock(finish_hm) if finished else ""
+    actual_range = ""
+    if started and finished:
+        actual_range = "{0} – {1}".format(started_display, finished_display)
+    elif started:
+        actual_range = started_display
     status = job_status.display(booking)
-    cancelled = status == "Cancelled"
     return {
-        "actual_start_time": start_iso,
-        "actual_finish_time": finish_iso,
+        "actual_start_hm": start_hm,
+        "actual_finish_hm": finish_hm,
+        "actual_start_time": start_raw,
+        "actual_finish_time": finish_raw,
         "actual_duration": duration,
-        "started": started,
-        "finished": finished,
-        "started_display": format_actual_clock(start_iso) if started else "",
-        "finished_display": format_actual_clock(finish_iso) if finished else "",
+        "has_actual": started or finished,
+        "started_display": started_display,
+        "finished_display": finished_display,
+        "actual_range_display": actual_range,
         "worked_display": worked,
-        "can_start": (not started) and (not cancelled),
-        "can_finish": started and (not finished) and (not cancelled),
         "is_completed_status": status == "Completed",
         "status_display": status if status == "Completed" else "",
     }
-
-
-def staff_can_update_job(booking: Dict[str, Any], staff_name: str) -> bool:
-    staff = str(staff_name or "").strip()
-    if not staff:
-        return False
-    if job_status.display(booking) == "Cancelled":
-        return False
-    return staff in crew_from_storage(booking.get("crew"))
-
-
-def start_job(
-    booking_id: int,
-    staff_name: str,
-    now: Optional[datetime] = None,
-) -> bool:
-    row = db.get_booking(booking_id)
-    if not row:
-        return False
-    booking = dict(row)
-    if not staff_can_update_job(booking, staff_name):
-        return False
-    if job_time_state(booking)["started"]:
-        return False
-    return db.try_set_actual_start(booking_id, to_iso(perth_now(now)))
-
-
-def finish_job(
-    booking_id: int,
-    staff_name: str,
-    now: Optional[datetime] = None,
-) -> bool:
-    row = db.get_booking(booking_id)
-    if not row:
-        return False
-    booking = dict(row)
-    if not staff_can_update_job(booking, staff_name):
-        return False
-    state = job_time_state(booking)
-    if not state["can_finish"]:
-        return False
-    finish_at = perth_now(now)
-    minutes = duration_minutes_between(state["actual_start_time"], to_iso(finish_at))
-    return db.try_set_actual_finish(booking_id, to_iso(finish_at), minutes)

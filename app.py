@@ -440,12 +440,26 @@ def _create_booking_from_data(data):
     return booking_id
 
 
+def _apply_actual_times_from_form(data, form):
+    start, finish, minutes, actual_errors = staff_job_times.parse_actual_times_from_form(
+        form
+    )
+    data["actual_start_time"] = start
+    data["actual_finish_time"] = finish
+    data["actual_duration_label"] = (
+        staff_job_times.format_worked_duration(minutes) if minutes else ""
+    )
+    return start, finish, minutes, actual_errors
+
+
 def _update_booking_from_form(booking_id, form):
     existing_row = db.get_booking(booking_id)
     existing_crew = ""
     if existing_row:
         existing_crew = existing_row["crew"] or ""
     data, errors = parse_booking_form(form, existing_crew_csv=existing_crew)
+    start, finish, minutes, actual_errors = _apply_actual_times_from_form(data, form)
+    errors.extend(actual_errors)
     if errors:
         return False, errors, data
     ok = db.update_booking(
@@ -472,6 +486,7 @@ def _update_booking_from_form(booking_id, form):
     if ok:
         services._persist_booking_extras(booking_id, data)
         _save_job_costs_from_form(booking_id, form, previous=existing_row)
+        db.save_booking_actual_times(booking_id, start, finish, minutes)
     return ok, errors, data
 
 
@@ -1869,55 +1884,6 @@ def staff_portal():
     return render_template("staff_portal.html", portal=portal)
 
 
-def _staff_portal_return():
-    staff = (request.form.get("staff") or request.args.get("staff") or "").strip()
-    range_key = (request.form.get("range") or request.args.get("range") or "today").strip()
-    return redirect(url_for("staff_portal", staff=staff, range=range_key))
-
-
-@app.route(
-    "/staff/jobs/<int:booking_id>/start",
-    methods=["POST"],
-    endpoint="staff_start_job",
-)
-@staff_auth.staff_login_required
-def staff_start_job(booking_id: int):
-    staff = (request.form.get("staff") or "").strip()
-    staff_job_times.start_job(booking_id, staff)
-    return _staff_portal_return()
-
-
-@app.route(
-    "/staff/jobs/<int:booking_id>/finish",
-    methods=["GET", "POST"],
-    endpoint="staff_finish_job",
-)
-@staff_auth.staff_login_required
-def staff_finish_job(booking_id: int):
-    from staff_portal import _serialize_job
-
-    staff = (request.form.get("staff") or request.args.get("staff") or "").strip()
-    range_key = (request.form.get("range") or request.args.get("range") or "today").strip()
-    row = db.get_booking(booking_id)
-    if not row:
-        return redirect(url_for("staff_portal", staff=staff, range=range_key))
-    booking = dict(row)
-    if not staff_job_times.staff_can_update_job(booking, staff):
-        return redirect(url_for("staff_portal", staff=staff, range=range_key))
-    state = staff_job_times.job_time_state(booking)
-    if not state["can_finish"]:
-        return redirect(url_for("staff_portal", staff=staff, range=range_key))
-    if request.method == "GET":
-        return render_template(
-            "staff_finish_confirm.html",
-            job=_serialize_job(booking),
-            staff=staff,
-            range_key=range_key,
-        )
-    staff_job_times.finish_job(booking_id, staff)
-    return redirect(url_for("staff_portal", staff=staff, range=range_key))
-
-
 @app.route("/driver", endpoint="driver")
 @auth.login_required
 def driver():
@@ -2159,10 +2125,12 @@ def _view_booking_extras(row) -> dict:
     from crew_schedule_data import booking_duration_hours, format_hours_label
 
     booking = services.booking_to_dict(row)
+    actual_times = staff_job_times.job_time_state(booking)
     return {
         "duration_label": format_hours_label(booking_duration_hours(booking)),
         "invoice_summary": _invoice_summary_for_row(row),
         "profit_summary": booking_profit.profit_summary_for_booking(booking),
+        "actual_times": actual_times,
         **_double_booking_context(booking),
     }
 
@@ -2459,6 +2427,15 @@ def edit_booking(booking_id):
         "finish_time": normalize_time_input(row["finish_time"])
         or effective_finish_hm(_row_to_dict(row)),
         "duration_hours": _form_duration_from_row(row),
+        "actual_start_time": staff_job_times.parse_actual_clock(
+            _row_to_dict(row).get("actual_start_time")
+        ),
+        "actual_finish_time": staff_job_times.parse_actual_clock(
+            _row_to_dict(row).get("actual_finish_time")
+        ),
+        "actual_duration_label": staff_job_times.format_worked_duration(
+            _row_to_dict(row).get("actual_duration")
+        ),
         "crew": crew_from_storage(_row_to_dict(row).get("crew")),
         "num_movers": row["num_movers"],
         "notes": row["notes"] or "",

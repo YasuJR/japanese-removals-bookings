@@ -72,6 +72,27 @@
            value="{{ form.get('finish_time', '') }}">
   </label>
   {% endif %}
+  {% if not new_booking_mode %}
+  <label>
+    Actual start time
+    <input type="time" name="actual_start_time" id="actual_start_time"
+           value="{{ form.get('actual_start_time', '') }}">
+    <span class="field-hint">Actual work start. Does not change scheduled or invoice times.</span>
+  </label>
+  <label>
+    Actual finish time
+    <input type="time" name="actual_finish_time" id="actual_finish_time"
+           value="{{ form.get('actual_finish_time', '') }}">
+    <span class="field-hint">Actual work finish. Separate from scheduled finish time.</span>
+  </label>
+  <div class="finish-live-box">
+    <span class="finish-live-label">Actual duration</span>
+    <p class="finish-live" aria-live="polite">
+      <strong>{{ form.get('actual_duration_label') or '—' }}</strong>
+    </p>
+    <span class="field-hint">Calculated on save from actual start and finish</span>
+  </div>
+  {% endif %}
   <label>
     Number of movers *
     <input type="number" name="num_movers" id="num_movers" min="1" max="20" required

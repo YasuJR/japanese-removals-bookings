@@ -10,12 +10,12 @@
   {% else %}
   <p class="staff-job-headline">{{ job.start_time }} — {{ job.customer_name }}</p>
   <p class="staff-job-date"><span>Date</span> {{ job.date_display }}</p>
+  <p class="staff-job-scheduled"><span>Scheduled</span> {{ job.start_time }}</p>
   {% endif %}
 
-  {% if job.started_display or job.finished_display %}
+  {% if job.has_actual %}
   <p class="staff-job-actual">
-    {% if job.started_display %}<span>Started: {{ job.started_display }}</span>{% endif %}
-    {% if job.finished_display %}<span>Finished: {{ job.finished_display }}</span>{% endif %}
+    <span>Actual: {{ job.actual_range_display }}</span>
     {% if job.worked_display %}<span>Worked: {{ job.worked_display }}</span>{% endif %}
   </p>
   {% endif %}
@@ -62,21 +62,6 @@
       <dd>{{ job.phone or "—" }}</dd>
     </div>
   </dl>
-  {% endif %}
-
-  {% if job.can_start or job.can_finish %}
-  <div class="staff-job-time-actions">
-    {% if job.can_start %}
-    <form method="post" action="{{ url_for('staff_start_job', booking_id=job.id) }}" class="staff-job-time-form">
-      <input type="hidden" name="staff" value="{{ portal.staff }}">
-      <input type="hidden" name="range" value="{{ portal.range }}">
-      <button type="submit" class="staff-job-btn staff-job-btn-start">START JOB</button>
-    </form>
-    {% endif %}
-    {% if job.can_finish %}
-    <a class="staff-job-btn staff-job-btn-finish" href="{{ url_for('staff_finish_job', booking_id=job.id, staff=portal.staff, range=portal.range) }}">FINISH JOB</a>
-    {% endif %}
-  </div>
   {% endif %}
 
   <div class="staff-job-actions">
