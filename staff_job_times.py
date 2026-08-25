@@ -1,19 +1,55 @@
 """Actual work times — admin-entered, separate from scheduled/invoice times.
 
-actual_duration is stored as minutes for later pay calculations.
+Staff Portal worked hours come from Actual start/finish (Owner/Admin).
+actual_duration is still stored on save for later pay calculations.
 Staff Portal is read-only.
 """
 
-from datetime import datetime
+import re
+from datetime import datetime, time as dt_time
 from typing import Any, Dict, List, Optional, Tuple
 
 import job_status
 from booking_times import format_time_12h, normalize_time_input
 
+_CLOCK_12H = re.compile(
+    r"(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp]\.?[Mm]\.?)"
+)
+
+
+def _from_12h_clock(text: str) -> str:
+    match = _CLOCK_12H.search(str(text or "").strip())
+    if not match:
+        return ""
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    suffix = match.group(3).upper().replace(".", "")
+    if hour < 1 or hour > 12 or minute > 59:
+        return ""
+    if suffix == "AM":
+        hour = 0 if hour == 12 else hour
+    else:
+        hour = hour if hour == 12 else hour + 12
+    return "{0:02d}:{1:02d}".format(hour, minute)
+
 
 def parse_actual_clock(value: Any) -> str:
-    """Normalize stored actual times (HH:MM or ISO datetime) to HH:MM."""
-    return normalize_time_input(value)
+    """Normalize stored actual times to HH:MM.
+
+    Accepts HH:MM, ISO datetimes, datetime/time values, and 12-hour
+    strings such as 8:00 AM / 10:30 AM.
+    """
+    if isinstance(value, datetime):
+        return "{0:02d}:{1:02d}".format(value.hour, value.minute)
+    if isinstance(value, dt_time):
+        return "{0:02d}:{1:02d}".format(value.hour, value.minute)
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    from_12h = _from_12h_clock(text)
+    if from_12h:
+        return from_12h
+    return normalize_time_input(text)
 
 
 def format_actual_clock(value: Any) -> str:
@@ -62,19 +98,25 @@ def parse_actual_duration_minutes(value: Any) -> Optional[int]:
 
 
 def worked_minutes(booking: Dict[str, Any]) -> int:
-    """Minutes that count toward this staff member's worked time.
+    """Minutes from Owner/Admin Actual finish − Actual start.
 
-    Uses stored actual_duration only. Unset actual start/finish, missing
-    duration, or Cancelled jobs contribute 0. Does not split by crew size,
-    so the same job minutes apply to every assigned crew member.
+    Does not use scheduled start/finish or estimated duration. Missing
+    actual start or finish, or Cancelled jobs, contribute 0. Does not
+    split by crew size — the same job minutes apply to every assigned
+    crew member. Existing bookings with start/finish already stored are
+    counted without requiring actual_duration to be pre-filled.
     """
     if job_status.display(booking) == "Cancelled":
         return 0
-    start = parse_actual_clock(booking.get("actual_start_time"))
-    finish = parse_actual_clock(booking.get("actual_finish_time"))
+    start = parse_actual_clock(
+        booking.get("actual_start_time") or booking.get("actual_start_hm")
+    )
+    finish = parse_actual_clock(
+        booking.get("actual_finish_time") or booking.get("actual_finish_hm")
+    )
     if not start or not finish:
         return 0
-    return parse_actual_duration_minutes(booking.get("actual_duration")) or 0
+    return duration_minutes_between(start, finish)
 
 
 def sum_worked_minutes(jobs: List[Dict[str, Any]]) -> int:
@@ -120,13 +162,10 @@ def job_time_state(booking: Dict[str, Any]) -> Dict[str, Any]:
     started = bool(start_hm)
     finished = bool(finish_hm)
     duration = booking.get("actual_duration")
-    worked = (
-        format_worked_duration(duration)
-        if duration is not None and str(duration) != ""
-        else ""
-    )
-    if started and finished and not worked:
-        worked = format_worked_duration(duration_minutes_between(start_hm, finish_hm))
+    computed = duration_minutes_between(start_hm, finish_hm) if started and finished else 0
+    if computed:
+        duration = computed
+    worked = format_worked_duration(duration) if duration not in (None, "") else ""
     started_display = format_actual_clock(start_hm) if started else ""
     finished_display = format_actual_clock(finish_hm) if finished else ""
     actual_range = ""

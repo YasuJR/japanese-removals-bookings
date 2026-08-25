@@ -845,6 +845,79 @@ def test_weekly_worked_format_examples():
     assert staff_job_times.format_weekly_worked(1880) == "31hr 20min"
     assert staff_job_times.format_weekly_worked(0) == "0hr"
     assert staff_job_times.format_weekly_worked(None) == "0hr"
+    assert staff_job_times.parse_actual_clock("8:00 AM") == "08:00"
+    assert staff_job_times.parse_actual_clock("10:30 AM") == "10:30"
+    assert staff_job_times.parse_actual_clock("1:00 PM") == "13:00"
+    assert staff_job_times.duration_minutes_between("8:00 AM", "10:30 AM") == 150
+    assert staff_job_times.format_weekly_worked(150) == "2hr 30min"
+    return True
+
+
+def test_weekly_worked_uses_actual_start_finish_even_without_duration():
+    """Completed jobs with Owner Actual Start/Finish must not stay at 0hr."""
+    from datetime import date as date_cls
+    from staff_portal import build_staff_portal
+
+    monday = date_cls(2101, 1, 3)
+    while monday.weekday() != 0:
+        monday += timedelta(days=1)
+    monday = monday + timedelta(weeks=(os.getpid() % 20) + 2)
+    today = monday
+
+    shared = _create_job(
+        _unique("KeiichiYasuCompleted"),
+        monday.isoformat(),
+        crew="Keiichi,Yasu",
+        start_time="08:00",
+        finish_time="18:00",
+        status="Completed",
+    )
+    second = _create_job(
+        _unique("SameDayAfternoon"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="13:00",
+        finish_time="18:00",
+        status="Completed",
+    )
+    no_finish = _create_job(
+        _unique("StartOnly"),
+        (monday + timedelta(days=1)).isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        status="Completed",
+    )
+    # Existing production-style rows: start/finish saved, actual_duration empty.
+    db.save_booking_actual_times(shared, "08:00", "10:30", None)
+    db.save_booking_actual_times(second, "1:00 PM", "4:15 PM", None)
+    db.save_booking_actual_times(no_finish, "08:00", "", None)
+    row = dict(db.get_booking(shared))
+    assert row["actual_start_time"]
+    assert row["actual_finish_time"]
+    assert row["actual_duration"] in (None, "", 0)
+
+    yasu = build_staff_portal("Yasu", "week", today)
+    ken = build_staff_portal("Ken", "week", today)
+    by_heading = {day["heading"]: day for day in yasu["week_days"]}
+    assert yasu["weekly_worked"]["display"] != "0hr"
+    assert yasu["weekly_worked"]["minutes"] == 150 + 195
+    assert yasu["weekly_worked"]["display"] == "5hr 45min"
+    assert by_heading["MONDAY"]["worked_display"] == "5hr 45min"
+    assert by_heading["TUESDAY"]["worked_display"] == "0hr"
+    shared_job = [
+        job for job in yasu["jobs"] if job["id"] == shared
+    ][0]
+    assert shared_job["worked_display"] == "2hr 30min"
+    assert shared_job["actual_range_display"] == "8:00 AM – 10:30 AM"
+    # Same Actual Time is credited in full to each assigned crew member.
+    # Ken is not on this job.
+    ken_minutes = ken["weekly_worked"]["minutes"]
+    assert ken_minutes == 0 or shared not in [job["id"] for job in ken["jobs"]]
+
+    today_portal = build_staff_portal("Yasu", "today", today)
+    tomorrow_portal = build_staff_portal("Yasu", "tomorrow", today)
+    assert any(job["id"] == shared for job in today_portal["jobs"])
+    assert tomorrow_portal["weekly_worked"] is None
     return True
 
 
@@ -871,6 +944,7 @@ def main():
         test_weekly_schedule_shows_completed_not_cancelled,
         test_this_week_weekly_worked_hours,
         test_weekly_worked_format_examples,
+        test_weekly_worked_uses_actual_start_finish_even_without_duration,
     ]
     passed = 0
     for test in tests:
