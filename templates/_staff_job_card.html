@@ -11,7 +11,19 @@
   <p class="staff-job-headline">{{ job.start_time }} — {{ job.customer_name }}</p>
   <p class="staff-job-date"><span>Date</span> {{ job.date_display }}</p>
   <p class="staff-job-scheduled"><span>Scheduled</span> {{ job.start_time }}</p>
+  <p class="staff-job-crew-line"><span>Crew</span> {{ job.crew }}</p>
   {% endif %}
+
+  <div class="staff-job-hours">
+    <p>
+      <span class="staff-job-hours-label">Estimated</span>
+      <span class="staff-job-hours-value">{{ job.estimated_duration }}</span>
+    </p>
+    <p>
+      <span class="staff-job-hours-label">Actual Worked</span>
+      <span class="staff-job-hours-value{% if not job.has_actual_worked %} staff-job-hours-unset{% endif %}">{{ job.actual_worked_display }}</span>
+    </p>
+  </div>
 
   {% if job.has_actual %}
   <p class="staff-job-actual">
@@ -31,14 +43,6 @@
       <dd>{{ job.dropoff_address or "—" }}</dd>
     </div>
     <div>
-      <dt>Crew</dt>
-      <dd>{{ job.crew }}</dd>
-    </div>
-    <div>
-      <dt>Estimated</dt>
-      <dd>{{ job.estimated_duration }}</dd>
-    </div>
-    <div>
       <dt>Phone Number</dt>
       <dd>{{ job.phone or "—" }}</dd>
     </div>
@@ -52,10 +56,6 @@
     <div>
       <dt>Drop-off</dt>
       <dd>{{ job.dropoff_address or "—" }}</dd>
-    </div>
-    <div>
-      <dt>Estimated</dt>
-      <dd>{{ job.estimated_duration }}</dd>
     </div>
     <div>
       <dt>Phone Number</dt>

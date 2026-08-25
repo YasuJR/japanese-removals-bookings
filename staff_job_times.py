@@ -73,6 +73,29 @@ def format_worked_duration(minutes: Any) -> str:
     return "{0}min".format(mins)
 
 
+def format_hours_as_worked(hours: Any) -> str:
+    """Convert decimal hours such as 2.5 / 5.75 / 4.0 / 2.5hr to 2hr 30min form."""
+    if isinstance(hours, bool) or hours is None:
+        return ""
+    if isinstance(hours, (int, float)):
+        value = float(hours)
+    else:
+        text = str(hours).strip()
+        if not text:
+            return ""
+        text = re.sub(r"(?i)\s*h(?:ou)?rs?\s*$", "", text).strip()
+        try:
+            value = float(text)
+        except (TypeError, ValueError):
+            return ""
+    if value <= 0:
+        return ""
+    minutes = int(round(value * 60.0))
+    if minutes <= 0:
+        return ""
+    return format_worked_duration(minutes)
+
+
 def format_weekly_worked(minutes: Any) -> str:
     """Hours and minutes for weekly/day totals. Never decimal hours."""
     try:

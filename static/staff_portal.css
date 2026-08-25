@@ -271,6 +271,45 @@ a.staff-job-btn:active {
   margin-right: 0.3rem;
 }
 
+.staff-job-hours {
+  margin: 0.7rem 0 0;
+  padding: 0.7rem 0.75rem;
+  display: grid;
+  gap: 0.4rem;
+  background: var(--cream-dark);
+  border-radius: 8px;
+}
+
+.staff-job-hours p {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.staff-job-hours-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.staff-job-hours-value {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.staff-job-hours-unset {
+  font-weight: 700;
+  color: var(--muted);
+}
+
 .staff-weekly-worked {
   margin: 0 0 1rem;
   padding: 1.15rem 1rem 1.05rem;
