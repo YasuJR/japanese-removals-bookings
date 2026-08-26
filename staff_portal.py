@@ -121,8 +121,13 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
     times = staff_job_times.job_time_state(row)
     owner_start_hm = normalize_time_input(row.get("start_time"))
     owner_finish_hm = normalize_time_input(row.get("finish_time"))
+    recorded = staff_job_times.recorded_actual_minutes(row)
     actual_minutes = staff_job_times.worked_minutes(row)
-    if actual_minutes > 0:
+    if recorded is not None:
+        actual_worked_display = (
+            staff_job_times.format_worked_duration(recorded) or "0min"
+        )
+    elif actual_minutes > 0:
         actual_worked_display = staff_job_times.format_worked_duration(actual_minutes)
     else:
         actual_worked_display = "Not set"

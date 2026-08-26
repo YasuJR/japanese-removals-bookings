@@ -102,6 +102,18 @@ def _staff_client():
     return client
 
 
+def _admin_staff_client():
+    """Office/admin session plus Staff Portal cookie — Owner editing Actual Time."""
+    client = _admin_client()
+    response = client.post(
+        "/staff/login",
+        data={"password": TEST_STAFF_PORTAL_PASSWORD},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    return client
+
+
 def _create_job(
     customer,
     move_date,
@@ -1146,6 +1158,122 @@ def test_weekly_actual_excludes_future_jobs_and_does_not_use_duration():
     return True
 
 
+def test_owner_can_edit_and_clear_actual_times_from_staff_portal():
+    import staff_job_times
+    from staff_portal import build_staff_portal
+
+    monday = _isolated_monday()
+    customer = _unique("WrongActual")
+    booking_id = _create_job(
+        customer,
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="16:00",
+        duration_hours="8",
+        status="Completed",
+    )
+    db.save_booking_actual_times(booking_id, "21:18", "21:18", 0)
+    row = dict(db.get_booking(booking_id))
+    assert staff_job_times.parse_actual_clock(row["actual_start_time"]) == "21:18"
+    assert staff_job_times.parse_actual_clock(row["actual_finish_time"]) == "21:18"
+    assert staff_job_times.recorded_actual_minutes(row) == 0
+
+    portal = build_staff_portal("Yasu", "week", monday)
+    job = [item for item in portal["jobs"] if item["id"] == booking_id][0]
+    assert job["actual_range_display"] == "9:18 PM – 9:18 PM"
+    assert job["worked_display"] == "0min"
+    assert job["actual_worked_display"] == "0min"
+    assert job["estimated_duration"] == "8hr"
+    assert portal["weekly_worked"]["minutes"] == 0
+    assert portal["weekly_worked"]["estimated_display"] == "8hr"
+
+    staff = _staff_client()
+    live_today = _unique("OwnerEditToday")
+    live_id = _create_job(live_today, perth_today().isoformat(), crew="Yasu")
+    staff_html = staff.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
+    assert "Edit Actual Time" not in staff_html
+    assert "Clear Actual Time" not in staff_html
+    assert "/bookings/{0}/actual-times".format(booking_id) not in staff_html
+    assert "/bookings/{0}/actual-times".format(live_id) not in staff_html
+    blocked = staff.post(
+        "/bookings/{0}/actual-times".format(booking_id),
+        data={
+            "staff": "Yasu",
+            "range": "week",
+            "action": "save",
+            "actual_start_time": "07:00",
+            "actual_finish_time": "15:30",
+        },
+        follow_redirects=False,
+    )
+    assert blocked.status_code == 302
+    assert "/login" in (blocked.headers.get("Location") or "")
+    row = dict(db.get_booking(booking_id))
+    assert staff_job_times.parse_actual_clock(row["actual_start_time"]) == "21:18"
+    assert staff_job_times.parse_actual_clock(row["actual_finish_time"]) == "21:18"
+    assert row["start_time"] in ("08:00", "8:00")
+    assert row["finish_time"] in ("16:00",)
+
+    owner = _admin_staff_client()
+    owner_html = owner.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
+    assert "Edit Actual Time" in owner_html
+    assert "Clear Actual Time" in owner_html
+    assert 'name="actual_start_time"' in owner_html
+    assert "/bookings/{0}/actual-times".format(live_id) in owner_html
+    saved = owner.post(
+        "/bookings/{0}/actual-times".format(booking_id),
+        data={
+            "staff": "Yasu",
+            "range": "week",
+            "action": "save",
+            "actual_start_time": "07:00",
+            "actual_finish_time": "15:30",
+        },
+        follow_redirects=False,
+    )
+    assert saved.status_code in (302, 303)
+    row = dict(db.get_booking(booking_id))
+    assert staff_job_times.parse_actual_clock(row["actual_start_time"]) == "07:00"
+    assert staff_job_times.parse_actual_clock(row["actual_finish_time"]) == "15:30"
+    assert int(row["actual_duration"]) == 510
+    assert row["start_time"] in ("08:00", "8:00")
+    assert row["finish_time"] in ("16:00",)
+    assert str(row["duration_hours"]) == "8"
+
+    portal = build_staff_portal("Yasu", "week", monday)
+    job = [item for item in portal["jobs"] if item["id"] == booking_id][0]
+    assert job["actual_worked_display"] == "8hr 30min"
+    assert job["worked_display"] == "8hr 30min"
+    assert job["estimated_duration"] == "8hr"
+    assert portal["weekly_worked"]["minutes"] == 510
+    assert portal["weekly_worked"]["display"] == "8hr 30min"
+    assert portal["week_days"][0]["worked_display"] == "8hr 30min"
+
+    cleared = owner.post(
+        "/bookings/{0}/actual-times".format(booking_id),
+        data={
+            "staff": "Yasu",
+            "range": "week",
+            "action": "clear",
+        },
+        follow_redirects=False,
+    )
+    assert cleared.status_code in (302, 303)
+    row = dict(db.get_booking(booking_id))
+    assert not (row.get("actual_start_time") or "").strip()
+    assert not (row.get("actual_finish_time") or "").strip()
+    assert row["start_time"] in ("08:00", "8:00")
+    assert row["finish_time"] in ("16:00",)
+    portal = build_staff_portal("Yasu", "week", monday)
+    job = [item for item in portal["jobs"] if item["id"] == booking_id][0]
+    assert job["has_actual"] is False
+    assert job["actual_worked_display"] == "8hr"
+    assert portal["weekly_worked"]["minutes"] == 480
+    assert portal["weekly_worked"]["display"] == "8hr"
+    return True
+
+
 def main():
     tests = [
         test_staff_requires_login,
@@ -1173,6 +1301,7 @@ def main():
         test_job_card_shows_estimated_and_actual_worked,
         test_this_week_shows_weekly_estimated_and_actual,
         test_weekly_actual_excludes_future_jobs_and_does_not_use_duration,
+        test_owner_can_edit_and_clear_actual_times_from_staff_portal,
     ]
     passed = 0
     for test in tests:
