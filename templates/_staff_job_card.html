@@ -25,7 +25,37 @@
     </p>
   </div>
 
-  {% if job.has_actual %}
+  {% if can_edit_actual %}
+  <div class="staff-job-actual">
+    {% if job.has_actual %}
+    <p>
+      <span>Actual: {{ job.actual_range_display }}</span>
+      {% if job.worked_display %}<span>Worked: {{ job.worked_display }}</span>{% endif %}
+    </p>
+    {% else %}
+    <p><span>Actual: Not set</span></p>
+    {% endif %}
+    <details class="staff-actual-edit">
+      <summary class="staff-job-btn staff-actual-edit-toggle">Edit Actual Time</summary>
+      <form class="staff-actual-edit-form" method="post" action="{{ url_for('save_booking_actual_times', booking_id=job.id) }}">
+        <input type="hidden" name="staff" value="{{ portal.staff }}">
+        <input type="hidden" name="range" value="{{ portal.range }}">
+        <label>
+          Actual Start
+          <input type="time" name="actual_start_time" value="{{ job.actual_start_hm }}">
+        </label>
+        <label>
+          Actual Finish
+          <input type="time" name="actual_finish_time" value="{{ job.actual_finish_hm }}">
+        </label>
+        <div class="staff-actual-edit-actions">
+          <button class="staff-job-btn" type="submit" name="action" value="save">Save</button>
+          <button class="staff-job-btn staff-actual-clear" type="submit" name="action" value="clear">Clear Actual Time</button>
+        </div>
+      </form>
+    </details>
+  </div>
+  {% elif job.has_actual %}
   <p class="staff-job-actual">
     <span>Actual: {{ job.actual_range_display }}</span>
     {% if job.worked_display %}<span>Worked: {{ job.worked_display }}</span>{% endif %}

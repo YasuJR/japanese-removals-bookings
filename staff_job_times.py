@@ -141,17 +141,28 @@ def booking_move_date(booking: Dict[str, Any]) -> Optional[date]:
         return None
 
 
+def recorded_actual_minutes(booking: Dict[str, Any]) -> Optional[int]:
+    """Minutes from actual_start_time / actual_finish_time when both are set.
+
+    Returns 0 when both times exist but finish is not after start (e.g. 9:18 PM
+    – 9:18 PM). Returns None when either actual time is missing so callers can
+    fall back to Owner booking start/finish. Never uses duration_hours.
+    """
+    start = parse_actual_clock(booking.get("actual_start_time"))
+    finish = parse_actual_clock(booking.get("actual_finish_time"))
+    if not start or not finish:
+        return None
+    return duration_minutes_between(start, finish)
+
+
 def worked_minutes(booking: Dict[str, Any], today: Optional[date] = None) -> int:
-    """Minutes from Owner/Admin Edit Booking Start time − Finish time.
+    """Worked minutes for Staff Portal Actual Worked / WEEKLY ACTUAL.
 
-    Source of truth is bookings.start_time / bookings.finish_time — the
-    fields the Owner edits on Edit Booking and Invoice pricing. The newer
-    actual_start_time / actual_finish_time columns are not used here
-    because existing Completed jobs leave them empty.
-
-    Does not use duration_hours, estimated duration, or 08:00/18:00
-    defaults. Cancelled jobs, future jobs (move_date after today), and
-    jobs missing start or finish are 0. Does not split by crew size.
+    Prefers Owner/Admin Actual Start / Finish when both are stored. Otherwise
+    uses Edit Booking start_time / finish_time. Does not use duration_hours
+    or 08:00/18:00 defaults. Cancelled jobs, future jobs (move_date after
+    today), and jobs missing a usable start or finish are 0. Does not split
+    by crew size.
     """
     if job_status.display(booking) == "Cancelled":
         return 0
@@ -159,6 +170,9 @@ def worked_minutes(booking: Dict[str, Any], today: Optional[date] = None) -> int
         move = booking_move_date(booking)
         if move is not None and move > today:
             return 0
+    recorded = recorded_actual_minutes(booking)
+    if recorded is not None:
+        return recorded
     start = parse_actual_clock(
         booking.get("owner_start_hm")
         or booking.get("start_time")

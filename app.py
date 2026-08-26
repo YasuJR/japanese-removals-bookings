@@ -15,6 +15,7 @@ from calendar import monthrange
 
 from flask import (
     Flask,
+    abort,
     flash,
     g,
     jsonify,
@@ -1881,7 +1882,46 @@ def staff_portal():
     staff = request.args.get("staff", "").strip()
     range_key = request.args.get("range", "today").strip()
     portal = build_staff_portal(staff, range_key, perth_today())
-    return render_template("staff_portal.html", portal=portal)
+    return render_template(
+        "staff_portal.html",
+        portal=portal,
+        can_edit_actual=auth.get_current_user_id() is not None,
+    )
+
+
+def _staff_portal_redirect():
+    staff = (request.form.get("staff") or request.args.get("staff") or "").strip()
+    range_key = (request.form.get("range") or request.args.get("range") or "today").strip()
+    return redirect(url_for("staff_portal", staff=staff, range=range_key))
+
+
+@app.route(
+    "/bookings/<int:booking_id>/actual-times",
+    methods=["POST"],
+    endpoint="save_booking_actual_times",
+)
+@auth.login_required
+def save_booking_actual_times_view(booking_id: int):
+    """Owner/Admin overwrite or clear Actual Start / Finish only."""
+    row = db.get_booking(booking_id)
+    if row is None:
+        abort(404)
+    dest = _staff_portal_redirect()
+    action = str(request.form.get("action") or "save").strip().lower()
+    if action == "clear":
+        db.save_booking_actual_times(booking_id, "", "", None)
+        flash("Actual time cleared.", "success")
+        return dest
+    start, finish, minutes, errors = staff_job_times.parse_actual_times_from_form(
+        request.form
+    )
+    if errors:
+        for message in errors:
+            flash(message, "error")
+        return dest
+    db.save_booking_actual_times(booking_id, start, finish, minutes)
+    flash("Actual time saved.", "success")
+    return dest
 
 
 @app.route("/driver", endpoint="driver")
