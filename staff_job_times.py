@@ -1,6 +1,7 @@
 """Actual work times — admin-entered, separate from scheduled/invoice times.
 
-Staff Portal WEEKLY WORKED uses Owner Edit Booking start_time / finish_time.
+Staff Portal WEEKLY ACTUAL uses Owner Edit Booking start_time / finish_time.
+WEEKLY ESTIMATED uses stored duration_hours only.
 Staff Portal is read-only.
 """
 
@@ -73,6 +74,35 @@ def format_worked_duration(minutes: Any) -> str:
     return "{0}min".format(mins)
 
 
+def duration_hours_to_minutes(hours: Any) -> int:
+    """Stored duration_hours to minutes. Does not use start/finish times."""
+    if isinstance(hours, bool) or hours is None:
+        return 0
+    if isinstance(hours, (int, float)):
+        value = float(hours)
+    else:
+        text = str(hours).strip()
+        if not text:
+            return 0
+        text = re.sub(r"(?i)\s*h(?:ou)?rs?\s*$", "", text).strip()
+        try:
+            value = float(text)
+        except (TypeError, ValueError):
+            return 0
+    if value <= 0:
+        return 0
+    minutes = int(round(value * 60.0))
+    return minutes if minutes > 0 else 0
+
+
+def format_hours_as_worked(hours: Any) -> str:
+    """Convert decimal hours such as 2.5 / 5.75 / 4.0 / 2.5hr to 2hr 30min form."""
+    minutes = duration_hours_to_minutes(hours)
+    if minutes <= 0:
+        return ""
+    return format_worked_duration(minutes)
+
+
 def format_weekly_worked(minutes: Any) -> str:
     """Hours and minutes for weekly/day totals. Never decimal hours."""
     try:
@@ -125,6 +155,24 @@ def worked_minutes(booking: Dict[str, Any]) -> int:
 
 def sum_worked_minutes(jobs: List[Dict[str, Any]]) -> int:
     return sum(worked_minutes(job) for job in jobs)
+
+
+def estimated_minutes(booking: Dict[str, Any]) -> int:
+    """Minutes from stored duration_hours. Never start/finish or actual times."""
+    if job_status.display(booking) == "Cancelled":
+        return 0
+    stored = booking.get("estimated_minutes")
+    if stored not in (None, ""):
+        try:
+            minutes = int(stored)
+            return minutes if minutes > 0 else 0
+        except (TypeError, ValueError):
+            pass
+    return duration_hours_to_minutes(booking.get("duration_hours"))
+
+
+def sum_estimated_minutes(jobs: List[Dict[str, Any]]) -> int:
+    return sum(estimated_minutes(job) for job in jobs)
 
 
 def duration_minutes_between(start_value: Any, finish_value: Any) -> int:

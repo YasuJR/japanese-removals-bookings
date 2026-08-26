@@ -116,6 +116,7 @@ def _create_job(
     notes="Apartment level 3. Lift booked 8:00–12:00.",
     hourly_rate=185.0,
     callout_fee=90.0,
+    duration_hours="4",
 ):
     db.init_db()
     booking_id = db.create_booking(
@@ -129,7 +130,7 @@ def _create_job(
         notes,
         start_time=start_time,
         finish_time=finish_time,
-        duration_hours="4",
+        duration_hours=duration_hours,
         status=status,
         crew=crew,
         hourly_rate=hourly_rate,
@@ -179,7 +180,7 @@ def test_staff_page_defaults_to_today_and_shows_assigned_jobs():
     customer = _unique("StaffPortal Tanaka")
     _create_job(customer, today, crew="Yasu,Ken")
     client = _staff_client()
-    html = client.get("/staff").get_data(as_text=True)
+    html = client.get("/staff?staff=Yasu").get_data(as_text=True)
 
     assert "Staff Portal" in html
     assert 'class="staff-portal-tab active"' in html
@@ -748,7 +749,9 @@ def test_this_week_weekly_worked_hours():
     monday = date_cls(2100, 1, 4)
     while monday.weekday() != 0:
         monday += timedelta(days=1)
-    monday = monday + timedelta(weeks=(os.getpid() % 40) + 1)
+    monday = monday + timedelta(
+        weeks=((os.getpid() + int(time.time() * 1000)) % 400) + 1
+    )
     wednesday = monday + timedelta(days=2)
     sunday = monday + timedelta(days=6)
     previous_sunday = monday - timedelta(days=1)
@@ -800,10 +803,16 @@ def test_this_week_weekly_worked_hours():
     assert yasu["weekly_worked"]["staff"] == "Yasu"
     assert yasu["weekly_worked"]["minutes"] == 215 + 180 + 155 + 240
     assert yasu["weekly_worked"]["display"] == "13hr 10min"
+    assert yasu["weekly_worked"]["estimated_minutes"] == 5 * 240
+    assert yasu["weekly_worked"]["estimated_display"] == "20hr"
     assert ken["weekly_worked"]["minutes"] == 400 + 240
     assert ken["weekly_worked"]["display"] == "10hr 40min"
+    assert ken["weekly_worked"]["estimated_minutes"] == 2 * 240
+    assert ken["weekly_worked"]["estimated_display"] == "8hr"
     assert tom["weekly_worked"]["minutes"] == 240
     assert tom["weekly_worked"]["display"] == "4hr"
+    assert tom["weekly_worked"]["estimated_minutes"] == 240
+    assert tom["weekly_worked"]["estimated_display"] == "4hr"
 
     by_heading = {day["heading"]: day for day in yasu["week_days"]}
     assert by_heading["MONDAY"]["worked_display"] == "6hr 35min"
@@ -821,8 +830,14 @@ def test_this_week_weekly_worked_hours():
     live_week = client.get("/staff?staff=Yasu&range=week").get_data(as_text=True)
     live_today = client.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
     live_tomorrow = client.get("/staff?staff=Yasu&range=tomorrow").get_data(as_text=True)
-    assert "WEEKLY WORKED" in live_week
+    assert "WEEKLY ESTIMATED" in live_week
+    assert "WEEKLY ACTUAL" in live_week
+    assert "WEEKLY WORKED" not in live_week
+    assert "WEEKLY ESTIMATED" not in live_today
+    assert "WEEKLY ACTUAL" not in live_today
     assert "WEEKLY WORKED" not in live_today
+    assert "WEEKLY ESTIMATED" not in live_tomorrow
+    assert "WEEKLY ACTUAL" not in live_tomorrow
     assert "WEEKLY WORKED" not in live_tomorrow
     assert "9.17hr" not in live_week
     assert "Hourly Rate" not in live_week
@@ -842,6 +857,15 @@ def test_weekly_worked_format_examples():
     assert staff_job_times.parse_actual_clock("1:00 PM") == "13:00"
     assert staff_job_times.duration_minutes_between("8:00 AM", "10:30 AM") == 150
     assert staff_job_times.format_weekly_worked(150) == "2hr 30min"
+    assert staff_job_times.format_hours_as_worked(2.5) == "2hr 30min"
+    assert staff_job_times.format_hours_as_worked("2.5hr") == "2hr 30min"
+    assert staff_job_times.format_hours_as_worked("5.75") == "5hr 45min"
+    assert staff_job_times.format_hours_as_worked("4.0") == "4hr"
+    assert staff_job_times.format_hours_as_worked(4) == "4hr"
+    assert staff_job_times.duration_hours_to_minutes("2.5") == 150
+    assert staff_job_times.duration_hours_to_minutes("3") == 180
+    assert staff_job_times.duration_hours_to_minutes("1.75") == 105
+    assert staff_job_times.format_weekly_worked(150 + 180 + 105) == "7hr 15min"
     return True
 
 
@@ -857,7 +881,9 @@ def test_weekly_worked_rebecca_style_completed_uses_owner_start_finish():
     monday = date_cls(2101, 1, 3)
     while monday.weekday() != 0:
         monday += timedelta(days=1)
-    monday = monday + timedelta(weeks=(os.getpid() % 20) + 2)
+    monday = monday + timedelta(
+        weeks=((os.getpid() + int(time.time() * 1000)) % 400) + 2
+    )
 
     rebecca = _create_job(
         "Rebecca Boyce",
@@ -910,6 +936,154 @@ def test_weekly_worked_rebecca_style_completed_uses_owner_start_finish():
     return True
 
 
+def test_job_card_shows_estimated_and_actual_worked():
+    from datetime import date as date_cls
+    from staff_portal import build_staff_portal
+
+    names = [row["name"] for row in db.list_crew_members(active_only=False)]
+    if "Keiichi" not in names:
+        db.create_crew_member("Keiichi", role="Driver", active=1)
+
+    monday = date_cls(2102, 1, 6)
+    while monday.weekday() != 0:
+        monday += timedelta(days=1)
+    monday = monday + timedelta(
+        weeks=((os.getpid() + int(time.time() * 1000)) % 400) + 20
+    )
+    customer = "Rebecca Boyce"
+    booking_id = _create_job(
+        customer,
+        monday.isoformat(),
+        crew="Keiichi,Yasu",
+        start_time="08:00",
+        finish_time="12:30",
+        duration_hours="2.5",
+        status="Completed",
+    )
+    unset = _create_job(
+        _unique("NoFinishYet"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="13:00",
+        finish_time="",
+        duration_hours="5.75",
+        status="Confirmed",
+    )
+    row = dict(db.get_booking(booking_id))
+    assert str(row["duration_hours"]) == "2.5"
+    assert row["start_time"] in ("08:00", "8:00")
+    assert row["finish_time"] in ("12:30",)
+
+    portal = build_staff_portal("Yasu", "week", monday)
+    job = [item for item in portal["jobs"] if item["id"] == booking_id][0]
+    unset_job = [item for item in portal["jobs"] if item["id"] == unset][0]
+    assert job["estimated_duration"] == "2hr 30min"
+    assert job["actual_worked_display"] == "4hr 30min"
+    assert unset_job["estimated_duration"] == "5hr 45min"
+    assert unset_job["actual_worked_display"] == "Not set"
+    assert portal["weekly_worked"]["minutes"] == 270
+    assert portal["weekly_worked"]["display"] == "4hr 30min"
+    assert portal["weekly_worked"]["estimated_minutes"] == 150 + 345
+    assert portal["weekly_worked"]["estimated_display"] == "8hr 15min"
+
+    keiichi = build_staff_portal("Keiichi", "week", monday)
+    assert keiichi["weekly_worked"]["display"] == "4hr 30min"
+    assert keiichi["weekly_worked"]["estimated_display"] == "2hr 30min"
+
+    today = perth_today()
+    tomorrow = today + timedelta(days=1)
+    live_today = _unique("CardToday")
+    live_tomorrow = _unique("CardTomorrow")
+    _create_job(
+        live_today,
+        today.isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="12:30",
+        duration_hours="2.5",
+        status="Completed",
+    )
+    _create_job(
+        live_tomorrow,
+        tomorrow.isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="12:30",
+        duration_hours="2.5",
+        status="Confirmed",
+    )
+    client = _staff_client()
+    today_html = client.get("/staff?staff=Yasu&range=today").get_data(as_text=True)
+    tomorrow_html = client.get("/staff?staff=Yasu&range=tomorrow").get_data(as_text=True)
+    week_html = client.get("/staff?staff=Yasu&range=week").get_data(as_text=True)
+    today_snippet = today_html[today_html.find(live_today): today_html.find(live_today) + 1200]
+    tomorrow_snippet = tomorrow_html[tomorrow_html.find(live_tomorrow): tomorrow_html.find(live_tomorrow) + 1200]
+    week_snippet = week_html[week_html.find(live_today): week_html.find(live_today) + 1200]
+    for snippet in (today_snippet, tomorrow_snippet, week_snippet):
+        assert "Estimated" in snippet
+        assert "Actual Worked" in snippet
+        assert "2hr 30min" in snippet
+        assert "4hr 30min" in snippet
+        assert "2.5hr" not in snippet
+    return True
+
+
+def test_this_week_shows_weekly_estimated_and_actual():
+    from datetime import date as date_cls
+    from staff_portal import build_staff_portal
+
+    monday = date_cls(2103, 2, 5)
+    while monday.weekday() != 0:
+        monday += timedelta(days=1)
+    monday = monday + timedelta(
+        weeks=((os.getpid() + int(time.time() * 1000)) % 400) + 40
+    )
+    wednesday = monday + timedelta(days=2)
+
+    _create_job(
+        _unique("EstA"), monday.isoformat(), crew="Yasu",
+        start_time="08:00", finish_time="12:30", duration_hours="2.5",
+        status="Completed",
+    )
+    _create_job(
+        _unique("EstB"), (monday + timedelta(days=1)).isoformat(), crew="Yasu",
+        start_time="08:00", finish_time="12:00", duration_hours="3",
+        status="Confirmed",
+    )
+    _create_job(
+        _unique("EstC"), (monday + timedelta(days=2)).isoformat(), crew="Yasu,Ken",
+        start_time="08:00", finish_time="10:00", duration_hours="1.75",
+        status="Completed",
+    )
+    _create_job(
+        _unique("EstCancelled"), (monday + timedelta(days=3)).isoformat(), crew="Yasu",
+        start_time="08:00", finish_time="18:00", duration_hours="10",
+        status="Cancelled",
+    )
+    _create_job(
+        _unique("EstKenOnly"), (monday + timedelta(days=4)).isoformat(), crew="Ken",
+        start_time="08:00", finish_time="14:00", duration_hours="6",
+        status="Completed",
+    )
+
+    yasu = build_staff_portal("Yasu", "week", wednesday)
+    ken = build_staff_portal("Ken", "week", wednesday)
+    assert yasu["weekly_worked"]["estimated_minutes"] == 150 + 180 + 105
+    assert yasu["weekly_worked"]["estimated_display"] == "7hr 15min"
+    assert yasu["weekly_worked"]["minutes"] == 270 + 240 + 120
+    assert yasu["weekly_worked"]["display"] == "10hr 30min"
+    assert ken["weekly_worked"]["estimated_minutes"] == 105 + 360
+    assert ken["weekly_worked"]["estimated_display"] == "7hr 45min"
+    assert ken["weekly_worked"]["minutes"] == 120 + 360
+    assert ken["weekly_worked"]["display"] == "8hr"
+
+    today_portal = build_staff_portal("Yasu", "today", wednesday)
+    tomorrow_portal = build_staff_portal("Yasu", "tomorrow", wednesday)
+    assert today_portal["weekly_worked"] is None
+    assert tomorrow_portal["weekly_worked"] is None
+    return True
+
+
 def main():
     tests = [
         test_staff_requires_login,
@@ -934,6 +1108,8 @@ def main():
         test_this_week_weekly_worked_hours,
         test_weekly_worked_format_examples,
         test_weekly_worked_rebecca_style_completed_uses_owner_start_finish,
+        test_job_card_shows_estimated_and_actual_worked,
+        test_this_week_shows_weekly_estimated_and_actual,
     ]
     passed = 0
     for test in tests:

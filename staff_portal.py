@@ -13,13 +13,10 @@ import job_status
 from booking_helpers import apple_maps_url, pickup_suburb, sms_href, tel_href
 from booking_times import (
     display_start_time,
-    duration_hours_from_times,
-    effective_finish_hm,
     effective_start_hm,
     normalize_time_input,
 )
 from crew import CREW_OPTIONS, active_crew_names, crew_from_storage
-from daily_jobs_data import format_job_duration_label
 from dashboard_data import perth_today, week_range
 from display_dates import format_display_date, normalize_move_date
 import staff_job_times
@@ -119,28 +116,40 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
     dropoff = str(row.get("delivery_address") or "").strip()
     phone = str(row.get("phone") or "").strip()
     start_hm = effective_start_hm(row)
-    finish_hm = effective_finish_hm(row)
-    duration_label = format_job_duration_label(
-        duration_hours_from_times(start_hm, finish_hm)
-    )
     pickup_label = _suburb_label(pickup) if pickup else ""
     dropoff_label = _suburb_label(dropoff) if dropoff else ""
     times = staff_job_times.job_time_state(row)
+    owner_start_hm = normalize_time_input(row.get("start_time"))
+    owner_finish_hm = normalize_time_input(row.get("finish_time"))
+    actual_minutes = staff_job_times.worked_minutes(row)
+    if actual_minutes > 0:
+        actual_worked_display = staff_job_times.format_worked_duration(actual_minutes)
+    else:
+        actual_worked_display = "Not set"
+    estimated_minutes = staff_job_times.duration_hours_to_minutes(
+        row.get("duration_hours")
+    )
+    estimated_duration = staff_job_times.format_hours_as_worked(
+        row.get("duration_hours")
+    ) or "—"
     payload = {
         "id": int(row["id"]),
         "date_iso": move_date,
         "date_display": _date_display(move_date) if move_date else "—",
         "start_time": display_start_time(row),
         "start_hm": start_hm,
-        "owner_start_hm": normalize_time_input(row.get("start_time")),
-        "owner_finish_hm": normalize_time_input(row.get("finish_time")),
+        "owner_start_hm": owner_start_hm,
+        "owner_finish_hm": owner_finish_hm,
         "customer_name": str(row.get("customer_name") or "").strip() or "—",
         "pickup_address": pickup,
         "pickup_label": pickup_label or pickup,
         "dropoff_address": dropoff,
         "dropoff_label": dropoff_label or dropoff,
         "crew": _crew_slash_display(row),
-        "estimated_duration": duration_label or "—",
+        "estimated_duration": estimated_duration,
+        "estimated_minutes": estimated_minutes,
+        "actual_worked_display": actual_worked_display,
+        "has_actual_worked": actual_worked_display != "Not set",
         "phone": phone,
         "notes": _notes_text(row),
         "tel_href": tel_href(phone),
@@ -258,6 +267,7 @@ def build_staff_portal(
         else []
     )
     weekly_minutes = staff_job_times.sum_worked_minutes(jobs)
+    weekly_estimated_minutes = staff_job_times.sum_estimated_minutes(jobs)
     weekly_worked = None
     if active_range == RANGE_WEEK:
         weekly_worked = {
@@ -266,6 +276,10 @@ def build_staff_portal(
             "week_end": end_iso,
             "minutes": weekly_minutes,
             "display": staff_job_times.format_weekly_worked(weekly_minutes),
+            "estimated_minutes": weekly_estimated_minutes,
+            "estimated_display": staff_job_times.format_weekly_worked(
+                weekly_estimated_minutes
+            ),
         }
 
     return {

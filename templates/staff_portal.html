@@ -59,9 +59,17 @@
 
     {% if portal.range == "week" %}
     {% if portal.weekly_worked %}
-    <section class="staff-weekly-worked" aria-label="Weekly worked hours for {{ portal.staff }}">
-      <p class="staff-weekly-worked-label">WEEKLY WORKED</p>
-      <p class="staff-weekly-worked-value">{{ portal.weekly_worked.display }}</p>
+    <section class="staff-weekly-worked" aria-label="Weekly estimated and actual hours for {{ portal.staff }}">
+      <div class="staff-weekly-totals">
+        <div class="staff-weekly-totals-item">
+          <p class="staff-weekly-worked-label">WEEKLY ESTIMATED</p>
+          <p class="staff-weekly-worked-value">{{ portal.weekly_worked.estimated_display }}</p>
+        </div>
+        <div class="staff-weekly-totals-item">
+          <p class="staff-weekly-worked-label">WEEKLY ACTUAL</p>
+          <p class="staff-weekly-worked-value">{{ portal.weekly_worked.display }}</p>
+        </div>
+      </div>
     </section>
     {% endif %}
     <div class="staff-week-schedule">
