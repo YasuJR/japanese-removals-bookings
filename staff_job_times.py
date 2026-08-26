@@ -1,16 +1,19 @@
 """Actual work times — admin-entered, separate from scheduled/invoice times.
 
-Staff Portal WEEKLY ACTUAL uses Owner Edit Booking start_time / finish_time.
+Staff Portal WEEKLY ACTUAL uses Owner Edit Booking start_time / finish_time
+for jobs on or before today that have both times set. Future jobs are
+excluded. WEEKLY ESTIMATED uses stored duration_hours for the whole week.
 WEEKLY ESTIMATED uses stored duration_hours only.
 Staff Portal is read-only.
 """
 
 import re
-from datetime import datetime, time as dt_time
+from datetime import date, datetime, time as dt_time
 from typing import Any, Dict, List, Optional, Tuple
 
 import job_status
 from booking_times import format_time_12h, normalize_time_input
+from display_dates import normalize_move_date
 
 _CLOCK_12H = re.compile(
     r"(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp]\.?[Mm]\.?)"
@@ -126,7 +129,19 @@ def parse_actual_duration_minutes(value: Any) -> Optional[int]:
     return minutes
 
 
-def worked_minutes(booking: Dict[str, Any]) -> int:
+def booking_move_date(booking: Dict[str, Any]) -> Optional[date]:
+    iso = normalize_move_date(
+        booking.get("date_iso") or booking.get("move_date")
+    )
+    if not iso:
+        return None
+    try:
+        return date.fromisoformat(iso)
+    except ValueError:
+        return None
+
+
+def worked_minutes(booking: Dict[str, Any], today: Optional[date] = None) -> int:
     """Minutes from Owner/Admin Edit Booking Start time − Finish time.
 
     Source of truth is bookings.start_time / bookings.finish_time — the
@@ -135,11 +150,15 @@ def worked_minutes(booking: Dict[str, Any]) -> int:
     because existing Completed jobs leave them empty.
 
     Does not use duration_hours, estimated duration, or 08:00/18:00
-    defaults. Cancelled jobs and jobs missing start or finish are 0.
-    Does not split by crew size.
+    defaults. Cancelled jobs, future jobs (move_date after today), and
+    jobs missing start or finish are 0. Does not split by crew size.
     """
     if job_status.display(booking) == "Cancelled":
         return 0
+    if today is not None:
+        move = booking_move_date(booking)
+        if move is not None and move > today:
+            return 0
     start = parse_actual_clock(
         booking.get("owner_start_hm")
         or booking.get("start_time")
@@ -153,8 +172,10 @@ def worked_minutes(booking: Dict[str, Any]) -> int:
     return duration_minutes_between(start, finish)
 
 
-def sum_worked_minutes(jobs: List[Dict[str, Any]]) -> int:
-    return sum(worked_minutes(job) for job in jobs)
+def sum_worked_minutes(
+    jobs: List[Dict[str, Any]], today: Optional[date] = None
+) -> int:
+    return sum(worked_minutes(job, today) for job in jobs)
 
 
 def estimated_minutes(booking: Dict[str, Any]) -> int:
