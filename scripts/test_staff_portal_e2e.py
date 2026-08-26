@@ -166,6 +166,17 @@ def _later_this_week(today):
     return sunday
 
 
+def _isolated_monday():
+    """Far-future Monday unique to this test so weekly hour totals stay isolated."""
+    from datetime import date as date_cls
+
+    monday = date_cls(2300, 1, 6)
+    while monday.weekday() != 0:
+        monday += timedelta(days=1)
+    salt = (time.time_ns() + os.getpid() * 1_000_003 + _book_n * 97) % 90_000
+    return monday + timedelta(weeks=int(salt) + 1)
+
+
 def test_staff_requires_login():
     client = app.test_client()
     response = client.get("/staff", follow_redirects=False)
@@ -743,15 +754,9 @@ def _set_actual(booking_id, start, finish, minutes):
 
 
 def test_this_week_weekly_worked_hours():
-    from datetime import date as date_cls
     from staff_portal import build_staff_portal
 
-    monday = date_cls(2100, 1, 4)
-    while monday.weekday() != 0:
-        monday += timedelta(days=1)
-    monday = monday + timedelta(
-        weeks=((os.getpid() + int(time.time() * 1000)) % 400) + 1
-    )
+    monday = _isolated_monday()
     wednesday = monday + timedelta(days=2)
     sunday = monday + timedelta(days=6)
     previous_sunday = monday - timedelta(days=1)
@@ -801,16 +806,16 @@ def test_this_week_weekly_worked_hours():
     assert yasu["start_date"] == monday.isoformat()
     assert yasu["end_date"] == sunday.isoformat()
     assert yasu["weekly_worked"]["staff"] == "Yasu"
-    assert yasu["weekly_worked"]["minutes"] == 215 + 180 + 155 + 240
-    assert yasu["weekly_worked"]["display"] == "13hr 10min"
+    assert yasu["weekly_worked"]["minutes"] == 215 + 180 + 155
+    assert yasu["weekly_worked"]["display"] == "9hr 10min"
     assert yasu["weekly_worked"]["estimated_minutes"] == 5 * 240
     assert yasu["weekly_worked"]["estimated_display"] == "20hr"
-    assert ken["weekly_worked"]["minutes"] == 400 + 240
-    assert ken["weekly_worked"]["display"] == "10hr 40min"
+    assert ken["weekly_worked"]["minutes"] == 0
+    assert ken["weekly_worked"]["display"] == "0hr"
     assert ken["weekly_worked"]["estimated_minutes"] == 2 * 240
     assert ken["weekly_worked"]["estimated_display"] == "8hr"
-    assert tom["weekly_worked"]["minutes"] == 240
-    assert tom["weekly_worked"]["display"] == "4hr"
+    assert tom["weekly_worked"]["minutes"] == 0
+    assert tom["weekly_worked"]["display"] == "0hr"
     assert tom["weekly_worked"]["estimated_minutes"] == 240
     assert tom["weekly_worked"]["estimated_display"] == "4hr"
 
@@ -819,7 +824,7 @@ def test_this_week_weekly_worked_hours():
     assert by_heading["TUESDAY"]["worked_display"] == "2hr 35min"
     assert by_heading["WEDNESDAY"]["worked_display"] == "0hr"
     assert by_heading["THURSDAY"]["worked_display"] == "0hr"
-    assert by_heading["FRIDAY"]["worked_display"] == "4hr"
+    assert by_heading["FRIDAY"]["worked_display"] == "0hr"
 
     today_portal = build_staff_portal("Yasu", "today", wednesday)
     tomorrow_portal = build_staff_portal("Yasu", "tomorrow", wednesday)
@@ -871,19 +876,13 @@ def test_weekly_worked_format_examples():
 
 def test_weekly_worked_rebecca_style_completed_uses_owner_start_finish():
     """Completed Keiichi/Yasu job with empty actual_* must use start_time/finish_time."""
-    from datetime import date as date_cls
     from staff_portal import build_staff_portal
 
     names = [row["name"] for row in db.list_crew_members(active_only=False)]
     if "Keiichi" not in names:
         db.create_crew_member("Keiichi", role="Driver", active=1)
 
-    monday = date_cls(2101, 1, 3)
-    while monday.weekday() != 0:
-        monday += timedelta(days=1)
-    monday = monday + timedelta(
-        weeks=((os.getpid() + int(time.time() * 1000)) % 400) + 2
-    )
+    monday = _isolated_monday()
 
     rebecca = _create_job(
         "Rebecca Boyce",
@@ -937,19 +936,13 @@ def test_weekly_worked_rebecca_style_completed_uses_owner_start_finish():
 
 
 def test_job_card_shows_estimated_and_actual_worked():
-    from datetime import date as date_cls
     from staff_portal import build_staff_portal
 
     names = [row["name"] for row in db.list_crew_members(active_only=False)]
     if "Keiichi" not in names:
         db.create_crew_member("Keiichi", role="Driver", active=1)
 
-    monday = date_cls(2102, 1, 6)
-    while monday.weekday() != 0:
-        monday += timedelta(days=1)
-    monday = monday + timedelta(
-        weeks=((os.getpid() + int(time.time() * 1000)) % 400) + 20
-    )
+    monday = _isolated_monday()
     customer = "Rebecca Boyce"
     booking_id = _create_job(
         customer,
@@ -1029,15 +1022,9 @@ def test_job_card_shows_estimated_and_actual_worked():
 
 
 def test_this_week_shows_weekly_estimated_and_actual():
-    from datetime import date as date_cls
     from staff_portal import build_staff_portal
 
-    monday = date_cls(2103, 2, 5)
-    while monday.weekday() != 0:
-        monday += timedelta(days=1)
-    monday = monday + timedelta(
-        weeks=((os.getpid() + int(time.time() * 1000)) % 400) + 40
-    )
+    monday = _isolated_monday()
     wednesday = monday + timedelta(days=2)
 
     _create_job(
@@ -1074,13 +1061,88 @@ def test_this_week_shows_weekly_estimated_and_actual():
     assert yasu["weekly_worked"]["display"] == "10hr 30min"
     assert ken["weekly_worked"]["estimated_minutes"] == 105 + 360
     assert ken["weekly_worked"]["estimated_display"] == "7hr 45min"
-    assert ken["weekly_worked"]["minutes"] == 120 + 360
-    assert ken["weekly_worked"]["display"] == "8hr"
+    assert ken["weekly_worked"]["minutes"] == 120
+    assert ken["weekly_worked"]["display"] == "2hr"
 
     today_portal = build_staff_portal("Yasu", "today", wednesday)
     tomorrow_portal = build_staff_portal("Yasu", "tomorrow", wednesday)
     assert today_portal["weekly_worked"] is None
     assert tomorrow_portal["weekly_worked"] is None
+    return True
+
+
+def test_weekly_actual_excludes_future_jobs_and_does_not_use_duration():
+    """Wednesday: future scheduled start/finish must not inflate WEEKLY ACTUAL.
+
+    Six 8hr jobs Mon–Sat with start/finish would previously make both
+    WEEKLY ESTIMATED and WEEKLY ACTUAL 48hr. Future days must be estimated
+    only. A past job with duration_hours but no finish_time must not fill
+    WEEKLY ACTUAL from estimated hours.
+    """
+    from staff_portal import build_staff_portal
+
+    monday = _isolated_monday()
+    wednesday = monday + timedelta(days=2)
+
+    for offset, name in (
+        (0, "PastMon"),
+        (1, "PastTue"),
+        (2, "TodayWed"),
+        (3, "FutureThu"),
+        (4, "FutureFri"),
+        (5, "FutureSat"),
+    ):
+        _create_job(
+            _unique(name),
+            (monday + timedelta(days=offset)).isoformat(),
+            crew="Yasu",
+            start_time="08:00",
+            finish_time="16:00",
+            duration_hours="8",
+            status="Confirmed",
+        )
+    _create_job(
+        _unique("PastNoFinish"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="17:00",
+        finish_time="",
+        duration_hours="8",
+        status="Confirmed",
+    )
+    _create_job(
+        _unique("CancelledSun"),
+        (monday + timedelta(days=6)).isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="16:00",
+        duration_hours="8",
+        status="Cancelled",
+    )
+
+    yasu = build_staff_portal("Yasu", "week", wednesday)
+    by_heading = {day["heading"]: day for day in yasu["week_days"]}
+
+    assert yasu["weekly_worked"]["estimated_minutes"] == 7 * 480
+    assert yasu["weekly_worked"]["estimated_display"] == "56hr"
+    assert yasu["weekly_worked"]["minutes"] == 3 * 480
+    assert yasu["weekly_worked"]["display"] == "24hr"
+    assert by_heading["MONDAY"]["worked_display"] == "8hr"
+    assert by_heading["TUESDAY"]["worked_display"] == "8hr"
+    assert by_heading["WEDNESDAY"]["worked_display"] == "8hr"
+    assert by_heading["THURSDAY"]["worked_display"] == "0hr"
+    assert by_heading["FRIDAY"]["worked_display"] == "0hr"
+    assert by_heading["SATURDAY"]["worked_display"] == "0hr"
+    assert by_heading["SUNDAY"]["worked_display"] == "0hr"
+
+    no_finish = [
+        job
+        for job in yasu["jobs"]
+        if job["date_iso"] == monday.isoformat()
+        and job["actual_worked_display"] == "Not set"
+    ]
+    assert no_finish
+    assert no_finish[0]["estimated_duration"] == "8hr"
     return True
 
 
@@ -1110,6 +1172,7 @@ def main():
         test_weekly_worked_rebecca_style_completed_uses_owner_start_finish,
         test_job_card_shows_estimated_and_actual_worked,
         test_this_week_shows_weekly_estimated_and_actual,
+        test_weekly_actual_excludes_future_jobs_and_does_not_use_duration,
     ]
     passed = 0
     for test in tests:
