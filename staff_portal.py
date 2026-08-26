@@ -189,7 +189,7 @@ def _week_days(
     while current <= end:
         iso = current.isoformat()
         day_jobs = by_date.get(iso, [])
-        day_minutes = staff_job_times.sum_worked_minutes(day_jobs)
+        day_minutes = staff_job_times.sum_worked_minutes(day_jobs, today)
         days.append(
             {
                 "date_iso": iso,
@@ -266,7 +266,7 @@ def build_staff_portal(
         if active_range == RANGE_WEEK
         else []
     )
-    weekly_minutes = staff_job_times.sum_worked_minutes(jobs)
+    weekly_minutes = staff_job_times.sum_worked_minutes(jobs, today)
     weekly_estimated_minutes = staff_job_times.sum_estimated_minutes(jobs)
     weekly_worked = None
     if active_range == RANGE_WEEK:
