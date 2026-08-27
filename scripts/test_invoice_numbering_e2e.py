@@ -118,6 +118,8 @@ def test_format_existing_numeric_invoice():
     assert invoice_numbering.format_invoice_number("INV-25") == "INV25"
     assert invoice_numbering.format_invoice_number("INV-0025") == "INV25"
     assert invoice_numbering.numeric_sequence_value("INV25") == 25
+    assert invoice_numbering.numeric_sequence_value("INV 25") == 25
+    assert invoice_numbering.format_invoice_number("INV 25") == "INV25"
     booking = {"invoice_number": "25"}
     assert invoice_numbering.display_invoice_number(booking) == "INV25"
     assert invoice_numbering.stored_invoice_number_display(booking) == "INV25"
@@ -202,6 +204,108 @@ def test_deleted_invoice_does_not_reuse_number():
     return number, next_number
 
 
+def _force_sequence(next_number: int) -> None:
+    with db.get_connection() as conn:
+        conn.execute(
+            "UPDATE invoice_sequence SET next_number = ? WHERE id = 1",
+            (next_number,),
+        )
+        conn.commit()
+
+
+def test_stored_inv25_counts_toward_max_sequence():
+    assert db._booking_row_sequence_value({"invoice_number": "INV25"}) == 25
+    assert db._booking_row_sequence_value({"invoice_number": "25"}) == 25
+    assert db._booking_row_sequence_value({"invoice_number": "INV-25"}) == 25
+    assert db._booking_row_sequence_value({"invoice_number": "INV 25"}) == 25
+    assert db._booking_row_sequence_value(
+        {"id": 7, "invoice_number": "", "invoice_status": "AUTHORISED"}
+    ) == 7
+    assert db._booking_row_sequence_value(
+        {"id": 9, "invoice_number": "", "status": "Confirmed"}
+    ) == 0
+    db.init_db()
+    existing_id = _create_booking("Inv25Count")
+    db.update_booking_invoice_fields(existing_id, {"invoice_number": "INV25"})
+    with db.get_connection() as conn:
+        assert db._max_used_invoice_sequence(conn) >= 25
+    assert dict(db.get_booking(existing_id))["invoice_number"] == "INV25"
+    return True
+
+
+def test_next_number_continues_from_max_inv25_after_counter_reset():
+    """Redeploy recreating invoice_sequence at 1 must still issue INV26 after INV25."""
+    db.init_db()
+    existing_id = _create_booking("ExistingInv25")
+    db.update_booking_invoice_fields(existing_id, {"invoice_number": "INV25"})
+    before = dict(db.get_booking(existing_id))
+    _force_sequence(1)
+
+    with patch("database._max_used_invoice_sequence", return_value=25):
+        allocated = db.allocate_invoice_number()
+    assert allocated == 26, allocated
+    after = dict(db.get_booking(existing_id))
+    assert after["invoice_number"] == before["invoice_number"] == "INV25"
+
+    with db.get_connection() as conn:
+        real_max = db._max_used_invoice_sequence(conn)
+    unique = real_max + 100000
+    db.update_booking_invoice_fields(
+        existing_id, {"invoice_number": "INV{0}".format(unique)}
+    )
+    _force_sequence(1)
+    allocated_real = db.allocate_invoice_number()
+    assert allocated_real == unique + 1, (allocated_real, unique)
+
+    new_id = _create_booking("NextAfterMax")
+    assigned = invoice_numbering.ensure_booking_invoice_number(new_id)
+    assert assigned == str(unique + 2)
+    row = dict(db.get_booking(new_id))
+    assert row["invoice_number"] == str(unique + 2)
+    doc = invoice_pdf.build_invoice_document({**row, "extra_charges": []})
+    expected = "INV{0}".format(unique + 2)
+    assert doc["invoice_number"] == expected
+    assert doc["bank"]["payment_reference"] == expected
+    assert dict(db.get_booking(existing_id))["invoice_number"] == "INV{0}".format(
+        unique
+    )
+    return True
+
+
+def test_issued_invoice_without_stored_number_is_not_duplicated():
+    db.init_db()
+    issued_id = _create_booking("IssuedEmpty")
+    db.update_booking_invoice_fields(
+        issued_id,
+        {"invoice_number": "", "invoice_status": "AUTHORISED"},
+    )
+    _force_sequence(1)
+    allocated = db.allocate_invoice_number()
+    assert allocated > issued_id
+    assert dict(db.get_booking(issued_id))["invoice_number"] in ("", None)
+    return True
+
+
+def test_recreating_sequence_table_continues_from_db_max():
+    """CREATE TABLE invoice_sequence at 1 (redeploy) must not issue INV1 when invoices exist."""
+    db.init_db()
+    existing_id = _create_booking("RecreateSeq")
+    with db.get_connection() as conn:
+        max_used = db._max_used_invoice_sequence(conn)
+    unique = max(max_used, 25) + 200000
+    db.update_booking_invoice_fields(
+        existing_id, {"invoice_number": "INV{0}".format(unique)}
+    )
+    stored_before = dict(db.get_booking(existing_id))["invoice_number"]
+    with db.get_connection() as conn:
+        conn.execute("DROP TABLE invoice_sequence")
+        conn.commit()
+    allocated = db.allocate_invoice_number()
+    assert allocated == unique + 1, allocated
+    assert dict(db.get_booking(existing_id))["invoice_number"] == stored_before
+    return True
+
+
 def main():
     tests = [
         ("first_and_second", test_first_and_second_invoice_numbers),
@@ -214,6 +318,10 @@ def main():
         ("reference_25_fallback", test_reference_25_without_stored_invoice_number),
         ("sequence_reinit", test_sequence_survives_reinit),
         ("no_reuse_after_delete", test_deleted_invoice_does_not_reuse_number),
+        ("inv25_counts_in_max", test_stored_inv25_counts_toward_max_sequence),
+        ("continue_after_reset", test_next_number_continues_from_max_inv25_after_counter_reset),
+        ("no_duplicate_issued_id", test_issued_invoice_without_stored_number_is_not_duplicated),
+        ("recreate_sequence_table", test_recreating_sequence_table_continues_from_db_max),
     ]
     failed = 0
     for name, fn in tests:

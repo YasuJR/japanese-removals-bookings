@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 import database as db
 
 DEFAULT_ABN = "93 645 845 227"
-_INVOICE_NUMERIC_RE = re.compile(r"^INV-?(\d+)$", re.I)
+_INVOICE_NUMERIC_RE = re.compile(r"^INV[-\s]*(\d+)$", re.I)
 
 
 def _numeric_suffix(raw: Optional[str]) -> Optional[int]:
