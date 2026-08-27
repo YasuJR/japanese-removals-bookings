@@ -151,6 +151,71 @@ def _seed_crew_and_trucks(conn) -> None:
             )
 
 
+_ISSUED_INVOICE_STATUSES = frozenset(
+    {"DRAFT", "Draft Created", "AUTHORISED", "SUBMITTED", "PAID"}
+)
+
+
+def _booking_row_sequence_value(row: Any) -> int:
+    """Highest invoice sequence represented by this booking.
+
+    Stored invoice_number wins (INV25, 25, INV-25). Issued invoices with an
+    empty invoice_number column are still shown as INV{id} on PDFs, so that
+    id is reserved too.
+    """
+    if hasattr(row, "keys"):
+        data = dict(row)
+    else:
+        data = {"invoice_number": row}
+    stored = invoice_numbering.numeric_sequence_value(data.get("invoice_number"))
+    if stored > 0:
+        return stored
+    xero_id = str(data.get("xero_invoice_id") or "").strip()
+    issued = bool(
+        (xero_id and not xero_id.startswith("LOCAL-"))
+        or str(data.get("invoice_status") or "").strip() in _ISSUED_INVOICE_STATUSES
+        or str(data.get("status") or "").strip() == "Invoiced"
+        or str(data.get("invoice_sent_at") or "").strip()
+    )
+    if not issued:
+        return 0
+    try:
+        return int(data.get("id") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _max_used_invoice_sequence(conn) -> int:
+    """Max numeric invoice already in the bookings table. Never reads a file counter."""
+    columns = db_backend.table_columns(conn, "bookings")
+    if "invoice_number" not in columns:
+        return 0
+    select = ["id", "invoice_number"]
+    for extra in ("invoice_status", "xero_invoice_id", "status", "invoice_sent_at"):
+        if extra in columns:
+            select.append(extra)
+    rows = conn.execute(
+        "SELECT {0} FROM bookings".format(", ".join(select))
+    ).fetchall()
+    max_used = 0
+    for row in rows:
+        max_used = max(max_used, _booking_row_sequence_value(row))
+    return max_used
+
+
+def _raw_connection(conn):
+    """Unwrap request/compat wrappers to the sqlite3 or psycopg2 connection."""
+    current = conn
+    seen = set()
+    while id(current) not in seen:
+        seen.add(id(current))
+        inner = getattr(current, "_conn", None)
+        if inner is None:
+            break
+        current = inner
+    return current
+
+
 def _ensure_invoice_sequence(conn) -> None:
     conn.execute(
         """
@@ -179,21 +244,8 @@ def _ensure_invoice_sequence(conn) -> None:
 
 
 def _bootstrap_invoice_sequence(conn) -> None:
-    """Ensure the counter stays ahead of any numeric invoice numbers already in use."""
-    columns = db_backend.table_columns(conn, "bookings")
-    if "invoice_number" not in columns:
-        return
-
-    rows = conn.execute(
-        """
-        SELECT invoice_number FROM bookings
-        WHERE invoice_number IS NOT NULL
-        """
-    ).fetchall()
-    max_used = 0
-    for row in rows:
-        text = str(row["invoice_number"] if hasattr(row, "keys") else row[0]).strip()
-        max_used = max(max_used, invoice_numbering.numeric_sequence_value(text))
+    """Keep the persisted counter at or above max(existing invoices)+1."""
+    max_used = _max_used_invoice_sequence(conn)
     if max_used <= 0:
         return
     floor = max_used + 1
@@ -207,10 +259,39 @@ def _bootstrap_invoice_sequence(conn) -> None:
     )
 
 
+def _next_invoice_number_locked(conn) -> int:
+    """Return the next number while the invoice_sequence row is locked.
+
+    Always at least max(stored/issued invoice numbers)+1, so a counter of 1
+    after redeploy still continues (INV25 → INV26) and never duplicates.
+    """
+    row = conn.execute(
+        "SELECT next_number FROM invoice_sequence WHERE id = 1"
+    ).fetchone()
+    if row is None:
+        raise RuntimeError("invoice_sequence row missing")
+    floor = _max_used_invoice_sequence(conn) + 1
+    current = max(int(row["next_number"]), floor)
+    conn.execute(
+        "UPDATE invoice_sequence SET next_number = ? WHERE id = 1",
+        (current + 1,),
+    )
+    conn.commit()
+    return current
+
+
 def allocate_invoice_number() -> int:
-    """Atomically take the next invoice number (never reused)."""
+    """Atomically take the next invoice number (never reused, never below DB max).
+
+    next_number lives in the PostgreSQL/SQLite table invoice_sequence, not in
+    process memory or a local file. Redeploy/restart does not reset issued
+    numbers: each allocate raises the persisted counter to
+    max(existing invoices)+1 before handing one out.
+    """
     with get_connection() as conn:
-        if conn._is_postgres:
+        _ensure_invoice_sequence(conn)
+        postgres = bool(getattr(conn, "_is_postgres", False))
+        if postgres:
             row = conn.execute(
                 """
                 SELECT next_number FROM invoice_sequence
@@ -218,32 +299,39 @@ def allocate_invoice_number() -> int:
                 FOR UPDATE
                 """
             ).fetchone()
-            current = int(row["next_number"])
-            conn.execute(
-                """
-                UPDATE invoice_sequence
-                SET next_number = ?
-                WHERE id = 1
-                """,
-                (current + 1,),
-            )
-            conn.commit()
-            return current
+            if row is None:
+                conn.execute(
+                    """
+                    INSERT INTO invoice_sequence (id, next_number)
+                    VALUES (1, 1)
+                    ON CONFLICT (id) DO NOTHING
+                    """
+                )
+                conn.execute(
+                    """
+                    SELECT next_number FROM invoice_sequence
+                    WHERE id = 1
+                    FOR UPDATE
+                    """
+                ).fetchone()
+            return _next_invoice_number_locked(conn)
 
-        conn._conn.execute("BEGIN IMMEDIATE")
+        raw = _raw_connection(conn)
         try:
-            row = conn.execute(
-                "SELECT next_number FROM invoice_sequence WHERE id = 1"
-            ).fetchone()
-            current = int(row["next_number"])
-            conn.execute(
-                "UPDATE invoice_sequence SET next_number = ? WHERE id = 1",
-                (current + 1,),
-            )
             conn.commit()
-            return current
         except Exception:
-            conn._conn.rollback()
+            pass
+        try:
+            raw.execute("BEGIN IMMEDIATE")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            return _next_invoice_number_locked(conn)
+        except Exception:
+            try:
+                raw.rollback()
+            except Exception:
+                pass
             raise
 
 
