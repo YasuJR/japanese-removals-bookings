@@ -306,6 +306,107 @@ def test_recreating_sequence_table_continues_from_db_max():
     return True
 
 
+def test_reassign_stray_inv1_when_max_is_45():
+    """Product example: stray stored INV1 + max INV45 → INV46; next allocate is 47."""
+    db.init_db()
+    stray_id = _create_booking("StrayInv1")
+    keep_id = _create_booking("KeepInv25")
+    db.update_booking_invoice_fields(
+        stray_id, {"invoice_number": "1", "hourly_rate": 199.0, "gst_enabled": 1}
+    )
+    db.update_booking_invoice_fields(keep_id, {"invoice_number": "INV25"})
+    before_stray = dict(db.get_booking(stray_id))
+    before_keep = dict(db.get_booking(keep_id))["invoice_number"]
+    _force_sequence(46)
+
+    with patch("database._max_used_invoice_sequence", return_value=45):
+        dry = db.reassign_mistaken_invoice_one(dry_run=True)
+        assert dry["target_id"] == stray_id
+        assert dry["old_number"] == "1"
+        assert dry["new_number"] == 46
+        assert dry["changed"] is False
+        assert dict(db.get_booking(stray_id))["invoice_number"] == "1"
+
+        applied = db.reassign_mistaken_invoice_one(dry_run=False)
+
+    assert applied["changed"] is True
+    assert applied["target_id"] == stray_id
+    assert applied["new_number"] == 46
+    after_stray = dict(db.get_booking(stray_id))
+    assert after_stray["invoice_number"] == "46"
+    assert after_stray["hourly_rate"] == before_stray["hourly_rate"]
+    assert after_stray["gst_enabled"] == before_stray["gst_enabled"]
+    assert after_stray["customer_name"] == before_stray["customer_name"]
+    assert after_stray["phone"] == before_stray["phone"]
+    assert dict(db.get_booking(keep_id))["invoice_number"] == before_keep
+    doc = invoice_pdf.build_invoice_document({**after_stray, "extra_charges": []})
+    assert doc["invoice_number"] == "INV46"
+    assert doc["bank"]["payment_reference"] == "INV46"
+
+    again = db.reassign_mistaken_invoice_one(dry_run=False)
+    assert again["changed"] is False
+    assert dict(db.get_booking(stray_id))["invoice_number"] == "46"
+    return True
+
+
+def test_reassign_stray_inv1_aligns_sequence_to_next_unused():
+    db.init_db()
+    stray_id = _create_booking("StrayInv1Seq")
+    current_id = _create_booking("CurrentMaxInv")
+    other_id = _create_booking("KeepOtherInv")
+    db.update_booking_invoice_fields(other_id, {"invoice_number": "12"})
+    before_other = dict(db.get_booking(other_id))
+    with db.get_connection() as conn:
+        max_used = db._max_used_invoice_sequence(conn)
+    unique_max = max(max_used, 45) + 400000
+    db.update_booking_invoice_fields(current_id, {"invoice_number": str(unique_max)})
+    db.update_booking_invoice_fields(stray_id, {"invoice_number": "INV1"})
+    _force_sequence(unique_max + 1)
+
+    report = db.reassign_mistaken_invoice_one()
+    assert report["changed"] is True
+    assert report["target_id"] == stray_id
+    assert report["new_number"] == unique_max + 1
+    assert dict(db.get_booking(stray_id))["invoice_number"] == str(unique_max + 1)
+    assert dict(db.get_booking(current_id))["invoice_number"] == str(unique_max)
+    assert dict(db.get_booking(other_id))["invoice_number"] == before_other["invoice_number"]
+    assert dict(db.get_booking(other_id))["customer_name"] == before_other["customer_name"]
+
+    with db.get_connection() as conn:
+        seq = conn.execute(
+            "SELECT next_number FROM invoice_sequence WHERE id = 1"
+        ).fetchone()
+    assert int(seq["next_number"]) >= unique_max + 2
+    allocated = db.allocate_invoice_number()
+    assert allocated == unique_max + 2
+    return True
+
+
+def test_reassign_does_not_rewrite_booking_id_1():
+    db.init_db()
+    row1 = db.get_booking(1)
+    if not row1:
+        return True
+    original = dict(row1).get("invoice_number")
+    db.update_booking_invoice_fields(1, {"invoice_number": "1"})
+    other_id = _create_booking("NotInv1")
+    with db.get_connection() as conn:
+        max_used = db._max_used_invoice_sequence(conn)
+    unique_max = max(max_used, 45) + 500000
+    db.update_booking_invoice_fields(other_id, {"invoice_number": str(unique_max)})
+    try:
+        report = db.reassign_mistaken_invoice_one()
+        assert dict(db.get_booking(1))["invoice_number"] == "1"
+        assert report.get("target_id") != 1
+        if report.get("changed"):
+            assert report["target_id"] != 1
+    finally:
+        db.update_booking_invoice_fields(
+            1, {"invoice_number": original if original is not None else ""}
+        )
+    return True
+
+
 def main():
     tests = [
         ("first_and_second", test_first_and_second_invoice_numbers),
@@ -322,6 +423,9 @@ def main():
         ("continue_after_reset", test_next_number_continues_from_max_inv25_after_counter_reset),
         ("no_duplicate_issued_id", test_issued_invoice_without_stored_number_is_not_duplicated),
         ("recreate_sequence_table", test_recreating_sequence_table_continues_from_db_max),
+        ("reassign_inv1_to_46", test_reassign_stray_inv1_when_max_is_45),
+        ("reassign_inv1_sequence", test_reassign_stray_inv1_aligns_sequence_to_next_unused),
+        ("reassign_skips_id_1", test_reassign_does_not_rewrite_booking_id_1),
     ]
     failed = 0
     for name, fn in tests:
