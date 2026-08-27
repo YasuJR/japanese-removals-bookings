@@ -1,6 +1,7 @@
 """SQLite or PostgreSQL storage for bookings and staff."""
 
 import json
+import logging
 import secrets
 import sqlite3
 from datetime import date
@@ -10,6 +11,8 @@ from typing import Any, Dict, List, Optional
 import db_backend
 import invoice_numbering
 import job_status
+
+logger = logging.getLogger(__name__)
 
 DB_PATH = Path(__file__).parent / "bookings.db"
 
@@ -335,6 +338,134 @@ def allocate_invoice_number() -> int:
             raise
 
 
+def _booking_rows_for_invoice_scan(conn) -> List[Any]:
+    columns = db_backend.table_columns(conn, "bookings")
+    if "invoice_number" not in columns:
+        return []
+    select = ["id", "invoice_number", "customer_name"]
+    for extra in (
+        "invoice_status",
+        "xero_invoice_id",
+        "status",
+        "invoice_sent_at",
+        "hourly_rate",
+        "callout_fee",
+        "gst_enabled",
+        "created_at",
+        "invoice_issue_date",
+    ):
+        if extra in columns:
+            select.append(extra)
+    return conn.execute(
+        "SELECT {0} FROM bookings".format(", ".join(select))
+    ).fetchall()
+
+
+def _stored_invoice_number_one_rows(conn) -> List[Dict[str, Any]]:
+    """Bookings whose stored invoice_number is INV1 / 1. Empty-column INV{id} is ignored."""
+    found: List[Dict[str, Any]] = []
+    for row in _booking_rows_for_invoice_scan(conn):
+        data = dict(row)
+        stored = str(data.get("invoice_number") or "").strip()
+        if not stored:
+            continue
+        if invoice_numbering.numeric_sequence_value(stored) != 1:
+            continue
+        found.append(data)
+    found.sort(key=lambda item: int(item.get("id") or 0))
+    return found
+
+
+def _reassign_mistaken_invoice_number_one(
+    conn, dry_run: bool = False
+) -> Dict[str, Any]:
+    """Move the stray stored INV1 from the sequence-reset bug to max+1.
+
+    Booking id 1 is never changed (historical INV1 / empty-column fallback).
+    Other invoice numbers, amounts, GST, and customer fields are not written.
+    """
+    _ensure_invoice_sequence(conn)
+    stored_ones = _stored_invoice_number_one_rows(conn)
+    stray_ones = [
+        row for row in stored_ones if int(row.get("id") or 0) != 1
+    ]
+    max_used = _max_used_invoice_sequence(conn)
+    report: Dict[str, Any] = {
+        "target_id": None,
+        "customer_name": None,
+        "old_number": None,
+        "new_number": None,
+        "max_used_before": max_used,
+        "kept_inv1_ids": [
+            int(row["id"]) for row in stored_ones if int(row.get("id") or 0) == 1
+        ],
+        "changed": False,
+        "skipped": None,
+    }
+    if not stray_ones:
+        report["skipped"] = "no_stray_stored_inv1"
+        return report
+    if max_used <= 1:
+        report["skipped"] = "no_higher_invoice_to_continue_from"
+        return report
+
+    target = stray_ones[-1]
+    new_number = max_used + 1
+    old_number = str(target.get("invoice_number") or "").strip()
+    report["target_id"] = int(target["id"])
+    report["customer_name"] = target.get("customer_name")
+    report["old_number"] = old_number
+    report["new_number"] = new_number
+    report["invoice_status"] = target.get("invoice_status")
+    report["created_at"] = target.get("created_at")
+    if dry_run:
+        report["skipped"] = "dry_run"
+        return report
+
+    cursor = conn.execute(
+        """
+        UPDATE bookings
+        SET invoice_number = ?
+        WHERE id = ?
+          AND invoice_number = ?
+        """,
+        (str(new_number), int(target["id"]), old_number),
+    )
+    if int(cursor.rowcount or 0) != 1:
+        report["skipped"] = "target_row_changed"
+        return report
+
+    _bootstrap_invoice_sequence(conn)
+    floor = new_number + 1
+    conn.execute(
+        """
+        UPDATE invoice_sequence
+        SET next_number = CASE WHEN next_number > ? THEN next_number ELSE ? END
+        WHERE id = 1
+        """,
+        (floor, floor),
+    )
+    report["changed"] = True
+    logger.info(
+        "Reassigned mistaken invoice %s on booking id=%s (%s) to %s; next_number >= %s",
+        old_number,
+        report["target_id"],
+        report.get("customer_name"),
+        new_number,
+        floor,
+    )
+    return report
+
+
+def reassign_mistaken_invoice_one(*, dry_run: bool = False) -> Dict[str, Any]:
+    """Public helper: reassign stray stored INV1 to the next unused number."""
+    with get_connection() as conn:
+        report = _reassign_mistaken_invoice_number_one(conn, dry_run=dry_run)
+        if not dry_run and report.get("changed"):
+            conn.commit()
+        return report
+
+
 _INIT_DB_LOCK_KEY = 824739161
 _DB_INITIALIZED = False
 
@@ -362,6 +493,16 @@ def init_db() -> None:
                 _seed_crew_and_trucks(conn)
                 _ensure_indexes(conn)
                 _complete_existing_paid_jobs(conn)
+                plan = _reassign_mistaken_invoice_number_one(conn, dry_run=True)
+                if plan.get("target_id") and plan.get("new_number"):
+                    logger.info(
+                        "Confirming INV1 reassignment: booking id=%s %s -> INV%s (max was %s)",
+                        plan.get("target_id"),
+                        plan.get("old_number"),
+                        plan.get("new_number"),
+                        plan.get("max_used_before"),
+                    )
+                    _reassign_mistaken_invoice_number_one(conn)
             finally:
                 conn.execute("SELECT pg_advisory_unlock(?)", (_INIT_DB_LOCK_KEY,))
         _DB_INITIALIZED = True
