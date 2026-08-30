@@ -86,6 +86,23 @@ def _form(booking_id, **overrides):
     return base
 
 
+def _control_labels(html):
+    import re
+
+    chunks = re.findall(
+        r"<(?:a|button)\b[^>]*>(.*?)</(?:a|button)>",
+        html,
+        flags=re.I | re.S,
+    )
+    labels = []
+    for chunk in chunks:
+        text = re.sub(r"<[^>]+>", " ", chunk)
+        text = " ".join(text.split())
+        if text:
+            labels.append(text)
+    return labels
+
+
 def test_edit_page_keeps_three_primary_buttons():
     booking_id = _create_booking()
     client = _login_client()
@@ -94,13 +111,28 @@ def test_edit_page_keeps_three_primary_buttons():
     assert "Save Changes" in html
     assert "Delete booking" in html
     assert "Invoice overrides" in html
+    labels = _control_labels(html)
     for removed in (
         "Invoice Preview",
         "Update Invoice",
         "Send Invoice",
         "Share PDF",
+        "Cancel",
     ):
-        assert removed not in html, removed
+        assert removed not in labels, removed
+    assert "invoice-workflow-bar" not in html
+    assert "invoice-send-btn" not in html
+    assert "invoice-send-blocked" not in html
+    assert "invoice-send-status" not in html
+    assert 'name="action" value="update_invoice"' not in html
+    assert 'name="action" value="send_invoice"' not in html
+    assert "invoice_send.js" not in html
+    assert "Enter a valid customer email or mobile number" not in html
+    assert "Enter a valid customer email, or add a customer mobile number" not in html
+    assert "Customer email or phone number required." not in html
+    actions = html.split("booking-save-actions", 1)[-1].split("Invoice overrides", 1)[0]
+    action_labels = _control_labels(actions)
+    assert action_labels == ["Download PDF", "Save Changes", "Delete booking…"]
     return True
 
 
