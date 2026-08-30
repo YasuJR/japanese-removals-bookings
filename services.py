@@ -494,6 +494,25 @@ def invoice_send_context(booking: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def refresh_invoice_after_booking_save(booking_id: int) -> str:
+    """Refresh invoice number, pay link, and linked Xero draft after a booking save.
+
+    Does not change GST, rates, or stored invoice numbers that already exist.
+    """
+    row = db.get_booking(booking_id)
+    had_number = bool((dict(row).get("invoice_number") or "").strip()) if row else False
+    assigned = invoice_numbering.ensure_booking_invoice_number(booking_id)
+    prepare_booking_payment_link(booking_id)
+    booking_profit.recalculate_and_save(booking_id)
+    xero_msg = sync_xero_draft_if_linked(booking_id)
+    parts = ["Invoice updated."]
+    if assigned and not had_number:
+        parts.append("Invoice #{0} assigned.".format(assigned))
+    if xero_msg:
+        parts.append(xero_msg)
+    return " ".join(parts)
+
+
 def update_booking_invoice(booking_id: int, form) -> Tuple[bool, List[str], str]:
     """
     Save booking pricing from form, sync Xero draft if linked, refresh pay link.
@@ -530,18 +549,7 @@ def update_booking_invoice(booking_id: int, form) -> Tuple[bool, List[str], str]
         return False, ["Could not save booking."], ""
 
     _persist_booking_extras(booking_id, parsed)
-    row = db.get_booking(booking_id)
-    had_number = bool((dict(row).get("invoice_number") or "").strip()) if row else False
-    assigned = invoice_numbering.ensure_booking_invoice_number(booking_id)
-    prepare_booking_payment_link(booking_id)
-
-    xero_msg = sync_xero_draft_if_linked(booking_id)
-    parts = ["Invoice updated."]
-    if assigned and not had_number:
-        parts.append("Invoice #{0} assigned.".format(assigned))
-    if xero_msg:
-        parts.append(xero_msg)
-    return True, [], " ".join(parts)
+    return True, [], refresh_invoice_after_booking_save(booking_id)
 
 
 def send_customer_invoice(booking_id: int) -> Tuple[bool, str]:

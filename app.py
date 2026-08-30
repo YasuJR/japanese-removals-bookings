@@ -2354,47 +2354,6 @@ def edit_booking(booking_id):
             ok, msg = services.cancel_payment_reminders(booking_id)
             flash(msg, "success" if ok else "error")
             return redirect(url_for("edit_booking", booking_id=booking_id))
-        if action == "update_invoice":
-            previous_row = db.get_booking(booking_id)
-            cost_errors = booking_profit.job_cost_form_errors(request.form)
-            if cost_errors:
-                for err in cost_errors:
-                    flash(err, "error")
-                row = db.get_booking(booking_id)
-                data, _ = parse_booking_form(request.form)
-                _copy_job_cost_form_values(data, request.form)
-                return render_template(
-                    "edit_booking.html",
-                    booking=row,
-                    form=data,
-                    status=_integration_status(),
-                    pricing_panel_mode=True,
-                    **_edit_booking_extras(row),
-                )
-            ok, errors, msg = services.update_booking_invoice(
-                booking_id, request.form
-            )
-            if errors:
-                for err in errors:
-                    flash(err, "error")
-                row = db.get_booking(booking_id)
-                data, _ = parse_booking_form(request.form)
-                _copy_job_cost_form_values(data, request.form)
-                return render_template(
-                    "edit_booking.html",
-                    booking=row,
-                    form=data,
-                    status=_integration_status(),
-                    pricing_panel_mode=True,
-                    **_edit_booking_extras(row),
-                )
-            if ok:
-                _save_job_costs_from_form(
-                    booking_id, request.form, previous=previous_row
-                )
-                booking_profit.recalculate_and_save(booking_id)
-            flash(msg, "success" if ok else "error")
-            return redirect(url_for("edit_booking", booking_id=booking_id))
         if action == "send_invoice":
             db.update_booking_contact_fields(
                 booking_id,
@@ -2445,13 +2404,17 @@ def edit_booking(booking_id):
                 **extras,
             )
         if ok:
+            invoice_msg = services.refresh_invoice_after_booking_save(booking_id)
             _flash_crew_warnings(crew_warnings)
             _flash_integration_messages(
                 services.after_booking_updated(
                     booking_id, previous_status=previous_status
                 )
             )
-            flash("Changes saved successfully.", "saved")
+            flash(
+                "Changes saved successfully. {0}".format(invoice_msg).strip(),
+                "saved",
+            )
             return redirect(url_for("edit_booking", booking_id=booking_id))
         flash("Could not update booking.", "error")
         return redirect(url_for("edit_booking", booking_id=booking_id))
@@ -2668,7 +2631,7 @@ def invoice_pdf(booking_id):
     return Response(
         pdf_bytes,
         mimetype="application/pdf",
-        headers={"Content-Disposition": "inline; filename={0}".format(filename)},
+        headers={"Content-Disposition": "attachment; filename={0}".format(filename)},
     )
 
 
