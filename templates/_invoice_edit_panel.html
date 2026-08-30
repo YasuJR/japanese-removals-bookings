@@ -142,7 +142,8 @@
   {% include '_job_costs_form.html' %}
 
   <div class="form-actions booking-save-actions">
-    <a class="btn-secondary" href="{{ url_for('invoice_pdf', booking_id=booking.id) }}" download="invoice.pdf">Download PDF</a>
+    <button type="button" class="btn-secondary"
+            data-download-invoice-pdf="{{ url_for('invoice_pdf', booking_id=booking.id) }}">Download PDF</button>
     <button type="submit" name="action" value="save" class="btn-primary">Save Changes</button>
     <a class="btn-secondary" href="{{ url_for('delete_booking', booking_id=booking.id) }}">Delete booking…</a>
   </div>
@@ -184,3 +185,4 @@
 
 <script src="{{ url_for('static', filename='mover_pricing.js') }}"></script>
 <script src="{{ url_for('static', filename='invoice_pricing.js') }}"></script>
+<script src="{{ url_for('static', filename='invoice_share.js') }}"></script>

@@ -57,8 +57,9 @@ def _create_booking():
 def test_share_js_never_passes_page_metadata():
     source = SHARE_JS.read_text(encoding="utf-8")
     assert "window.location" not in source
+    assert "document.URL" not in source
     assert "location.href" not in source
-    assert "nav.share(buildShareData(" in source
+    assert "nav.share({ files: [pdfFile] })" in source
     forbidden_share = re.findall(
         r"nav\.share\(\s*\{[^}]*\b(url|text|title)\s*:", source
     )
@@ -78,7 +79,9 @@ def test_preview_has_share_button_and_keeps_download():
     assert "data-share-invoice-pdf=" in html
     assert "/bookings/{0}/invoice.pdf".format(booking_id) in html
     assert "Download PDF" in html
+    assert "data-download-invoice-pdf=" in html
     assert "invoice_share.js" in html
+    assert 'target="_blank"' not in html
     assert "Staff login" not in html
     return True
 
@@ -88,7 +91,7 @@ def test_edit_booking_has_download_without_share_or_removed_buttons():
     client = _login_client()
     html = client.get("/bookings/{0}/edit".format(booking_id)).get_data(as_text=True)
     assert "Download PDF" in html
-    assert 'download="invoice.pdf"' in html
+    assert "data-download-invoice-pdf=" in html
     assert "/bookings/{0}/invoice.pdf".format(booking_id) in html
     assert "Save Changes" in html
     assert "Delete booking" in html
@@ -103,7 +106,9 @@ def test_edit_booking_has_download_without_share_or_removed_buttons():
     assert "Cancel" not in actions
     assert "Update Invoice" not in actions
     assert "data-share-invoice-pdf=" not in html
-    assert "invoice_share.js" not in html
+    assert "invoice_share.js" in html
+    assert "<button" in actions and "Download PDF" in actions
+    assert 'href="/bookings/{0}/invoice.pdf"'.format(booking_id) not in actions
     assert "Invoice overrides" in html
     return True
 

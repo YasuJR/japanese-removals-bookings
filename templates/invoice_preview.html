@@ -10,7 +10,8 @@
 <body class="invoice-preview-page">
   <div class="invoice-preview-toolbar">
     <a class="btn-secondary btn-sm" href="{{ url_for('edit_booking', booking_id=booking_id) }}">← Back to booking</a>
-    <a class="btn-primary btn-sm" href="{{ url_for('invoice_pdf', booking_id=booking_id) }}" target="_blank">Download PDF</a>
+    <button type="button" class="btn-primary btn-sm"
+            data-download-invoice-pdf="{{ url_for('invoice_pdf', booking_id=booking_id) }}">Download PDF</button>
     <button type="button" class="btn-secondary btn-sm js-share-invoice-pdf"
             data-share-invoice-pdf="{{ url_for('invoice_pdf', booking_id=booking_id) }}">
       Share PDF
