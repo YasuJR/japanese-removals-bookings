@@ -6,6 +6,7 @@ import re
 import sys
 from datetime import date, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -323,13 +324,80 @@ def test_weekly_pdf_example_layout():
     return True
 
 
+def test_sunday_opens_monday_to_sunday_week_containing_today():
+    """Sun 30 Aug 2026 belongs to 24 AUG – 30 AUG, not the July week of 1 Aug."""
+    db.init_db()
+    today = date(2026, 8, 30)
+    assert today.weekday() == 6
+    weekly = weekly_schedule_data.build_weekly_schedule(
+        today.isoformat(),
+        reference=today,
+    )
+    assert weekly["week_start"] == "2026-08-24"
+    assert weekly["week_end"] == "2026-08-30"
+    assert weekly["range_heading"] == "24 AUG – 30 AUG 2026"
+    assert weekly["is_this_week"] is True
+    assert weekly["prev_week"] == "2026-08-17"
+    assert weekly["next_week"] == "2026-08-31"
+    assert weekly["this_week"] == "2026-08-24"
+    return True
+
+
+def _patched_today(today):
+    return (
+        patch("app.perth_today", return_value=today),
+        patch("weekly_schedule_data.perth_today", return_value=today),
+    )
+
+
+def test_plain_open_shows_current_week_not_month_anchor():
+    """Menu /calendar/weekly and Calendar (no date_iso) use today's Mon–Sun week."""
+    today = date(2026, 8, 30)
+    app_patch, data_patch = _patched_today(today)
+    client = _login_client()
+    with app_patch, data_patch:
+        html = client.get("/calendar/weekly").get_data(as_text=True)
+        calendar_html = client.get("/calendar?view=month&year=2026&month=8").get_data(
+            as_text=True
+        )
+    assert "24 AUG – 30 AUG 2026" in html
+    assert "27 JUL – 2 AUG 2026" not in html
+    assert "MONDAY 24 AUG" in html
+    assert "SUNDAY 30 AUG" in html
+    assert "/calendar/weekly/2026-08-17" in html
+    assert "/calendar/weekly/2026-08-31" in html
+    assert "/calendar/weekly/2026-08-24/schedule.pdf" in html
+    assert "/calendar/weekly/2026-08-01" not in calendar_html
+    assert 'href="/calendar/weekly?' in calendar_html or 'href="/calendar/weekly"' in calendar_html
+    return True
+
+
+def test_previous_next_and_this_week_keep_explicit_navigation():
+    today = date(2026, 8, 30)
+    app_patch, data_patch = _patched_today(today)
+    client = _login_client()
+    with app_patch, data_patch:
+        july_html = client.get("/calendar/weekly/2026-07-27").get_data(as_text=True)
+        this_html = client.get("/calendar/weekly/2026-08-24").get_data(as_text=True)
+        next_html = client.get("/calendar/weekly/2026-08-31").get_data(as_text=True)
+        pdf = client.get("/calendar/weekly/2026-07-27/schedule.pdf")
+    assert "27 JUL – 2 AUG 2026" in july_html
+    assert "/calendar/weekly/2026-08-24" in july_html
+    assert "24 AUG – 30 AUG 2026" in this_html
+    assert "31 AUG – 6 SEP 2026" in next_html
+    assert pdf.status_code == 200
+    assert "weekly-schedule-2026-07-27.pdf" in pdf.headers.get("Content-Disposition", "")
+    return True
+
+
 def test_calendar_and_nav_include_weekly_schedule():
     client = _login_client()
     calendar_html = client.get("/calendar?view=month&year=2097&month=4").get_data(
         as_text=True
     )
     assert "Weekly Schedule" in calendar_html
-    assert "/calendar/weekly/" in calendar_html
+    assert "/calendar/weekly" in calendar_html
+    assert "/calendar/weekly/2097-04-01" not in calendar_html
     assert "Daily Jobs" in client.get(
         "/calendar?view=day&year=2097&month=4&day=1"
     ).get_data(as_text=True)
@@ -337,6 +405,7 @@ def test_calendar_and_nav_include_weekly_schedule():
     assert "Daily Jobs" in daily
     nav = (ROOT / "templates" / "_navigation.html").read_text()
     assert "calendar_weekly_schedule" in nav
+    assert "date_iso" not in nav
     return True
 
 
@@ -426,6 +495,7 @@ def test_weekly_screen_layout_desktop_and_phone():
 
 
 def main():
+    db.init_db()
     tests = [
         test_monday_to_sunday_order_and_empty_days,
         test_month_spanning_week_heading,
@@ -433,6 +503,9 @@ def main():
         test_weekly_page_nav_and_fields,
         test_weekly_pdf_one_landscape_page_even_when_busy,
         test_weekly_pdf_example_layout,
+        test_sunday_opens_monday_to_sunday_week_containing_today,
+        test_plain_open_shows_current_week_not_month_anchor,
+        test_previous_next_and_this_week_keep_explicit_navigation,
         test_calendar_and_nav_include_weekly_schedule,
         test_weekly_screen_layout_desktop_and_phone,
     ]

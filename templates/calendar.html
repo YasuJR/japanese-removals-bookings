@@ -17,7 +17,7 @@
       <a class="filter-pill{% if cal.view == 'month' %} active{% endif %}" href="{{ url_for('booking_calendar', view='month', year=cal.year, month=cal.month, day=cal.day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Month</a>
       <a class="filter-pill{% if cal.view == 'week' %} active{% endif %}" href="{{ url_for('booking_calendar', view='week', year=cal.year, month=cal.month, day=cal.day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Week</a>
       <a class="filter-pill{% if cal.view == 'day' %} active{% endif %}" href="{{ url_for('booking_calendar', view='day', year=cal.year, month=cal.month, day=cal.day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Day</a>
-      <a class="btn-secondary btn-sm" href="{{ url_for('calendar_weekly_schedule', date_iso=cal.anchor_date, view=cal.view, year=cal.year, month=cal.month, day=cal.day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Weekly Schedule</a>
+      <a class="btn-secondary btn-sm" href="{{ url_for('calendar_weekly_schedule', view=cal.view, year=cal.year, month=cal.month, day=cal.day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Weekly Schedule</a>
     </div>
 
     <form method="get" class="calendar-filters" id="calendar-filters">
@@ -128,7 +128,7 @@
     <div class="calendar-day-view-head">
       <h3>{{ cal.title }}</h3>
       <a class="btn-secondary btn-sm" href="{{ url_for('calendar_daily_jobs', date_iso=cal.anchor_date, view=cal.view, year=cal.year, month=cal.month, day=cal.day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Daily Jobs</a>
-      <a class="btn-secondary btn-sm" href="{{ url_for('calendar_weekly_schedule', date_iso=cal.anchor_date, view=cal.view, year=cal.year, month=cal.month, day=cal.day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Weekly Schedule</a>
+      <a class="btn-secondary btn-sm" href="{{ url_for('calendar_weekly_schedule', view=cal.view, year=cal.year, month=cal.month, day=cal.day, status=cal.filters.status, crew=cal.filters.crew, truck=cal.filters.truck, payment=cal.filters.payment) }}">Weekly Schedule</a>
       {% if cal.events %}
       {% set has_conflict = cal.events | selectattr('has_conflict') | list | length > 0 %}
       {% if has_conflict %}<span class="calendar-conflict-badge">CONFLICT</span>{% endif %}
