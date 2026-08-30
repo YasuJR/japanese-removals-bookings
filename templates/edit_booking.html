@@ -404,18 +404,7 @@
   <form method="post" class="booking-form">
     {% include '_double_booking_banner.html' %}
     {% include '_booking_form.html' %}
-    {% if pricing_panel_mode %}
     {% include '_invoice_edit_panel.html' %}
-    {% else %}
-    {% include '_extra_charges.html' %}
-    {% include '_invoice_panel.html' %}
-    {% include '_job_costs_form.html' %}
-    <div class="form-actions">
-      <button type="submit" class="btn-primary">Save changes</button>
-      <a class="btn-secondary" href="{{ url_for('dashboard') }}">Cancel</a>
-      <a class="btn-secondary" href="{{ url_for('delete_booking', booking_id=booking.id) }}">Delete booking…</a>
-    </div>
-    {% endif %}
   </form>
 </section>
 {% endblock %}
