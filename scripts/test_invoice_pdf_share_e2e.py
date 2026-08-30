@@ -94,10 +94,14 @@ def test_edit_booking_has_download_without_share_or_removed_buttons():
     assert "Delete booking" in html
     assert "Share PDF" not in html
     assert "Invoice Preview" not in html
-    assert "Update Invoice" not in html
     assert "Send Invoice" not in html
+    assert "invoice-workflow-bar" not in html
+    assert "invoice-send-btn" not in html
+    assert "invoice-send-blocked" not in html
+    assert "Enter a valid customer email" not in html
     actions = html.split("booking-save-actions", 1)[-1].split("Invoice overrides", 1)[0]
     assert "Cancel" not in actions
+    assert "Update Invoice" not in actions
     assert "data-share-invoice-pdf=" not in html
     assert "invoice_share.js" not in html
     assert "Invoice overrides" in html

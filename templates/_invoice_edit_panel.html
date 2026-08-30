@@ -2,18 +2,6 @@
          data-calculate-url="{{ url_for('invoice_calculate', booking_id=booking.id) }}">
   <h3>Invoice</h3>
 
-  {% if invoice_send.sent_at %}
-  <div class="invoice-send-status">
-    <p class="invoice-send-status-title">Invoice sent{% if invoice_send.sent_method == 'sms' %} by SMS{% endif %}</p>
-    {% if invoice_send.sent_method == 'sms' %}
-    <p>Phone: <strong>{{ invoice_send.sent_to_display }}</strong></p>
-    {% else %}
-    <p>Email: <strong>{{ invoice_send.sent_to }}</strong></p>
-    {% endif %}
-    <p class="muted">Time: {{ invoice_send.sent_at[:16] }}</p>
-  </div>
-  {% endif %}
-
   <div class="invoice-meta-row muted">
     {% if invoice_summary.invoice_number %}
     <span>Invoice # <strong>{{ invoice_summary.invoice_number }}</strong></span>
