@@ -83,20 +83,28 @@ def test_preview_has_share_button_and_keeps_download():
     return True
 
 
-def test_edit_booking_has_share_button_without_submitting_form():
+def test_edit_booking_has_download_without_share_or_removed_buttons():
     booking_id = _create_booking()
     client = _login_client()
     html = client.get("/bookings/{0}/edit".format(booking_id)).get_data(as_text=True)
-    assert "Share PDF" in html
-    assert 'type="button"' in html
-    assert "data-share-invoice-pdf=" in html
-    assert "/bookings/{0}/invoice.pdf".format(booking_id) in html
     assert "Download PDF" in html
-    assert "invoice_share.js" in html
+    assert 'download="invoice.pdf"' in html
+    assert "/bookings/{0}/invoice.pdf".format(booking_id) in html
+    assert "Save Changes" in html
+    assert "Delete booking" in html
+    assert "Share PDF" not in html
+    assert "Invoice Preview" not in html
+    assert "Update Invoice" not in html
+    assert "Send Invoice" not in html
+    actions = html.split("booking-save-actions", 1)[-1].split("Invoice overrides", 1)[0]
+    assert "Cancel" not in actions
+    assert "data-share-invoice-pdf=" not in html
+    assert "invoice_share.js" not in html
+    assert "Invoice overrides" in html
     return True
 
 
-def test_download_pdf_endpoint_unchanged():
+def test_download_pdf_is_attachment_file():
     booking_id = _create_booking()
     client = _login_client()
     resp = client.get("/bookings/{0}/invoice.pdf".format(booking_id))
@@ -104,7 +112,7 @@ def test_download_pdf_endpoint_unchanged():
     assert resp.mimetype == "application/pdf"
     assert resp.data.startswith(b"%PDF")
     disposition = resp.headers.get("Content-Disposition", "")
-    assert disposition.startswith("inline;")
+    assert disposition.startswith("attachment;")
     assert "filename=invoice-" in disposition
     return True
 
@@ -125,8 +133,8 @@ def main():
     tests = [
         test_share_js_never_passes_page_metadata,
         test_preview_has_share_button_and_keeps_download,
-        test_edit_booking_has_share_button_without_submitting_form,
-        test_download_pdf_endpoint_unchanged,
+        test_edit_booking_has_download_without_share_or_removed_buttons,
+        test_download_pdf_is_attachment_file,
         test_share_payload_helper_files_only,
     ]
     failed = 0

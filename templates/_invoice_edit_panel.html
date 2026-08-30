@@ -21,7 +21,7 @@
     <span>Status: <span class="status-pill status-invoice">{{ invoice_summary.invoice_status }}</span></span>
     <span>Payment: {% with payment_status=invoice_summary.payment_status %}{% include '_payment_badge.html' %}{% endwith %}</span>
     {% if xero_invoice_draft %}
-    <span class="muted">Xero draft syncs when you update the invoice</span>
+    <span class="muted">Xero draft syncs when you save changes</span>
     {% elif xero_invoice_locked %}
     <span class="muted">Authorised/paid in Xero — create a new invoice version to change pricing</span>
     {% endif %}
@@ -151,45 +151,14 @@
     {% endif %}
   </dl>
 
-  <div class="invoice-update-actions">
-    <button type="submit" name="action" value="update_invoice" class="btn-primary btn-lg">
-      Update Invoice
-    </button>
-    <p class="hint muted">Saves pricing, refreshes the customer invoice PDF, and updates the Xero draft if linked.</p>
-  </div>
-
-  <div class="invoice-workflow-bar">
-    <a class="btn-secondary" href="{{ url_for('invoice_preview', booking_id=booking.id) }}" target="_blank">Invoice Preview</a>
-    <a class="btn-secondary" href="{{ url_for('invoice_pdf', booking_id=booking.id) }}" target="_blank">Download PDF</a>
-    <button type="button" class="btn-secondary js-share-invoice-pdf"
-            data-share-invoice-pdf="{{ url_for('invoice_pdf', booking_id=booking.id) }}">
-      Share PDF
-    </button>
-    <button type="submit" name="action" value="send_invoice" class="btn-primary btn-lg invoice-send-btn"
-      {% if not invoice_send.can_send %}disabled title="{{ invoice_send.blocked_reason }}"{% endif %}
-      data-send-method="{{ invoice_send.method }}"
-      data-send-destination="{{ invoice_send.destination }}"
-      data-send-destination-display="{{ invoice_send.destination_display }}"
-      data-default-email="{{ company_settings.default_email }}"
-      data-default-phone="{{ company_settings.default_phone }}"
-      data-company-phone="{{ company_settings.company_phone }}">
-      Send Invoice
-    </button>
-    {% if customer_pay_url and payment_options.can_pay_now and payment_options.card_payments_visible %}
-    <a class="btn-secondary" href="{{ customer_pay_url }}" target="_blank" rel="noopener">Open Pay Link</a>
-    {% endif %}
-  </div>
-  {% if not invoice_send.can_send %}
-  <p class="invoice-send-blocked muted">{{ invoice_send.blocked_reason }}</p>
-  {% endif %}
-
   {% include '_job_costs_form.html' %}
 
   <div class="form-actions booking-save-actions">
-    <button type="submit" name="action" value="save" class="btn-primary">Save changes</button>
-    <a class="btn-secondary" href="{{ url_for('dashboard') }}">Cancel</a>
+    <a class="btn-secondary" href="{{ url_for('invoice_pdf', booking_id=booking.id) }}" download="invoice.pdf">Download PDF</a>
+    <button type="submit" name="action" value="save" class="btn-primary">Save Changes</button>
     <a class="btn-secondary" href="{{ url_for('delete_booking', booking_id=booking.id) }}">Delete booking…</a>
   </div>
+  <p class="hint muted">Save Changes updates the booking, pricing, job costs, invoice PDF, and the Xero draft if linked.</p>
 
   <details class="invoice-overrides-details">
     <summary>Invoice overrides &amp; bank details</summary>
@@ -227,5 +196,3 @@
 
 <script src="{{ url_for('static', filename='mover_pricing.js') }}"></script>
 <script src="{{ url_for('static', filename='invoice_pricing.js') }}"></script>
-<script src="{{ url_for('static', filename='invoice_send.js') }}"></script>
-<script src="{{ url_for('static', filename='invoice_share.js') }}"></script>
