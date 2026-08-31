@@ -38,7 +38,12 @@
     {% for job in daily.jobs %}
     <article class="daily-job-card">
       <a class="daily-job-card-link" href="{{ url_for('view_booking', booking_id=job.id) }}">
-        <p class="daily-job-label">{{ job.job_label }}</p>
+        <div class="daily-job-top">
+          <span class="daily-job-label">{{ job.job_label }}</span>
+          <span class="daily-job-status">
+            {% with status=job.status %}{% include '_status_badge.html' %}{% endwith %}
+          </span>
+        </div>
         <p class="daily-job-time">
           <span class="daily-job-time-range">{{ job.time_range }}</span>
           {% if job.duration_label %}
@@ -46,12 +51,22 @@
           {% endif %}
         </p>
         <h2 class="daily-job-customer">{{ job.customer_name }}</h2>
-        <p class="daily-job-meta">{{ job.num_movers }} mover{% if job.num_movers != 1 %}s{% endif %}</p>
-        <p class="daily-job-row"><span class="daily-job-field">Crew:</span> {{ job.crew_display }}</p>
-        <p class="daily-job-row"><span class="daily-job-field">Pickup:</span> {{ job.pickup_address or '—' }}</p>
-        <p class="daily-job-row"><span class="daily-job-field">Delivery:</span> {{ job.delivery_address or '—' }}</p>
-        <p class="daily-job-row">
-          <span class="daily-job-field">Phone:</span>
+        <p class="daily-job-meta">
+          <span>{{ job.num_movers }} mover{% if job.num_movers != 1 %}s{% endif %}</span>
+          <span class="daily-job-row daily-job-crew"><span class="daily-job-field">Crew:</span> {{ job.crew_display }}</span>
+        </p>
+        <div class="daily-job-route">
+          <p class="daily-job-row">
+            <span class="daily-job-field">Pickup</span>
+            <span class="daily-job-address">{{ job.pickup_address or '—' }}</span>
+          </p>
+          <p class="daily-job-row">
+            <span class="daily-job-field">Delivery</span>
+            <span class="daily-job-address">{{ job.delivery_address or '—' }}</span>
+          </p>
+        </div>
+        <p class="daily-job-row daily-job-secondary">
+          <span class="daily-job-field">Phone</span>
           {% if job.phone and job.phone|tel_href %}
           {{ job.phone }}
           {% elif job.phone %}
@@ -60,11 +75,8 @@
           —
           {% endif %}
         </p>
-        <p class="daily-job-row">
-          <span class="daily-job-field">Status:</span> {{ job.status|upper }}
-        </p>
-        <p class="daily-job-row daily-job-notes{% if not job.notes %} muted{% endif %}">
-          <span class="daily-job-field">Notes:</span> {{ job.notes or '—' }}
+        <p class="daily-job-row daily-job-notes daily-job-secondary{% if not job.notes %} muted{% endif %}">
+          <span class="daily-job-field">Notes</span> {{ job.notes or '—' }}
         </p>
       </a>
       <div class="daily-job-actions">

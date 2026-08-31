@@ -95,6 +95,12 @@ def test_daily_jobs_page_renders_cards_and_links():
     assert "Katsu / Will / Yasu" in html
     assert "Pickup Map" in html
     assert "Delivery Map" in html
+    assert ">Call</a>" in html
+    assert ">Text</a>" in html
+    assert "tel:" in html
+    assert "sms:" in html
+    assert "status-badge" in html
+    assert "CONFIRMED" in html.upper()
     assert 'href="/bookings/{0}"'.format(booking_id) in html
     assert "← Back to Calendar" in html
     assert "Total Jobs" in html
