@@ -1,9 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Daily Jobs — {{ daily.date_heading }}{% endblock %}
 
-{% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='daily_jobs.css') }}">
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='daily_jobs.css', v=asset_version) }}">
+{% endblock %}
 
+{% block content %}
 <section class="panel daily-jobs-page">
   <p class="daily-jobs-back">
     <a class="btn-secondary btn-sm" href="{{ back_to_calendar_url }}">← Back to Calendar</a>

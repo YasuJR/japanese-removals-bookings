@@ -98,6 +98,8 @@ def test_daily_jobs_page_renders_cards_and_links():
     assert 'href="/bookings/{0}"'.format(booking_id) in html
     assert "← Back to Calendar" in html
     assert "Total Jobs" in html
+    assert html.find("daily_jobs.css") < html.find("<main")
+    assert "daily_jobs.css?v=" in html
     return True
 
 

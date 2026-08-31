@@ -206,6 +206,8 @@ def inject_template_globals():
         "invoice_filters": INVOICE_FILTERS,
         "company_settings": company_config.get_settings(),
         "is_admin": auth.is_admin_user(user),
+        "asset_version": (os.environ.get("RENDER_GIT_COMMIT") or "").strip()[:12]
+        or "dev",
     }
     g._template_globals = cached
     return cached

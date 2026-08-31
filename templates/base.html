@@ -8,6 +8,7 @@
   {% include '_head_icons.html' %}
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='mobile.css') }}">
+  {% block extra_head %}{% endblock %}
 </head>
 <body>
   <header class="site-header">
