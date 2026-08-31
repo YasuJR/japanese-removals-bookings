@@ -10,8 +10,8 @@
   </p>
 
   <header class="daily-jobs-header">
-    <p class="daily-jobs-date">{{ daily.date_heading }}</p>
     <h1 class="daily-jobs-title">Daily Jobs</h1>
+    <p class="daily-jobs-date">{{ daily.date_heading }}</p>
   </header>
 
   <section class="daily-jobs-summary" aria-label="Daily summary">
@@ -38,7 +38,9 @@
     {% for job in daily.jobs %}
     <article class="daily-job-card">
       <a class="daily-job-card-link" href="{{ url_for('view_booking', booking_id=job.id) }}">
-        <p class="daily-job-label">{{ job.job_label }}</p>
+        <div class="daily-job-card-head">
+          <p class="daily-job-label">{{ job.job_label }}</p>
+        </div>
         <p class="daily-job-time">
           <span class="daily-job-time-range">{{ job.time_range }}</span>
           {% if job.duration_label %}
@@ -46,26 +48,38 @@
           {% endif %}
         </p>
         <h2 class="daily-job-customer">{{ job.customer_name }}</h2>
-        <p class="daily-job-meta">{{ job.num_movers }} mover{% if job.num_movers != 1 %}s{% endif %}</p>
-        <p class="daily-job-row"><span class="daily-job-field">Crew:</span> {{ job.crew_display }}</p>
-        <p class="daily-job-row"><span class="daily-job-field">Pickup:</span> {{ job.pickup_address or '—' }}</p>
-        <p class="daily-job-row"><span class="daily-job-field">Delivery:</span> {{ job.delivery_address or '—' }}</p>
-        <p class="daily-job-row">
-          <span class="daily-job-field">Phone:</span>
-          {% if job.phone and job.phone|tel_href %}
-          {{ job.phone }}
-          {% elif job.phone %}
-          {{ job.phone }}
-          {% else %}
-          —
-          {% endif %}
-        </p>
-        <p class="daily-job-row">
-          <span class="daily-job-field">Status:</span> {{ job.status|upper }}
-        </p>
-        <p class="daily-job-row daily-job-notes{% if not job.notes %} muted{% endif %}">
-          <span class="daily-job-field">Notes:</span> {{ job.notes or '—' }}
-        </p>
+        <div class="daily-job-meta-row">
+          <p class="daily-job-meta">{{ job.num_movers }} mover{% if job.num_movers != 1 %}s{% endif %}</p>
+          <p class="daily-job-row daily-job-crew"><span class="daily-job-field">Crew:</span> {{ job.crew_display }}</p>
+          <span class="daily-job-status">
+            {% with status=job.status %}{% include '_status_badge.html' %}{% endwith %}
+          </span>
+        </div>
+        <div class="daily-job-locations">
+          <p class="daily-job-row daily-job-location">
+            <span class="daily-job-field">Pickup:</span>
+            <span class="daily-job-address">{{ job.pickup_address or '—' }}</span>
+          </p>
+          <p class="daily-job-row daily-job-location">
+            <span class="daily-job-field">Delivery:</span>
+            <span class="daily-job-address">{{ job.delivery_address or '—' }}</span>
+          </p>
+        </div>
+        <div class="daily-job-secondary">
+          <p class="daily-job-row daily-job-phone">
+            <span class="daily-job-field">Phone:</span>
+            {% if job.phone and job.phone|tel_href %}
+            {{ job.phone }}
+            {% elif job.phone %}
+            {{ job.phone }}
+            {% else %}
+            —
+            {% endif %}
+          </p>
+          <p class="daily-job-row daily-job-notes{% if not job.notes %} muted{% endif %}">
+            <span class="daily-job-field">Notes:</span> {{ job.notes or '—' }}
+          </p>
+        </div>
       </a>
       <div class="daily-job-actions">
         {% with phone=job.phone %}{% include '_contact_actions.html' %}{% endwith %}
