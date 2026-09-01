@@ -1,10 +1,10 @@
-"""Actual work times — admin-entered, separate from scheduled/invoice times.
+"""Staff Portal hour calculations. Read-only — does not change booking saves.
 
-Staff Portal WEEKLY ACTUAL uses Owner Edit Booking start_time / finish_time
-for jobs on or before today that have both times set. Future jobs are
-excluded. WEEKLY ESTIMATED uses stored duration_hours for the whole week.
-WEEKLY ESTIMATED uses stored duration_hours only.
-Staff Portal is read-only.
+Scheduled hours use start_time / finish_time, else duration_hours.
+Actual hours prefer actual_start_time / actual_finish_time / actual_duration.
+Completed / Invoiced / Paid jobs fall back to the saved booking start/finish
+or duration_hours when dedicated actual_* columns are empty. Quote schedules
+are never copied into Actual.
 """
 
 import re
@@ -259,9 +259,12 @@ def format_hours_short(hours: Any) -> str:
     return "{0}hr".format(text)
 
 
-def scheduled_hours(booking: Dict[str, Any]) -> Optional[float]:
-    """Planned hours from stored start/finish. Falls back to duration_hours only."""
-    from booking_times import duration_hours_from_times, parse_duration_hours
+_COMPLETED_WORK_STATUSES = frozenset({"Completed", "Invoiced", "Paid"})
+
+
+def _hours_from_booking_start_finish(booking: Dict[str, Any]) -> Optional[float]:
+    """Hours from stored start_time / finish_time. Does not invent default clocks."""
+    from booking_times import duration_hours_from_times
 
     start = parse_actual_clock(
         booking.get("owner_start_hm") or booking.get("start_time")
@@ -270,19 +273,30 @@ def scheduled_hours(booking: Dict[str, Any]) -> Optional[float]:
         booking.get("owner_finish_hm") or booking.get("finish_time")
     )
     hours = duration_hours_from_times(start, finish)
-    if hours is not None:
-        return hours
+    if hours is None:
+        return None
+    return round(float(hours), 2)
+
+
+def _hours_from_duration_hours(booking: Dict[str, Any]) -> Optional[float]:
+    from booking_times import parse_duration_hours
+
     stored = parse_duration_hours(booking.get("duration_hours"))
-    if stored is not None:
-        return round(float(stored), 2)
-    return None
+    if stored is None:
+        return None
+    return round(float(stored), 2)
 
 
-def actual_hours(booking: Dict[str, Any]) -> Optional[float]:
-    """Recorded actual start/finish, else stored actual_duration minutes.
+def scheduled_hours(booking: Dict[str, Any]) -> Optional[float]:
+    """Planned hours from stored start/finish. Falls back to duration_hours only."""
+    from_times = _hours_from_booking_start_finish(booking)
+    if from_times is not None:
+        return from_times
+    return _hours_from_duration_hours(booking)
 
-    Does not use scheduled start/finish or duration_hours.
-    """
+
+def _dedicated_actual_hours(booking: Dict[str, Any]) -> Optional[float]:
+    """Hours from actual_start_time / actual_finish_time or actual_duration minutes."""
     recorded = recorded_actual_minutes(booking)
     if recorded is not None:
         return round(recorded / 60.0, 2)
@@ -290,6 +304,37 @@ def actual_hours(booking: Dict[str, Any]) -> Optional[float]:
     if duration is not None:
         return round(duration / 60.0, 2)
     return None
+
+
+def _recorded_completed_hours(booking: Dict[str, Any]) -> Optional[float]:
+    """Worked hours saved on Completed / Invoiced / Paid bookings.
+
+    Edit Booking stores finished job times in start_time, finish_time, and
+    duration_hours (the same columns Invoice / Daily Jobs use). Dedicated
+    actual_* columns are often empty on existing completed jobs.
+    """
+    from_times = _hours_from_booking_start_finish(booking)
+    if from_times is not None:
+        return from_times
+    return _hours_from_duration_hours(booking)
+
+
+def actual_hours(booking: Dict[str, Any]) -> Optional[float]:
+    """Recorded work hours for Staff Portal Actual.
+
+    Prefer actual_start_time / actual_finish_time, then actual_duration.
+    For Completed / Invoiced / Paid jobs with those columns empty, use the
+    saved booking start/finish or duration_hours. Quote/Confirmed schedules
+    are never treated as Actual.
+    """
+    if job_status.display(booking) == "Cancelled":
+        return None
+    dedicated = _dedicated_actual_hours(booking)
+    if dedicated is not None:
+        return dedicated
+    if job_status.display(booking) not in _COMPLETED_WORK_STATUSES:
+        return None
+    return _recorded_completed_hours(booking)
 
 
 def callout_hours(booking: Dict[str, Any]) -> Optional[float]:

@@ -909,9 +909,9 @@ def test_weekly_hours_use_scheduled_actual_callout_paid():
 
     assert ken["weekly_worked"]["job_count"] == 2
     assert ken["weekly_worked"]["scheduled_display"] == "6hr"
-    assert ken["weekly_worked"]["actual_display"] == "2hr"
+    assert ken["weekly_worked"]["actual_display"] == "6hr"
     assert ken["weekly_worked"]["callout_display"] == "1hr"
-    assert ken["weekly_worked"]["paid_display"] == "3hr"
+    assert ken["weekly_worked"]["paid_display"] == "7hr"
 
     by_heading = {day["heading"]: day for day in yasu["week_days"]}
     assert by_heading["MONDAY"]["scheduled_display"] == "7hr"
@@ -951,6 +951,13 @@ def test_weekly_worked_format_examples():
     assert staff_job_times.actual_hours(
         {"start_time": "09:30", "finish_time": "12:30"}
     ) is None
+    assert staff_job_times.actual_hours(
+        {
+            "status": "Completed",
+            "start_time": "09:30",
+            "finish_time": "12:30",
+        }
+    ) == 3
     assert staff_job_times.actual_hours(
         {"actual_start_time": "09:30", "actual_finish_time": "12:15"}
     ) == 2.75
@@ -998,11 +1005,12 @@ def test_scheduled_hours_from_start_finish_not_duration_hours():
     unset_job = [item for item in portal["jobs"] if item["id"] == unset][0]
     assert job["scheduled_hours_display"] == "4.5hr"
     assert job["scheduled_range_display"] == "8:00 AM – 12:30 PM"
-    assert job["actual_hours_display"] == "—"
+    assert job["actual_hours_display"] == "4.5hr"
+    assert job["paid_hours_display"] == "4.5hr"
     assert unset_job["scheduled_hours_display"] == "5.75hr"
     assert unset_job["actual_hours_display"] == "Not completed"
     assert portal["weekly_worked"]["scheduled_display"] == "10.25hr"
-    assert portal["weekly_worked"]["actual_display"] == "0hr"
+    assert portal["weekly_worked"]["actual_display"] == "4.5hr"
 
     keiichi = build_staff_portal("Keiichi", "week", monday)
     assert keiichi["weekly_worked"]["scheduled_display"] == "4.5hr"
@@ -1118,6 +1126,125 @@ def test_history_groups_past_weeks_with_paid_hours():
     return True
 
 
+def test_completed_jobs_use_saved_booking_times_when_actual_columns_empty():
+    """Completed / Invoiced / Paid jobs show Actual from start/finish or duration."""
+    import staff_job_times
+    from staff_portal import build_staff_portal
+
+    monday = _isolated_monday()
+    completed = _create_job(
+        _unique("DoneNoActual"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="10:00",
+        finish_time="13:00",
+        duration_hours="3",
+        callout_fee=92.5,
+        hourly_rate=185,
+        status="Completed",
+    )
+    invoiced = _create_job(
+        _unique("InvoicedNoActual"),
+        (monday + timedelta(days=1)).isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="12:00",
+        duration_hours="4",
+        callout_fee=0,
+        hourly_rate=185,
+        status="Invoiced",
+    )
+    paid = _create_job(
+        _unique("PaidNoActual"),
+        (monday + timedelta(days=2)).isoformat(),
+        crew="Yasu",
+        start_time="09:00",
+        finish_time="11:00",
+        duration_hours="2",
+        callout_fee=185,
+        hourly_rate=185,
+        status="Paid",
+    )
+    duration_only = _create_job(
+        _unique("DurationOnly"),
+        (monday + timedelta(days=3)).isoformat(),
+        crew="Yasu",
+        start_time="",
+        finish_time="",
+        duration_hours="2.5",
+        callout_fee=0,
+        hourly_rate=185,
+        status="Completed",
+    )
+    quoted = _create_job(
+        _unique("QuotedSchedule"),
+        (monday + timedelta(days=4)).isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="11:00",
+        duration_hours="3",
+        callout_fee=92.5,
+        hourly_rate=185,
+        status="Confirmed",
+    )
+    dedicated = _create_job(
+        _unique("DedicatedActual"),
+        (monday + timedelta(days=5)).isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="16:00",
+        duration_hours="8",
+        callout_fee=0,
+        hourly_rate=185,
+        status="Completed",
+    )
+    db.save_booking_actual_times(dedicated, "08:15", "11:15", 180)
+
+    by_id = {
+        job["id"]: job
+        for job in build_staff_portal("Yasu", "week", monday)["jobs"]
+    }
+    done = by_id[completed]
+    assert done["actual_hours_display"] == "3hr"
+    assert done["callout_hours_label"] == "+ 0.5hr call out"
+    assert done["paid_hours_display"] == "3.5hr"
+    assert done["has_actual_hours"] is True
+    assert by_id[invoiced]["actual_hours_display"] == "4hr"
+    assert by_id[invoiced]["paid_hours_display"] == "4hr"
+    assert by_id[paid]["actual_hours_display"] == "2hr"
+    assert by_id[paid]["paid_hours_display"] == "3hr"
+    assert by_id[duration_only]["actual_hours_display"] == "2.5hr"
+    assert by_id[quoted]["actual_hours_display"] == "Not completed"
+    assert by_id[quoted]["paid_hours_display"] == "—"
+    assert by_id[dedicated]["actual_hours_display"] == "3hr"
+
+    live_name = _unique("LiveCompletedActual")
+    live_id = _create_job(
+        live_name,
+        perth_today().isoformat(),
+        crew="Yasu",
+        start_time="10:00",
+        finish_time="13:00",
+        duration_hours="3",
+        callout_fee=0,
+        hourly_rate=185,
+        status="Completed",
+    )
+    live_job = [
+        job
+        for job in build_staff_portal("Yasu", "jobs", perth_today())["jobs"]
+        if job["id"] == live_id
+    ][0]
+    assert live_job["actual_hours_display"] == "3hr"
+    assert live_job["paid_hours_display"] == "3hr"
+    html = _staff_client("Yasu").get("/staff").get_data(as_text=True)
+    assert live_name in html
+    assert "Actual 3hr" in html
+    assert staff_job_times.actual_hours(dict(db.get_booking(completed))) == 3
+    assert staff_job_times.paid_hours(dict(db.get_booking(completed))) == 3.5
+    return True
+
+
 def test_week_navigation_changes_week():
     from staff_portal import build_staff_portal
 
@@ -1229,8 +1356,9 @@ def test_owner_can_edit_and_clear_actual_times_from_staff_portal():
     portal = build_staff_portal("Yasu", "week", monday)
     job = [item for item in portal["jobs"] if item["id"] == booking_id][0]
     assert job["has_actual"] is False
-    assert job["actual_hours_display"] == "—"
-    assert portal["weekly_worked"]["actual_display"] == "0hr"
+    assert job["actual_hours_display"] == "8hr"
+    assert job["paid_hours_display"] == "8hr"
+    assert portal["weekly_worked"]["actual_display"] == "8hr"
     assert portal["weekly_worked"]["scheduled_display"] == "8hr"
     return True
 
@@ -1263,6 +1391,7 @@ def main():
         test_scheduled_hours_from_start_finish_not_duration_hours,
         test_future_actual_is_not_completed,
         test_history_groups_past_weeks_with_paid_hours,
+        test_completed_jobs_use_saved_booking_times_when_actual_columns_empty,
         test_week_navigation_changes_week,
         test_owner_can_edit_and_clear_actual_times_from_staff_portal,
     ]
