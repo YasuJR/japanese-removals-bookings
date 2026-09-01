@@ -84,7 +84,7 @@
 
   .mobile-bottom-link.active,
   .mobile-bottom-link:hover {
-    background: rgba(188, 0, 45, 0.35);
+    background: rgba(255, 255, 255, 0.14);
     color: #fff;
   }
 

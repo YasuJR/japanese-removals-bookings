@@ -1,19 +1,25 @@
 {% extends "base.html" %}
 {% block title %}CEO Dashboard{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='ceo_dashboard.css', v=asset_version) }}">
+<style>body { background: #eef1f6; }</style>
+{% endblock %}
+
 {% block content %}
+{% set today_parts = ceo.today|format_display_date %}
 <div class="ceo-dashboard">
-  <header class="ceo-header">
-    <div>
+  <header class="ceo-hero">
+    <img class="ceo-hero-logo" src="{{ url_for('static', filename='branding/japanese-removals-logo.png') }}" alt="Japanese Removals">
+    <div class="ceo-hero-copy">
       <p class="ceo-kicker">{{ ceo.company_name }}</p>
-      <h2 class="ceo-title">CEO Dashboard</h2>
-      {% set today_parts = ceo.today|format_display_date %}
+      <h2 class="ceo-title">Japanese Removals</h2>
       <p class="ceo-subtitle">{{ today_parts.weekday }} {{ today_parts.day_month }}</p>
     </div>
   </header>
 
-  <section class="ceo-section">
-    <h3 class="ceo-section-title">1. Today</h3>
+  <section class="ceo-section ceo-section-today">
+    <h3 class="ceo-section-title"><span class="ceo-day-chip ceo-day-chip-today">Today</span> 1. Today</h3>
     <div class="ceo-stat-grid ceo-stat-grid-5">
       <article class="ceo-stat-card ceo-stat-hero">
         <span class="ceo-stat-label">Jobs today</span>
@@ -40,16 +46,41 @@
     <div class="ceo-job-list">
       {% for job in ceo.today_section.jobs %}
       <article class="ceo-job-card">
-        <strong>{{ job.customer_name }}</strong>
-        <p class="ceo-job-meta">{{ job.start_display }} · {{ job.status }}</p>
+        <div class="ceo-job-card-head">
+          <p class="ceo-job-time">{{ job.start_display }}{% if job.finish_display %} – {{ job.finish_display }}{% endif %}</p>
+          <span class="ceo-job-status">{% with status=job.status %}{% include '_status_badge.html' %}{% endwith %}</span>
+        </div>
+        <strong class="ceo-job-customer">{{ job.customer_name }}</strong>
+        {% if job.pickup_address or job.delivery_address %}
+        <div class="ceo-job-route">
+          {% if job.pickup_address %}
+          <p class="ceo-job-address"><span>Pickup</span> {{ job.pickup_address }}</p>
+          {% endif %}
+          {% if job.delivery_address %}
+          <p class="ceo-job-address"><span>Delivery</span> {{ job.delivery_address }}</p>
+          {% endif %}
+        </div>
+        {% endif %}
         <div class="ceo-job-actions">
-          <a class="ceo-action-btn ceo-action-sm" href="{{ url_for('edit_booking', booking_id=job.booking_id) }}">Open booking</a>
+          <a class="ceo-action-btn ceo-action-sm" href="{{ url_for('edit_booking', booking_id=job.booking_id) }}">
+            <svg class="ceo-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h9.5A2.5 2.5 0 0 1 17 7v12.5H7.5A2.5 2.5 0 0 1 5 17V4.5Z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9 4.5V7h6.5V4.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 11h6M8.5 14.5h4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            Open booking
+          </a>
           {% if job.has_phone %}
-          <a class="ceo-action-btn ceo-action-sm" href="{{ job.phone|tel_href }}">Call</a>
-          <a class="ceo-action-btn ceo-action-sm" href="{{ job.phone|sms_href }}">Text</a>
+          <a class="ceo-action-btn ceo-action-sm" href="{{ job.phone|tel_href }}">
+            <svg class="ceo-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 4.8h3.1l1.1 3.2-1.8 1.3a12.2 12.2 0 0 0 5.1 5.1l1.3-1.8 3.2 1.1v3.1c0 .7-.6 1.4-1.4 1.4C9.8 18.2 5.8 14.2 5.8 6.2c0-.8.6-1.4 1.4-1.4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            Call
+          </a>
+          <a class="ceo-action-btn ceo-action-sm" href="{{ job.phone|sms_href }}">
+            <svg class="ceo-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14v9.2H9.2L5 19.2V6.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            Text
+          </a>
           {% endif %}
           {% if job.pickup_address %}
-          <a class="ceo-action-btn ceo-action-sm" href="{{ job.pickup_address|apple_maps_url }}" target="_blank" rel="noopener noreferrer">Map</a>
+          <a class="ceo-action-btn ceo-action-sm" href="{{ job.pickup_address|apple_maps_url }}" target="_blank" rel="noopener noreferrer">
+            <svg class="ceo-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6.2-5.4 6.2-10.1A6.2 6.2 0 0 0 12 4.8a6.2 6.2 0 0 0-6.2 6.1C5.8 15.6 12 21 12 21Z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10.8" r="2.1" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+            Map
+          </a>
           {% endif %}
         </div>
       </article>
@@ -58,8 +89,8 @@
     {% endif %}
   </section>
 
-  <section class="ceo-section">
-    <h3 class="ceo-section-title">2. Tomorrow</h3>
+  <section class="ceo-section ceo-section-tomorrow">
+    <h3 class="ceo-section-title"><span class="ceo-day-chip ceo-day-chip-tomorrow">Tomorrow</span> 2. Tomorrow</h3>
     <div class="ceo-stat-grid">
       <article class="ceo-stat-card ceo-stat-hero">
         <span class="ceo-stat-label">Jobs tomorrow</span>
@@ -137,26 +168,21 @@
       </article>
     </div>
     {% if ceo.payments.overdue %}
-    <div class="ceo-table-wrap">
-      <table class="ceo-table">
-        <thead><tr><th>Customer</th><th>Amount</th><th>Days overdue</th><th></th></tr></thead>
-        <tbody>
-          {% for row in ceo.payments.overdue %}
-          <tr>
-            <td><a href="{{ url_for('edit_booking', booking_id=row.booking_id) }}">{{ row.customer_name }}</a></td>
-            <td class="money">{{ row.amount|format_aud }}</td>
-            <td>{{ row.days_overdue_label }}</td>
-            <td>
-              <form method="post" class="inline-form">
-                <input type="hidden" name="action" value="send_reminder">
-                <input type="hidden" name="booking_id" value="{{ row.booking_id }}">
-                <button type="submit" class="ceo-action-btn ceo-action-sm">Send reminder</button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="ceo-overdue-list">
+      {% for row in ceo.payments.overdue %}
+      <article class="ceo-overdue-card">
+        <div class="ceo-overdue-copy">
+          <a href="{{ url_for('edit_booking', booking_id=row.booking_id) }}">{{ row.customer_name }}</a>
+          <p>{{ row.days_overdue_label }}</p>
+        </div>
+        <strong class="money">{{ row.amount|format_aud }}</strong>
+        <form method="post" class="inline-form">
+          <input type="hidden" name="action" value="send_reminder">
+          <input type="hidden" name="booking_id" value="{{ row.booking_id }}">
+          <button type="submit" class="ceo-action-btn ceo-action-sm">Send reminder</button>
+        </form>
+      </article>
+      {% endfor %}
     </div>
     {% endif %}
   </section>
@@ -197,7 +223,7 @@
   <section class="ceo-section">
     <h3 class="ceo-section-title">7. Quick actions</h3>
     <nav class="ceo-quick-actions ceo-quick-actions-bottom" aria-label="Quick actions">
-      <a class="ceo-action-btn" href="{{ url_for('new_booking') }}">New booking</a>
+      <a class="ceo-action-btn ceo-action-new" href="{{ url_for('new_booking') }}">New booking</a>
       <a class="ceo-action-btn" href="{{ url_for('daily_checklist', filter='today') }}">Today jobs</a>
       <a class="ceo-action-btn" href="{{ url_for('daily_checklist', filter='tomorrow') }}">Tomorrow jobs</a>
       <a class="ceo-action-btn" href="{{ url_for('crew_schedule') }}">Crew schedule</a>
