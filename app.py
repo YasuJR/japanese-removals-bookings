@@ -2598,16 +2598,60 @@ def stripe_checkout_success(booking_id):
     return redirect(url_for("edit_booking", booking_id=booking_id))
 
 
-@app.route("/bookings/<int:booking_id>/invoice/preview")
+def _booking_overlay_for_invoice_preview(booking: dict, data: dict) -> dict:
+    """Apply parsed form fields onto a booking dict without writing to the DB."""
+    overlay = dict(booking)
+    for key in (
+        "customer_name",
+        "phone",
+        "email",
+        "pickup_address",
+        "delivery_address",
+        "move_date",
+        "num_movers",
+        "notes",
+        "start_time",
+        "finish_time",
+        "duration_hours",
+        "hourly_rate",
+        "callout_fee",
+        "gst_enabled",
+        "payment_status",
+        "invoice_status",
+        "invoice_custom_text",
+        "invoice_bank_account_name",
+        "invoice_bank_bsb",
+        "invoice_bank_account",
+        "truck_assigned",
+        "status",
+    ):
+        if key in data:
+            overlay[key] = data[key]
+    overlay["extra_charges"] = list(data.get("extra_charges") or [])
+    if data.get("crew_csv") is not None:
+        overlay["crew"] = data["crew_csv"]
+    if data.get("invoice_description_present"):
+        overlay["invoice_description"] = invoice.stored_description_for_save(data)
+    return overlay
+
+
+@app.route("/bookings/<int:booking_id>/invoice/preview", methods=["GET", "POST"])
 @auth.login_required
 def invoice_preview(booking_id):
     row = db.get_booking(booking_id)
     if row is None:
         flash("Booking not found.", "error")
         return redirect(url_for("all_bookings"))
-    services.prepare_booking_payment_link(booking_id)
-    row = db.get_booking(booking_id)
+    if request.method != "POST":
+        services.prepare_booking_payment_link(booking_id)
+        row = db.get_booking(booking_id)
     booking = services.booking_to_dict(row)
+    if request.method == "POST":
+        data, errors = parse_booking_form(
+            request.form, existing_crew_csv=booking.get("crew") or ""
+        )
+        if not errors:
+            booking = _booking_overlay_for_invoice_preview(booking, data)
     inv = invoice_pdf_service.build_invoice_document(booking)
     return render_template(
         "invoice_preview.html",

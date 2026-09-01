@@ -108,12 +108,12 @@ def test_edit_page_keeps_three_primary_buttons():
     client = _login_client()
     html = client.get("/bookings/{0}/edit".format(booking_id)).get_data(as_text=True)
     assert "Download PDF" in html
+    assert "Preview Invoice" in html
     assert "Save Changes" in html
     assert "Delete booking" in html
     assert "Invoice overrides" in html
     labels = _control_labels(html)
     for removed in (
-        "Invoice Preview",
         "Update Invoice",
         "Send Invoice",
         "Share PDF",
@@ -132,7 +132,12 @@ def test_edit_page_keeps_three_primary_buttons():
     assert "Customer email or phone number required." not in html
     actions = html.split("booking-save-actions", 1)[-1].split("Invoice overrides", 1)[0]
     action_labels = _control_labels(actions)
-    assert action_labels == ["Download PDF", "Save Changes", "Delete booking…"]
+    assert action_labels == [
+        "Download PDF",
+        "Preview Invoice",
+        "Save Changes",
+        "Delete booking…",
+    ]
     return True
 
 
@@ -216,6 +221,31 @@ def test_save_does_not_rewrite_existing_invoice_number():
     return True
 
 
+def test_preview_uses_form_values_without_saving():
+    booking_id = _create_booking(hourly_rate=180.0, customer_name="Saved Preview Customer")
+    original = dict(db.get_booking(booking_id))
+    client = _login_client()
+    form = _form(
+        booking_id,
+        hourly_rate="250",
+        customer_name="Unsaved Preview Customer",
+        pickup_address="99 Unsaved St, Perth WA",
+    )
+    form.pop("action", None)
+    resp = client.post("/bookings/{0}/invoice/preview".format(booking_id), data=form)
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert "TAX INVOICE" in html
+    assert "Unsaved Preview Customer" in html
+    assert "99 Unsaved St, Perth WA" in html
+    assert "Saved Preview Customer" not in html
+    after = dict(db.get_booking(booking_id))
+    assert after["customer_name"] == original["customer_name"]
+    assert after["pickup_address"] == original["pickup_address"]
+    assert float(after["hourly_rate"]) == float(original["hourly_rate"])
+    return True
+
+
 def main():
     db.init_db()
     tests = [
@@ -223,6 +253,7 @@ def main():
         test_one_save_updates_booking_and_invoice,
         test_save_syncs_linked_xero_draft,
         test_save_does_not_rewrite_existing_invoice_number,
+        test_preview_uses_form_values_without_saving,
     ]
     failed = 0
     for fn in tests:

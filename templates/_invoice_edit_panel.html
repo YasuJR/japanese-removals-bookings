@@ -144,6 +144,10 @@
   <div class="form-actions booking-save-actions">
     <button type="button" class="btn-secondary"
             data-download-invoice-pdf="{{ url_for('invoice_pdf', booking_id=booking.id) }}">Download PDF</button>
+    <button type="submit" class="btn-secondary"
+            formmethod="post"
+            formaction="{{ url_for('invoice_preview', booking_id=booking.id) }}"
+            formtarget="_blank">Preview Invoice</button>
     <button type="submit" name="action" value="save" class="btn-primary">Save Changes</button>
     <a class="btn-secondary" href="{{ url_for('delete_booking', booking_id=booking.id) }}">Delete booking…</a>
   </div>

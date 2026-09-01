@@ -93,10 +93,11 @@ def test_edit_booking_has_download_without_share_or_removed_buttons():
     assert "Download PDF" in html
     assert "data-download-invoice-pdf=" in html
     assert "/bookings/{0}/invoice.pdf".format(booking_id) in html
+    assert "Preview Invoice" in html
+    assert "/bookings/{0}/invoice/preview".format(booking_id) in html
     assert "Save Changes" in html
     assert "Delete booking" in html
     assert "Share PDF" not in html
-    assert "Invoice Preview" not in html
     assert "Send Invoice" not in html
     assert "invoice-workflow-bar" not in html
     assert "invoice-send-btn" not in html
