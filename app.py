@@ -68,7 +68,7 @@ from booking_times import (
     format_time_12h,
     normalize_time_input,
 )
-from crew import CREW_OPTIONS, active_crew_names, crew_from_storage, display_crew
+from crew import CREW_OPTIONS, active_crew_names, all_crew_names, crew_from_storage, display_crew
 from resource_conflicts import find_resource_conflict_warnings
 from trucks import active_truck_names
 import double_booking
@@ -1848,26 +1848,51 @@ def profit_export_csv():
     )
 
 
+def _staff_login_names():
+    return list(all_crew_names() or active_crew_names() or CREW_OPTIONS)
+
+
+def _crew_id_for_name(staff_name: str):
+    wanted = str(staff_name or "").strip()
+    if not wanted:
+        return None
+    for member in db.list_crew_members(active_only=False):
+        if str(member.get("name") or "").strip() == wanted:
+            return member.get("id")
+    return None
+
+
 @app.route("/staff/login", methods=["GET", "POST"], endpoint="staff_login")
 def staff_login():
     if staff_auth.is_staff_logged_in():
         return redirect(staff_auth.safe_staff_next(request.args.get("next")))
 
+    crew_names = _staff_login_names()
     error = ""
+    selected_staff = (request.form.get("staff") or "").strip()
     if request.method == "POST":
         password = request.form.get("password", "")
-        if staff_auth.verify_staff_password(password):
+        if selected_staff not in crew_names:
+            error = "Select your name."
+        elif staff_auth.verify_staff_password(password):
             dest = staff_auth.safe_staff_next(
                 request.args.get("next") or request.form.get("next")
             )
             response = redirect(dest)
-            staff_auth.attach_staff_session(response)
+            staff_auth.attach_staff_session(
+                response,
+                selected_staff,
+                staff_id=_crew_id_for_name(selected_staff),
+            )
             return response
-        error = "Invalid password."
+        else:
+            error = "Invalid password."
     return render_template(
         "staff_login.html",
         error=error,
         next_url=staff_auth.safe_staff_next(request.args.get("next")),
+        staff_options=crew_names,
+        selected_staff=selected_staff,
     )
 
 
@@ -1881,9 +1906,21 @@ def staff_logout():
 @app.route("/staff", endpoint="staff_portal")
 @staff_auth.staff_login_required
 def staff_portal():
-    staff = request.args.get("staff", "").strip()
-    range_key = request.args.get("range", "today").strip()
-    portal = build_staff_portal(staff, range_key, perth_today())
+    staff = staff_auth.logged_in_staff_name()
+    staff_id = staff_auth.logged_in_staff_id()
+    range_key = request.args.get("range", "jobs").strip()
+    week_offset = request.args.get("week", "0").strip()
+    portal = build_staff_portal(
+        staff,
+        range_key,
+        perth_today(),
+        week_offset=week_offset,
+        staff_id=staff_id,
+    )
+    if not portal["staff"]:
+        response = redirect(url_for("staff_login"))
+        staff_auth.clear_staff_session(response)
+        return response
     return render_template(
         "staff_portal.html",
         portal=portal,
@@ -1892,9 +1929,9 @@ def staff_portal():
 
 
 def _staff_portal_redirect():
-    staff = (request.form.get("staff") or request.args.get("staff") or "").strip()
-    range_key = (request.form.get("range") or request.args.get("range") or "today").strip()
-    return redirect(url_for("staff_portal", staff=staff, range=range_key))
+    range_key = (request.form.get("range") or request.args.get("range") or "jobs").strip()
+    week_offset = (request.form.get("week") or request.args.get("week") or "0").strip()
+    return redirect(url_for("staff_portal", range=range_key, week=week_offset))
 
 
 @app.route(

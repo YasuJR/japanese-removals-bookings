@@ -17,6 +17,9 @@
         <div>
           <h1>Japanese Removals</h1>
           <p class="tagline">Staff Portal</p>
+          {% if portal.staff %}
+          <p class="staff-portal-who">{{ portal.staff }}</p>
+          {% endif %}
         </div>
       </div>
       <a class="staff-portal-logout" href="{{ url_for('staff_logout') }}">Log out</a>
@@ -35,21 +38,9 @@
     {% endwith %}
 
     <section class="panel staff-portal-controls">
-      <form method="get" action="{{ url_for('staff_portal') }}" class="staff-portal-staff-form">
-        <input type="hidden" name="range" value="{{ portal.range }}">
-        <label class="staff-portal-select-label">
-          <span>Staff</span>
-          <select name="staff" onchange="this.form.submit()" aria-label="Select staff">
-            {% for name in portal.staff_options %}
-            <option value="{{ name }}"{% if portal.staff == name %} selected{% endif %}>{{ name }}</option>
-            {% endfor %}
-          </select>
-        </label>
-      </form>
-
-      <nav class="staff-portal-tabs" aria-label="Date range">
+      <nav class="staff-portal-tabs" aria-label="Staff portal views">
         {% for key, label in portal.range_tabs %}
-        <a href="{{ url_for('staff_portal', staff=portal.staff, range=key) }}"
+        <a href="{{ url_for('staff_portal', range=key) }}"
            class="staff-portal-tab{% if portal.range == key %} active{% endif %}">{{ label }}</a>
         {% endfor %}
       </nav>
@@ -58,16 +49,34 @@
     </section>
 
     {% if portal.range == "week" %}
+    <section class="staff-week-nav" aria-label="Week navigation">
+      <a class="staff-week-nav-btn" href="{{ url_for('staff_portal', range='week', week=portal.prev_week_offset) }}">Previous Week</a>
+      <a class="staff-week-nav-btn{% if portal.week_offset == 0 %} active{% endif %}" href="{{ url_for('staff_portal', range='week', week=0) }}">This Week</a>
+      <a class="staff-week-nav-btn" href="{{ url_for('staff_portal', range='week', week=portal.next_week_offset) }}">Next Week</a>
+    </section>
     {% if portal.weekly_worked %}
-    <section class="staff-weekly-worked" aria-label="Weekly estimated and actual hours for {{ portal.staff }}">
-      <div class="staff-weekly-totals">
-        <div class="staff-weekly-totals-item">
-          <p class="staff-weekly-worked-label">WEEKLY ESTIMATED</p>
-          <p class="staff-weekly-worked-value">{{ portal.weekly_worked.estimated_display }}</p>
+    <section class="staff-weekly-worked" aria-label="Weekly hours for {{ portal.staff }}">
+      <p class="staff-weekly-week-label">{{ portal.weekly_worked.week_label }}</p>
+      <div class="staff-weekly-summary">
+        <div class="staff-weekly-summary-item">
+          <p class="staff-weekly-summary-label">Jobs</p>
+          <p class="staff-weekly-summary-value">{{ portal.weekly_worked.job_count }}</p>
         </div>
-        <div class="staff-weekly-totals-item">
-          <p class="staff-weekly-worked-label">WEEKLY ACTUAL</p>
-          <p class="staff-weekly-worked-value">{{ portal.weekly_worked.display }}</p>
+        <div class="staff-weekly-summary-item">
+          <p class="staff-weekly-summary-label">Scheduled</p>
+          <p class="staff-weekly-summary-value">{{ portal.weekly_worked.scheduled_display }}</p>
+        </div>
+        <div class="staff-weekly-summary-item">
+          <p class="staff-weekly-summary-label">Actual</p>
+          <p class="staff-weekly-summary-value">{{ portal.weekly_worked.actual_display }}</p>
+        </div>
+        <div class="staff-weekly-summary-item">
+          <p class="staff-weekly-summary-label">Call Out</p>
+          <p class="staff-weekly-summary-value">{{ portal.weekly_worked.callout_display }}</p>
+        </div>
+        <div class="staff-weekly-summary-item staff-weekly-summary-paid">
+          <p class="staff-weekly-summary-label">Paid Hours</p>
+          <p class="staff-weekly-summary-value">{{ portal.weekly_worked.paid_display }}</p>
         </div>
       </div>
     </section>
@@ -77,7 +86,12 @@
       <section class="staff-week-day{% if day.is_today %} staff-week-day-today{% endif %}">
         <h2 class="staff-week-heading">{{ day.heading }}</h2>
         <p class="staff-week-date">{{ day.date_display }}</p>
-        <p class="staff-week-day-worked">Worked: {{ day.worked_display }}</p>
+        <div class="staff-week-day-hours">
+          <p><span>Scheduled</span> {{ day.scheduled_display }}</p>
+          <p><span>Actual</span> {{ day.actual_display }}</p>
+          <p><span>Call Out</span> {{ day.callout_display }}</p>
+          <p class="staff-week-day-paid"><span>Paid Hours</span> {{ day.paid_display }}</p>
+        </div>
         {% if day.jobs %}
         <div class="staff-job-list">
           {% for job in day.jobs %}
@@ -92,17 +106,62 @@
       </section>
       {% endfor %}
     </div>
-    {% elif portal.jobs %}
-    <div class="staff-job-list">
-      {% for job in portal.jobs %}
-      {% with compact=false %}
-      {% include "_staff_job_card.html" %}
-      {% endwith %}
+
+    {% elif portal.range == "history" %}
+    {% if portal.history_weeks %}
+    <div class="staff-history">
+      {% for week in portal.history_weeks %}
+      <details class="staff-history-week"{% if loop.first %} open{% endif %}>
+        <summary class="staff-history-summary">
+          <span class="staff-history-week-label">{{ week.label }}</span>
+          <span class="staff-history-week-meta">{{ week.job_count }} Job{% if week.job_count != 1 %}s{% endif %}</span>
+          <span class="staff-history-week-paid">Total Paid Hours {{ week.paid_display }}</span>
+        </summary>
+        <div class="staff-history-body">
+          <div class="staff-history-week-hours">
+            <p><span>Scheduled</span> {{ week.scheduled_display }}</p>
+            <p><span>Actual</span> {{ week.actual_display }}</p>
+            <p><span>Call Out</span> {{ week.callout_display }}</p>
+          </div>
+          <div class="staff-job-list">
+            {% for job in week.jobs %}
+            {% with compact=true %}
+            {% include "_staff_job_card.html" %}
+            {% endwith %}
+            {% endfor %}
+          </div>
+        </div>
+      </details>
       {% endfor %}
     </div>
     {% else %}
     <section class="panel">
-      <p class="empty">No jobs for {{ portal.staff or "this staff member" }}{% if portal.range == "today" %} today{% elif portal.range == "tomorrow" %} tomorrow{% else %} this week{% endif %}.</p>
+      <p class="empty">No past jobs for {{ portal.staff or "this staff member" }}.</p>
+    </section>
+    {% endif %}
+
+    {% elif portal.job_sections %}
+    <div class="staff-job-sections">
+      {% for section in portal.job_sections %}
+      <section class="staff-job-section staff-job-section-{{ section.key }}" aria-label="{{ section.title }} jobs">
+        <h2 class="staff-job-section-title">{{ section.title }}</h2>
+        {% if section.jobs %}
+        <div class="staff-job-list">
+          {% for job in section.jobs %}
+          {% with compact=false %}
+          {% include "_staff_job_card.html" %}
+          {% endwith %}
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="staff-week-empty">No {{ section.title|lower }} jobs.</p>
+        {% endif %}
+      </section>
+      {% endfor %}
+    </div>
+    {% else %}
+    <section class="panel">
+      <p class="empty">No jobs for {{ portal.staff or "this staff member" }}.</p>
     </section>
     {% endif %}
   </main>

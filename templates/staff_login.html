@@ -30,8 +30,17 @@
       <input type="hidden" name="next" value="{{ next_url }}">
       {% endif %}
       <label>
+        Your name
+        <select name="staff" required aria-label="Select your name">
+          <option value="">Select your name</option>
+          {% for name in staff_options %}
+          <option value="{{ name }}"{% if selected_staff == name %} selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
         Password
-        <input type="password" name="password" required autocomplete="current-password" autofocus>
+        <input type="password" name="password" required autocomplete="current-password">
       </label>
       <button type="submit" class="btn-primary btn-block">Log in</button>
     </form>

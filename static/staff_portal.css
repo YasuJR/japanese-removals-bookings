@@ -4,6 +4,18 @@
   padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
 }
 
+.login-page select {
+  min-height: 48px;
+  width: 100%;
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 0.6rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--navy);
+}
+
 .staff-portal-header {
   align-items: center;
 }
@@ -465,5 +477,294 @@ a.staff-job-btn:active {
 }
 
 .staff-job-card-week .staff-job-headline {
-  font-size: 1.7rem;
+  font-size: 1.35rem;
+}
+
+.staff-portal-who {
+  margin: 0.15rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.staff-job-hours-block {
+  margin: 0.75rem 0 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.staff-hours-scheduled {
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: #eef1f6;
+  color: var(--navy);
+}
+
+.staff-hours-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.staff-hours-range {
+  margin: 0.2rem 0 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.staff-hours-scheduled .staff-hours-value {
+  margin: 0.15rem 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.staff-hours-actual {
+  padding: 0.7rem 0.75rem;
+  border-radius: 8px;
+  background: var(--navy);
+  color: #fff;
+}
+
+.staff-hours-actual .staff-hours-kicker {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.staff-hours-actual .staff-hours-value {
+  margin: 0.2rem 0 0;
+  font-size: 1.28rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.staff-hours-actual .staff-job-hours-unset {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.staff-hours-callout {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.staff-hours-paid {
+  margin: 0;
+  padding: 0.8rem 0.8rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  border-radius: 10px;
+  background: #fff;
+  border: 2px solid var(--navy);
+  color: var(--navy);
+}
+
+.staff-hours-paid span {
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.staff-hours-paid strong {
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-week-nav {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.45rem;
+  margin: 0 0 1rem;
+}
+
+.staff-week-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.5rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-decoration: none;
+  text-align: center;
+  color: var(--navy);
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+.staff-week-nav-btn.active {
+  color: #fff;
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+.staff-weekly-week-label {
+  margin: 0 0 0.85rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.staff-weekly-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+
+.staff-weekly-summary-item {
+  padding: 0.55rem 0.35rem;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+.staff-weekly-summary-paid {
+  grid-column: 1 / -1;
+  background: #fff;
+  color: var(--navy);
+}
+
+.staff-weekly-summary-label {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.staff-weekly-summary-value {
+  margin: 0.25rem 0 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-weekly-summary-paid .staff-weekly-summary-value {
+  font-size: 2rem;
+}
+
+.staff-week-day-hours {
+  margin: 0.55rem 0 0.8rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.staff-week-day-hours p {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.staff-week-day-hours span {
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.staff-week-day-paid {
+  color: var(--navy) !important;
+  font-size: 1.05rem !important;
+}
+
+.staff-job-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.staff-job-section-title {
+  margin: 0 0 0.65rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--navy);
+}
+
+.staff-history {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.staff-history-week {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.staff-history-summary {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.9rem 0.85rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.staff-history-summary::-webkit-details-marker {
+  display: none;
+}
+
+.staff-history-week-label {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.staff-history-week-meta {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.staff-history-week-paid {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.staff-history-body {
+  padding: 0 0.85rem 0.9rem;
+}
+
+.staff-history-week-hours {
+  margin: 0 0 0.75rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.staff-history-week-hours p {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.staff-history-week-hours span {
+  color: var(--navy);
+}
+
+@media (min-width: 420px) {
+  .staff-week-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }

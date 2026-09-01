@@ -5,23 +5,31 @@
   {% if compact %}
   <p class="staff-job-headline">{{ job.start_time }}</p>
   <p class="staff-job-customer">{{ job.customer_name }}</p>
+  <p class="staff-job-date"><span>Date</span> {{ job.date_display }}</p>
   <p class="staff-job-route">{{ job.pickup_label or "—" }} → {{ job.dropoff_label or "—" }}</p>
   <p class="staff-job-crew-line"><span>Crew</span> {{ job.crew }}</p>
   {% else %}
   <p class="staff-job-headline">{{ job.start_time }} — {{ job.customer_name }}</p>
   <p class="staff-job-date"><span>Date</span> {{ job.date_display }}</p>
-  <p class="staff-job-scheduled"><span>Scheduled</span> {{ job.start_time }}</p>
   <p class="staff-job-crew-line"><span>Crew</span> {{ job.crew }}</p>
   {% endif %}
 
-  <div class="staff-job-hours">
-    <p>
-      <span class="staff-job-hours-label">Estimated</span>
-      <span class="staff-job-hours-value">{{ job.estimated_duration }}</span>
-    </p>
-    <p>
-      <span class="staff-job-hours-label">Actual Worked</span>
-      <span class="staff-job-hours-value{% if not job.has_actual_worked %} staff-job-hours-unset{% endif %}">{{ job.actual_worked_display }}</span>
+  <div class="staff-job-hours-block">
+    <div class="staff-hours-scheduled">
+      <p class="staff-hours-kicker">Scheduled</p>
+      <p class="staff-hours-range">{{ job.scheduled_range_display }}</p>
+      <p class="staff-hours-value">Scheduled {{ job.scheduled_hours_display }}</p>
+    </div>
+    <div class="staff-hours-actual">
+      <p class="staff-hours-kicker">Actual</p>
+      <p class="staff-hours-value{% if not job.has_actual_hours %} staff-job-hours-unset{% endif %}">Actual {{ job.actual_hours_display }}</p>
+    </div>
+    {% if job.callout_hours_label %}
+    <p class="staff-hours-callout">Call Out: {{ job.callout_hours_label }}</p>
+    {% endif %}
+    <p class="staff-hours-paid">
+      <span>Paid Hours</span>
+      <strong>{{ job.paid_hours_display }}</strong>
     </p>
   </div>
 
@@ -38,8 +46,8 @@
     <details class="staff-actual-edit">
       <summary class="staff-job-btn staff-actual-edit-toggle">Edit Actual Time</summary>
       <form class="staff-actual-edit-form" method="post" action="{{ url_for('save_booking_actual_times', booking_id=job.id) }}">
-        <input type="hidden" name="staff" value="{{ portal.staff }}">
         <input type="hidden" name="range" value="{{ portal.range }}">
+        <input type="hidden" name="week" value="{{ portal.week_offset }}">
         <label>
           Actual Start
           <input type="time" name="actual_start_time" value="{{ job.actual_start_hm }}">

@@ -3,7 +3,7 @@
 import hmac
 import os
 from functools import wraps
-from typing import Any, Callable
+from typing import Any, Callable, Dict, Optional
 
 from flask import current_app, redirect, request, url_for
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
@@ -58,23 +58,54 @@ def _max_age_seconds() -> int:
         return 14 * 24 * 60 * 60
 
 
-def is_staff_logged_in() -> bool:
+def _staff_session_payload() -> Optional[Dict[str, Any]]:
     token = request.cookies.get(COOKIE_NAME, "")
     if not token:
-        return False
+        return None
     try:
         payload = _serializer().loads(token, max_age=_max_age_seconds())
     except (BadSignature, SignatureExpired, TypeError, ValueError):
-        return False
+        return None
     if not isinstance(payload, dict):
-        return False
-    return payload.get("portal") == "staff"
+        return None
+    if payload.get("portal") != "staff":
+        return None
+    return payload
 
 
-def attach_staff_session(response: Response) -> Response:
+def logged_in_staff_name() -> str:
+    """Crew name bound to the Staff Portal cookie. Empty when unidentified."""
+    payload = _staff_session_payload()
+    if not payload:
+        return ""
+    return str(payload.get("staff") or "").strip()
+
+
+def logged_in_staff_id() -> str:
+    payload = _staff_session_payload()
+    if not payload:
+        return ""
+    return str(payload.get("staff_id") or "").strip()
+
+
+def is_staff_logged_in() -> bool:
+    return bool(logged_in_staff_name())
+
+
+def attach_staff_session(
+    response: Response,
+    staff_name: str,
+    staff_id: Any = None,
+) -> Response:
     import config
 
-    token = _serializer().dumps({"portal": "staff"})
+    payload = {
+        "portal": "staff",
+        "staff": str(staff_name or "").strip(),
+    }
+    if staff_id not in (None, ""):
+        payload["staff_id"] = str(staff_id)
+    token = _serializer().dumps(payload)
     response.set_cookie(
         COOKIE_NAME,
         token,

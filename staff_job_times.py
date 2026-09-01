@@ -241,6 +241,90 @@ def parse_actual_times_from_form(form: Any) -> Tuple[str, str, Optional[int], Li
     return start, finish, duration, errors
 
 
+def format_hours_short(hours: Any) -> str:
+    """Display hours as 2hr / 2.5hr / 2.75hr. Empty when missing or invalid."""
+    if hours is None or hours == "":
+        return ""
+    try:
+        value = float(hours)
+    except (TypeError, ValueError):
+        return ""
+    if value < 0:
+        return ""
+    rounded = round(value, 2)
+    if abs(rounded - int(rounded)) < 1e-9:
+        text = str(int(rounded))
+    else:
+        text = "{0:.2f}".format(rounded).rstrip("0").rstrip(".")
+    return "{0}hr".format(text)
+
+
+def scheduled_hours(booking: Dict[str, Any]) -> Optional[float]:
+    """Planned hours from stored start/finish. Falls back to duration_hours only."""
+    from booking_times import duration_hours_from_times, parse_duration_hours
+
+    start = parse_actual_clock(
+        booking.get("owner_start_hm") or booking.get("start_time")
+    )
+    finish = parse_actual_clock(
+        booking.get("owner_finish_hm") or booking.get("finish_time")
+    )
+    hours = duration_hours_from_times(start, finish)
+    if hours is not None:
+        return hours
+    stored = parse_duration_hours(booking.get("duration_hours"))
+    if stored is not None:
+        return round(float(stored), 2)
+    return None
+
+
+def actual_hours(booking: Dict[str, Any]) -> Optional[float]:
+    """Recorded actual start/finish, else stored actual_duration minutes.
+
+    Does not use scheduled start/finish or duration_hours.
+    """
+    recorded = recorded_actual_minutes(booking)
+    if recorded is not None:
+        return round(recorded / 60.0, 2)
+    duration = parse_actual_duration_minutes(booking.get("actual_duration"))
+    if duration is not None:
+        return round(duration / 60.0, 2)
+    return None
+
+
+def callout_hours(booking: Dict[str, Any]) -> Optional[float]:
+    """Call-out hours from stored callout_fee / hourly_rate. No invoice change."""
+    try:
+        fee = float(booking.get("callout_fee") or 0)
+        rate = float(booking.get("hourly_rate") or 0)
+    except (TypeError, ValueError):
+        return None
+    if fee <= 0 or rate <= 0:
+        return None
+    hours = round(fee / rate, 2)
+    if hours <= 0:
+        return None
+    return hours
+
+
+def paid_hours(booking: Dict[str, Any]) -> Optional[float]:
+    """Actual Hours + Call Out. None when actual time is not recorded."""
+    actual = actual_hours(booking)
+    if actual is None:
+        return None
+    extra = callout_hours(booking) or 0.0
+    return round(actual + extra, 2)
+
+
+def hours_or_zero(value: Optional[float]) -> float:
+    if value is None:
+        return 0.0
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def job_time_state(booking: Dict[str, Any]) -> Dict[str, Any]:
     start_raw = str(booking.get("actual_start_time") or "").strip()
     finish_raw = str(booking.get("actual_finish_time") or "").strip()
