@@ -178,20 +178,40 @@ def test_negative_costs_rejected():
 def test_edit_and_view_show_job_costs_and_save():
     client = _login_client()
     booking_id, marker = _create_booking_a()
+    db.update_booking_profit_fields(
+        booking_id,
+        {
+            "staff_cost": 300.0,
+            "fuel_cost": 50.0,
+            "truck_cost": 100.0,
+            "parking_cost": 20.0,
+            "other_costs": 30.0,
+        },
+    )
     before = dict(db.get_booking(booking_id))
     edit_html = client.get("/bookings/{0}/edit".format(booking_id)).get_data(as_text=True)
-    assert "Job Costs" in edit_html
-    assert 'name="staff_cost"' in edit_html
-    assert 'name="fuel_cost"' in edit_html
-    assert 'name="truck_cost"' in edit_html
-    assert 'name="parking_cost"' in edit_html
-    assert 'name="other_costs"' in edit_html
-    assert "Total Job Cost" in edit_html
+    assert "Job Costs" not in edit_html
+    assert 'name="staff_cost"' not in edit_html
+    assert 'name="fuel_cost"' not in edit_html
+    assert 'name="truck_cost"' not in edit_html
+    assert 'name="parking_cost"' not in edit_html
+    assert 'name="other_costs"' not in edit_html
+    assert "Total Job Cost" not in edit_html
     assert "_profit_panel.html" not in (ROOT / "templates" / "edit_booking.html").read_text()
     assert "Profit calculation" not in edit_html
+    save_form = _edit_form(booking_id)
+    for key in (
+        "staff_cost",
+        "fuel_cost",
+        "truck_cost",
+        "parking_cost",
+        "other_costs",
+        "staff_cost_manual",
+    ):
+        save_form.pop(key, None)
     resp = client.post(
         "/bookings/{0}/edit".format(booking_id),
-        data=_edit_form(booking_id),
+        data=save_form,
         follow_redirects=False,
     )
     assert resp.status_code in (302, 303), resp.status_code
