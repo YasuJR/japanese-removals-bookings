@@ -34,7 +34,15 @@ def _login_client():
     return client
 
 
-def _create_booking(customer, move_date, start_time, finish_time, crew="Yasu"):
+def _create_booking(
+    customer,
+    move_date,
+    start_time,
+    finish_time,
+    crew="Yasu",
+    hourly_rate=0.0,
+    callout_fee=0.0,
+):
     return db.create_booking(
         customer,
         "0412000123",
@@ -49,6 +57,8 @@ def _create_booking(customer, move_date, start_time, finish_time, crew="Yasu"):
         duration_hours="4",
         status="Confirmed",
         crew=crew,
+        hourly_rate=hourly_rate,
+        callout_fee=callout_fee,
     )
 
 
@@ -146,6 +156,84 @@ def test_daily_jobs_page_shows_duration_beside_times():
     return True
 
 
+def test_callout_hours_from_fee_and_rate():
+    assert daily_jobs_data.callout_hours_from_booking(
+        {"callout_fee": 90, "hourly_rate": 180}
+    ) == 0.5
+    assert daily_jobs_data.callout_hours_from_booking(
+        {"callout_fee": 180, "hourly_rate": 180}
+    ) == 1
+    assert daily_jobs_data.callout_hours_from_booking(
+        {"callout_fee": 0, "hourly_rate": 180}
+    ) is None
+    assert daily_jobs_data.callout_hours_from_booking(
+        {"callout_fee": 90, "hourly_rate": 0}
+    ) is None
+    assert daily_jobs_data.format_callout_hours_label(0.5) == "+ 0.5hr call out"
+    assert daily_jobs_data.format_callout_hours_label(1) == "+ 1hr call out"
+    assert daily_jobs_data.format_callout_hours_label(None) == ""
+    assert daily_jobs_data.format_callout_hours_label(0) == ""
+    return True
+
+
+def test_daily_jobs_shows_callout_hours_and_total_paid_hours():
+    move_date = "2026-12-23"
+    _create_booking(
+        "Job One",
+        move_date,
+        "08:00",
+        "11:00",
+        hourly_rate=180.0,
+        callout_fee=90.0,
+    )
+    _create_booking(
+        "Job Two",
+        move_date,
+        "12:00",
+        "14:45",
+        hourly_rate=180.0,
+        callout_fee=90.0,
+    )
+
+    daily = daily_jobs_data.build_daily_jobs(move_date)
+    by_name = {job["customer_name"]: job for job in daily["jobs"]}
+    assert by_name["Job One"]["duration_label"] == "3hr"
+    assert by_name["Job One"]["callout_hours_label"] == "+ 0.5hr call out"
+    assert by_name["Job Two"]["duration_label"] == "2.75hr"
+    assert by_name["Job Two"]["callout_hours_label"] == "+ 0.5hr call out"
+    assert daily["summary"]["total_paid_hours"] == 6.75
+    assert daily["summary"]["total_paid_hours_label"] == "6.75hr"
+
+    zero_date = "2026-12-24"
+    _create_booking(
+        "Job Zero Callout",
+        zero_date,
+        "16:00",
+        "17:00",
+        hourly_rate=180.0,
+        callout_fee=0.0,
+    )
+    zero_daily = daily_jobs_data.build_daily_jobs(zero_date)
+    assert zero_daily["jobs"][0]["duration_label"] == "1hr"
+    assert zero_daily["jobs"][0]["callout_hours_label"] == ""
+    assert zero_daily["summary"]["total_paid_hours_label"] == "1hr"
+
+    client = _login_client()
+    html = client.get("/calendar/daily/{0}".format(move_date)).get_data(as_text=True)
+    assert "Total paid hours" in html
+    assert "6.75hr" in html
+    assert "+ 0.5hr call out" in html
+    assert 'class="daily-job-callout"' in html
+    assert html.count("+ 0.5hr call out") == 2
+    zero_html = client.get("/calendar/daily/{0}".format(zero_date)).get_data(as_text=True)
+    assert "+ 0.5hr call out" not in zero_html
+    css = (ROOT / "static" / "daily_jobs.css").read_text()
+    hours_block = css.split(".daily-job-hours {")[1][:300]
+    assert "flex-direction: column" in hours_block
+    assert "flex-end" in hours_block
+    return True
+
+
 def test_calendar_page_includes_daily_jobs_navigation():
     client = _login_client()
     html = client.get("/calendar?view=month&year=2026&month=12").get_data(as_text=True)
@@ -162,6 +250,8 @@ def main():
         test_daily_jobs_page_renders_cards_and_links,
         test_daily_jobs_duration_from_start_finish_times,
         test_daily_jobs_page_shows_duration_beside_times,
+        test_callout_hours_from_fee_and_rate,
+        test_daily_jobs_shows_callout_hours_and_total_paid_hours,
         test_calendar_page_includes_daily_jobs_navigation,
     ]
     passed = 0

@@ -22,6 +22,10 @@
       <strong class="daily-jobs-summary-value">{{ daily.summary.total_jobs }}</strong>
     </div>
     <div class="daily-jobs-summary-item">
+      <span class="daily-jobs-summary-label">Total paid hours</span>
+      <strong class="daily-jobs-summary-value">{{ daily.summary.total_paid_hours_label }}</strong>
+    </div>
+    <div class="daily-jobs-summary-item">
       <span class="daily-jobs-summary-label">Crew</span>
       <strong class="daily-jobs-summary-value">{{ daily.summary.crew_display }}</strong>
     </div>
@@ -45,8 +49,15 @@
         </div>
         <p class="daily-job-time">
           <span class="daily-job-time-range">{{ job.time_range }}</span>
-          {% if job.duration_label %}
-          <span class="daily-job-duration">{{ job.duration_label }}</span>
+          {% if job.duration_label or job.callout_hours_label %}
+          <span class="daily-job-hours">
+            {% if job.duration_label %}
+            <span class="daily-job-duration">{{ job.duration_label }}</span>
+            {% endif %}
+            {% if job.callout_hours_label %}
+            <span class="daily-job-callout">{{ job.callout_hours_label }}</span>
+            {% endif %}
+          </span>
           {% endif %}
         </p>
         <h2 class="daily-job-customer">{{ job.customer_name }}</h2>

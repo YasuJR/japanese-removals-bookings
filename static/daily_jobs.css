@@ -136,7 +136,7 @@
   margin: 0.28rem 0 0;
   display: flex;
   flex-wrap: nowrap;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.55rem;
   font-size: 1.22rem;
@@ -148,17 +148,37 @@
 }
 
 .daily-job-time-range,
-.daily-job-duration {
+.daily-job-duration,
+.daily-job-callout {
   white-space: nowrap;
 }
 
-.daily-job-duration {
+.daily-job-hours {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   flex-shrink: 0;
+  gap: 0.08rem;
+  text-align: right;
+  min-width: 4.5rem;
+}
+
+.daily-job-duration {
   font-size: 0.92rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--navy);
   opacity: 0.72;
+  line-height: 1.15;
+}
+
+.daily-job-callout {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--navy);
+  opacity: 0.55;
+  line-height: 1.2;
 }
 
 .daily-job-customer {
@@ -342,7 +362,7 @@
 
 @media (min-width: 640px) {
   .daily-jobs-summary {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     padding: 0.8rem 1rem;
   }
 

@@ -36,6 +36,29 @@ def format_job_duration_label(hours: Optional[float]) -> str:
     return "{0}hr".format(text)
 
 
+def callout_hours_from_booking(booking: Dict[str, Any]) -> Optional[float]:
+    """Payroll call-out hours from stored fee and hourly rate. No invoice change."""
+    try:
+        fee = float(booking.get("callout_fee") or 0)
+        rate = float(booking.get("hourly_rate") or 0)
+    except (TypeError, ValueError):
+        return None
+    if fee <= 0 or rate <= 0:
+        return None
+    hours = round(fee / rate, 2)
+    if hours <= 0:
+        return None
+    return hours
+
+
+def format_callout_hours_label(hours: Optional[float]) -> str:
+    """Display as '+ 0.5hr call out'. Empty when there is no call-out time."""
+    base = format_job_duration_label(hours)
+    if not base:
+        return ""
+    return "+ {0} call out".format(base)
+
+
 def _time_to_minutes(hm: str) -> int:
     parts = (hm or "08:00").split(":")
     try:
@@ -66,6 +89,8 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
     start_display = format_time_12h(start_hm)
     finish_display = format_time_12h(finish_hm)
     duration_hours = duration_hours_from_times(start_hm, finish_hm)
+    callout_hours = callout_hours_from_booking(row)
+    paid_hours = round((duration_hours or 0) + (callout_hours or 0), 2)
     crew_list = crew_from_storage(row.get("crew"))
     return {
         "id": int(row["id"]),
@@ -79,7 +104,11 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
         "crew_display": _crew_slash_display(row),
         "crew_list": crew_list,
         "time_range": "{0} – {1}".format(start_display, finish_display),
+        "duration_hours": duration_hours,
         "duration_label": format_job_duration_label(duration_hours),
+        "callout_hours": callout_hours,
+        "callout_hours_label": format_callout_hours_label(callout_hours),
+        "paid_hours": paid_hours,
         "start_display": start_display,
         "finish_display": finish_display,
         "start_minutes": _time_to_minutes(start_hm),
@@ -108,6 +137,8 @@ def build_daily_jobs(date_iso: str) -> Dict[str, Any]:
         earliest = min(jobs, key=lambda job: job["start_minutes"])
         latest = max(jobs, key=lambda job: job["finish_minutes"])
 
+    total_paid_hours = round(sum(float(job.get("paid_hours") or 0) for job in jobs), 2)
+
     return {
         "date_iso": date_iso,
         "date_heading": _date_heading(date_iso),
@@ -118,5 +149,8 @@ def build_daily_jobs(date_iso: str) -> Dict[str, Any]:
             "crew_display": " / ".join(sorted(crews)) if crews else "—",
             "earliest_start": earliest["start_display"] if earliest else "—",
             "latest_finish": latest["finish_display"] if latest else "—",
+            "total_paid_hours": total_paid_hours,
+            "total_paid_hours_label": format_job_duration_label(total_paid_hours)
+            or "0hr",
         },
     }
