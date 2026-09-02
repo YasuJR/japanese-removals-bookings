@@ -245,38 +245,6 @@
   </ul>
   {% endif %}
 
-  {% if booking.on_route_at or booking.status == 'On Route' or booking.eta_sms_sent_at or booking.eta_minutes %}
-  <ul class="linked-meta phase10-automation-status">
-    <li>
-      On Route:
-      {% if booking.on_route_at or booking.status == 'On Route' %}
-      <span class="automation-status automation-status-success">Yes</span>
-      {% if booking.on_route_at %} · departed {{ booking.on_route_at[:16] }}{% endif %}
-      {% else %}
-      <span class="automation-status automation-status-partial">Not yet</span>
-      {% endif %}
-    </li>
-    <li>
-      ETA SMS sent:
-      {% if booking.eta_sms_sent_at %}
-      <span class="automation-status automation-status-sent">Yes</span>
-      · {{ booking.eta_sms_sent_at[:16] }}
-      {% else %}
-      <span class="automation-status automation-status-partial">Not yet</span>
-      {% endif %}
-    </li>
-    <li>
-      ETA minutes:
-      {% if booking.eta_minutes %}
-      <strong>{{ booking.eta_minutes }}</strong>
-      {% if booking.driver_name %} · {{ booking.driver_name }}{% endif %}
-      {% else %}
-      <span class="muted">—</span>
-      {% endif %}
-    </li>
-  </ul>
-  {% endif %}
-
   {% if payment_reminder_badges or booking.payment_reminder_1_sent_at or booking.payment_reminder_2_sent_at or booking.payment_reminder_3_sent_at or booking.payment_reminders_cancelled_at %}
   <ul class="linked-meta phase16-automation-status">
     {% for badge in payment_reminder_badges %}
@@ -289,59 +257,6 @@
     <li class="muted">No payment reminders sent yet.</li>
     {% endif %}
   </ul>
-  {% endif %}
-
-  {% if can_start_on_route and booking.status != 'Cancelled' and booking.status != 'Paid' %}
-  <div class="on-route-panel">
-    <h3 class="on-route-heading">Driver on route</h3>
-    <p class="muted form-hint">Sets status to <strong>On Route</strong>, saves departure time, estimates ETA via Google Maps when configured, and sends the customer an ETA SMS once.</p>
-    <form method="post" class="on-route-form">
-      <input type="hidden" name="action" value="start_on_route">
-      <div class="form-grid on-route-fields">
-        <label>
-          Driver name
-          <input type="text" name="driver_name" value="{{ booking.driver_name or default_driver_name }}" maxlength="80">
-        </label>
-        <label>
-          Manual ETA (minutes)
-          <input type="number" name="manual_eta_minutes" min="1" max="600" step="1"
-            value="{{ booking.eta_minutes or '' }}" placeholder="Auto from Google Maps">
-        </label>
-        <label>
-          Driver origin (optional)
-          <input type="text" name="driver_origin" value="" placeholder="Leave blank for default depot">
-        </label>
-      </div>
-      <div class="form-actions on-route-actions">
-        <button type="submit" class="btn-primary btn-sm"
-          {% if not status.sms_configured %}disabled title="Configure Twilio in .env"{% endif %}>
-          On Route
-        </button>
-      </div>
-    </form>
-    {% if booking.on_route_at or booking.eta_sms_sent_at %}
-    <form method="post" class="on-route-form on-route-resend-form">
-      <input type="hidden" name="action" value="resend_eta_sms">
-      <div class="form-grid on-route-fields">
-        <label>
-          Driver name
-          <input type="text" name="driver_name" value="{{ booking.driver_name or default_driver_name }}" maxlength="80">
-        </label>
-        <label>
-          ETA (minutes)
-          <input type="number" name="manual_eta_minutes" min="1" max="600" step="1"
-            value="{{ booking.eta_minutes or '' }}" required>
-        </label>
-      </div>
-      <div class="form-actions on-route-actions">
-        <button type="submit" class="btn-secondary btn-sm"
-          {% if not status.sms_configured %}disabled title="Configure Twilio in .env"{% endif %}>
-          Send ETA SMS Again
-        </button>
-      </div>
-    </form>
-    {% endif %}
-  </div>
   {% endif %}
 
   {% if booking.status == 'Completed' or booking.completed_at or booking.review_request_scheduled_at or booking.review_request_sent_at or booking.review_request_cancelled_at %}

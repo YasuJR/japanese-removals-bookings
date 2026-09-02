@@ -66,6 +66,18 @@ def test_profit_panel_removed_from_edit_template():
     return True
 
 
+def test_driver_on_route_removed_from_edit_template():
+    text = (ROOT / "templates" / "edit_booking.html").read_text()
+    assert "Driver on route" not in text
+    assert "on-route-panel" not in text
+    assert 'name="driver_name"' not in text
+    assert 'name="driver_origin"' not in text
+    assert 'name="manual_eta_minutes"' not in text
+    assert 'value="start_on_route"' not in text
+    assert "phase10-automation-status" not in text
+    return True
+
+
 def test_calendar_loads_bookings():
     db.init_db()
     booking_id = db.create_booking(
@@ -103,6 +115,7 @@ def main():
         test_send_enabled_with_phone_only,
         test_send_disabled_without_contact,
         test_profit_panel_removed_from_edit_template,
+        test_driver_on_route_removed_from_edit_template,
         test_calendar_loads_bookings,
         test_calendar_navigation_fields,
     ]
