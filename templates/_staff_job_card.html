@@ -48,6 +48,9 @@
       <form class="staff-actual-edit-form" method="post" action="{{ url_for('save_booking_actual_times', booking_id=job.id) }}">
         <input type="hidden" name="range" value="{{ portal.range }}">
         <input type="hidden" name="week" value="{{ portal.week_offset }}">
+        {% if portal.calendar_year %}<input type="hidden" name="year" value="{{ portal.calendar_year }}">{% endif %}
+        {% if portal.calendar_month %}<input type="hidden" name="month" value="{{ portal.calendar_month }}">{% endif %}
+        {% if portal.calendar_day %}<input type="hidden" name="day" value="{{ portal.calendar_day }}">{% endif %}
         <label>
           Actual Start
           <input type="time" name="actual_start_time" value="{{ job.actual_start_hm }}">

@@ -1,9 +1,5 @@
 /* Staff Portal — mobile-first job cards. Separate from admin screens. */
 
-.staff-portal-page {
-  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
-}
-
 .login-page select {
   min-height: 48px;
   width: 100%;
@@ -18,6 +14,12 @@
 
 .staff-portal-header {
   align-items: center;
+}
+
+.staff-portal-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
 }
 
 .staff-portal-logout {
@@ -61,12 +63,6 @@
   border: 1px solid var(--border);
   background: #fff;
   color: var(--navy);
-}
-
-.staff-portal-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.45rem;
 }
 
 .staff-portal-tab {
@@ -761,6 +757,135 @@ a.staff-job-btn:active {
 
 .staff-history-week-hours span {
   color: var(--navy);
+}
+
+.staff-cal-nav {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.45rem;
+  margin: 0 0 0.85rem;
+}
+
+.staff-cal-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.5rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  text-decoration: none;
+  text-align: center;
+  color: var(--navy);
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+.staff-cal-nav-btn.active {
+  color: #fff;
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+.staff-cal-month {
+  margin: 0 0 1rem;
+}
+
+.staff-cal-month-label {
+  margin: 0 0 0.65rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--navy);
+  text-align: center;
+}
+
+.staff-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.staff-cal-weekday {
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0.2rem 0;
+}
+
+.staff-cal-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.1rem 0.35rem;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--navy);
+  background: var(--cream);
+  border: 1px solid transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.staff-cal-day-outside {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.staff-cal-day-today {
+  border-color: var(--navy);
+}
+
+.staff-cal-day-selected {
+  background: var(--navy);
+  color: #fff;
+}
+
+.staff-cal-day-has-jobs .staff-cal-day-dot {
+  display: block;
+}
+
+.staff-cal-day-num {
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.staff-cal-day-dot {
+  display: none;
+  width: 0.35rem;
+  height: 0.35rem;
+  margin-top: 0.15rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.staff-cal-day-selected .staff-cal-day-dot {
+  background: #fff;
+}
+
+.staff-cal-day-jobs {
+  margin-top: 0.5rem;
+}
+
+.staff-cal-day-heading {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+@media (min-width: 420px) {
+  .staff-cal-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (min-width: 420px) {

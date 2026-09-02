@@ -1908,14 +1908,20 @@ def staff_logout():
 def staff_portal():
     staff = staff_auth.logged_in_staff_name()
     staff_id = staff_auth.logged_in_staff_id()
-    range_key = request.args.get("range", "jobs").strip()
+    range_key = request.args.get("range", "today").strip()
     week_offset = request.args.get("week", "0").strip()
+    cal_year = request.args.get("year", "").strip() or None
+    cal_month = request.args.get("month", "").strip() or None
+    cal_day = request.args.get("day", "").strip() or None
     portal = build_staff_portal(
         staff,
         range_key,
         perth_today(),
         week_offset=week_offset,
         staff_id=staff_id,
+        calendar_year=cal_year,
+        calendar_month=cal_month,
+        calendar_day=cal_day,
     )
     if not portal["staff"]:
         response = redirect(url_for("staff_login"))
@@ -1929,9 +1935,19 @@ def staff_portal():
 
 
 def _staff_portal_redirect():
-    range_key = (request.form.get("range") or request.args.get("range") or "jobs").strip()
+    range_key = (request.form.get("range") or request.args.get("range") or "today").strip()
     week_offset = (request.form.get("week") or request.args.get("week") or "0").strip()
-    return redirect(url_for("staff_portal", range=range_key, week=week_offset))
+    params = {"range": range_key, "week": week_offset}
+    cal_year = (request.form.get("year") or request.args.get("year") or "").strip()
+    cal_month = (request.form.get("month") or request.args.get("month") or "").strip()
+    cal_day = (request.form.get("day") or request.args.get("day") or "").strip()
+    if cal_year:
+        params["year"] = cal_year
+    if cal_month:
+        params["month"] = cal_month
+    if cal_day:
+        params["day"] = cal_day
+    return redirect(url_for("staff_portal", **params))
 
 
 @app.route(

@@ -48,7 +48,72 @@
       <p class="staff-portal-summary">{{ portal.jobs_label }}</p>
     </section>
 
-    {% if portal.range == "week" %}
+    {% if portal.range == "today" %}
+    {% if portal.jobs %}
+    <div class="staff-job-list">
+      {% for job in portal.jobs %}
+      {% with compact=false %}
+      {% include "_staff_job_card.html" %}
+      {% endwith %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <section class="panel">
+      <p class="empty">No jobs today</p>
+    </section>
+    {% endif %}
+
+    {% elif portal.range == "calendar" and portal.calendar %}
+    <section class="staff-cal-nav" aria-label="Month navigation">
+      <a class="staff-cal-nav-btn" href="{{ url_for('staff_portal', range='calendar', year=portal.calendar.prev_year, month=portal.calendar.prev_month) }}">Previous Month</a>
+      <a class="staff-cal-nav-btn{% if portal.calendar.is_current_month %} active{% endif %}" href="{{ url_for('staff_portal', range='calendar') }}">This Month</a>
+      <a class="staff-cal-nav-btn" href="{{ url_for('staff_portal', range='calendar', year=portal.calendar.next_year, month=portal.calendar.next_month) }}">Next Month</a>
+    </section>
+
+    <section class="staff-cal-month" aria-label="{{ portal.calendar.month_label }}">
+      <p class="staff-cal-month-label">{{ portal.calendar.month_label }}</p>
+      <div class="staff-cal-grid" role="grid" aria-label="Calendar">
+        {% for label in portal.calendar.weekday_labels %}
+        <div class="staff-cal-weekday" role="columnheader">{{ label }}</div>
+        {% endfor %}
+        {% for cell in portal.calendar.cells %}
+        {% if cell.in_month %}
+        <a class="staff-cal-day{% if cell.is_today %} staff-cal-day-today{% endif %}{% if cell.selected %} staff-cal-day-selected{% endif %}{% if cell.has_jobs %} staff-cal-day-has-jobs{% endif %}"
+           role="gridcell"
+           href="{{ url_for('staff_portal', range='calendar', year=portal.calendar.year, month=portal.calendar.month, day=cell.date_iso) }}"
+           aria-label="{{ cell.day_num }}{% if cell.has_jobs %}, {{ cell.job_count }} job{% if cell.job_count != 1 %}s{% endif %}{% endif %}">
+          <span class="staff-cal-day-num">{{ cell.day_num }}</span>
+          {% if cell.has_jobs %}
+          <span class="staff-cal-day-dot" aria-hidden="true"></span>
+          {% endif %}
+        </a>
+        {% else %}
+        <div class="staff-cal-day staff-cal-day-outside" role="gridcell" aria-hidden="true">
+          <span class="staff-cal-day-num">{{ cell.day_num }}</span>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </section>
+
+    {% if portal.calendar.selected_date_iso %}
+    <section class="staff-cal-day-jobs" aria-label="Jobs on {{ portal.calendar.selected_date_display }}">
+      <h2 class="staff-cal-day-heading">{{ portal.calendar.selected_date_display }}</h2>
+      {% if portal.calendar.selected_jobs %}
+      <div class="staff-job-list">
+        {% for job in portal.calendar.selected_jobs %}
+        {% with compact=false %}
+        {% include "_staff_job_card.html" %}
+        {% endwith %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="staff-week-empty">No jobs on this day.</p>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {% elif portal.range == "week" %}
     <section class="staff-week-nav" aria-label="Week navigation">
       <a class="staff-week-nav-btn" href="{{ url_for('staff_portal', range='week', week=portal.prev_week_offset) }}">Previous Week</a>
       <a class="staff-week-nav-btn{% if portal.week_offset == 0 %} active{% endif %}" href="{{ url_for('staff_portal', range='week', week=0) }}">This Week</a>
@@ -59,8 +124,8 @@
       <p class="staff-weekly-week-label">{{ portal.weekly_worked.week_label }}</p>
       <div class="staff-weekly-summary">
         <div class="staff-weekly-summary-item">
-          <p class="staff-weekly-summary-label">Jobs</p>
-          <p class="staff-weekly-summary-value">{{ portal.weekly_worked.job_count }}</p>
+          <p class="staff-weekly-summary-label">Work Days</p>
+          <p class="staff-weekly-summary-value">{{ portal.weekly_worked.work_days }}</p>
         </div>
         <div class="staff-weekly-summary-item">
           <p class="staff-weekly-summary-label">Scheduled</p>
@@ -140,25 +205,6 @@
     </section>
     {% endif %}
 
-    {% elif portal.job_sections %}
-    <div class="staff-job-sections">
-      {% for section in portal.job_sections %}
-      <section class="staff-job-section staff-job-section-{{ section.key }}" aria-label="{{ section.title }} jobs">
-        <h2 class="staff-job-section-title">{{ section.title }}</h2>
-        {% if section.jobs %}
-        <div class="staff-job-list">
-          {% for job in section.jobs %}
-          {% with compact=false %}
-          {% include "_staff_job_card.html" %}
-          {% endwith %}
-          {% endfor %}
-        </div>
-        {% else %}
-        <p class="staff-week-empty">No {{ section.title|lower }} jobs.</p>
-        {% endif %}
-      </section>
-      {% endfor %}
-    </div>
     {% else %}
     <section class="panel">
       <p class="empty">No jobs for {{ portal.staff or "this staff member" }}.</p>
