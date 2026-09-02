@@ -94,6 +94,50 @@
   color: var(--muted);
 }
 
+.staff-today-summary {
+  margin: 0.85rem 0 0;
+  padding: 1.1rem 1rem 1rem;
+  background: var(--navy);
+  color: #fff;
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.staff-today-kicker {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.staff-today-jobs {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.staff-today-paid-label {
+  margin: 0.85rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.staff-today-paid-value {
+  margin: 0.25rem 0 0;
+  font-size: 2.35rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
 .staff-job-list {
   display: flex;
   flex-direction: column;

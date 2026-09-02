@@ -45,7 +45,16 @@
         {% endfor %}
       </nav>
 
+      {% if portal.range == "today" and portal.today_summary %}
+      <section class="staff-today-summary" aria-label="Today's summary">
+        <p class="staff-today-kicker">Today</p>
+        <p class="staff-today-jobs">{{ portal.today_summary.jobs_heading }}</p>
+        <p class="staff-today-paid-label">Total Paid Hours</p>
+        <p class="staff-today-paid-value">{{ portal.today_summary.paid_display }}</p>
+      </section>
+      {% else %}
       <p class="staff-portal-summary">{{ portal.jobs_label }}</p>
+      {% endif %}
     </section>
 
     {% if portal.range == "today" %}

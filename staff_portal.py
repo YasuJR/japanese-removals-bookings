@@ -447,6 +447,31 @@ def _hours_summary(jobs: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def _today_paid_summary(jobs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Sum Paid Hours for today's jobs where Actual Hours is recorded."""
+    paid_total = 0.0
+    counted = 0
+    for job in jobs:
+        paid = job.get("paid_hours")
+        if paid is None:
+            continue
+        paid_total += float(paid)
+        counted += 1
+    paid_total = round(paid_total, 2)
+    count = len(jobs)
+    return {
+        "job_count": count,
+        "paid_job_count": counted,
+        "paid_hours": paid_total,
+        "paid_display": staff_job_times.format_hours_short(paid_total) or "0hr",
+        "jobs_heading": (
+            "No jobs today"
+            if count == 0
+            else "{0} Job{1}".format(count, "" if count == 1 else "s").upper()
+        ),
+    }
+
+
 def _week_days(
     jobs: List[Dict[str, Any]], start_iso: str, end_iso: str, today: date
 ) -> List[Dict[str, Any]]:
@@ -657,10 +682,10 @@ def build_staff_portal(
 
     range_label = dict(RANGE_TABS).get(active_range, "Today")
     count = len(jobs)
+    today_summary = None
     if active_range == RANGE_TODAY:
-        jobs_label = (
-            "No jobs today" if count == 0 else "{0} Job{1} today".format(count, "" if count == 1 else "s")
-        )
+        today_summary = _today_paid_summary(jobs)
+        jobs_label = today_summary["jobs_heading"]
     elif active_range == RANGE_CALENDAR:
         jobs_label = _month_heading(cal_year, cal_month)
     elif active_range == RANGE_WEEK:
@@ -731,4 +756,5 @@ def build_staff_portal(
         "weekly_worked": weekly_worked,
         "summary": summary,
         "work_days": work_days,
+        "today_summary": today_summary,
     }

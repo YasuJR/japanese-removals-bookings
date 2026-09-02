@@ -377,6 +377,66 @@ def test_today_tab_shows_only_today_jobs():
     return True
 
 
+def test_today_total_paid_hours_sums_recorded_jobs_only():
+    from datetime import date as date_cls
+    from staff_portal import build_staff_portal
+
+    today = date_cls(2099, 3, 20) + timedelta(
+        days=(os.getpid() + int(time.time() * 1000)) % 3000
+    )
+    first = _unique("PaidOne")
+    second = _unique("PaidTwo")
+    pending = _unique("PendingToday")
+    first_id = _create_job(
+        first,
+        today.isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="11:00",
+        callout_fee=92.5,
+        hourly_rate=185,
+        status="Completed",
+    )
+    db.save_booking_actual_times(first_id, "08:00", "11:00", 180)
+    second_id = _create_job(
+        second,
+        today.isoformat(),
+        crew="Yasu",
+        start_time="12:00",
+        finish_time="15:30",
+        callout_fee=92.5,
+        hourly_rate=185,
+        status="Completed",
+    )
+    db.save_booking_actual_times(second_id, "12:00", "15:30", 210)
+    _create_job(pending, today.isoformat(), crew="Yasu", status="Confirmed")
+
+    portal = build_staff_portal("Yasu", "today", today)
+    assert portal["today_summary"]["job_count"] == 3
+    assert portal["today_summary"]["paid_job_count"] == 2
+    assert portal["today_summary"]["paid_display"] == "7.5hr"
+
+    real_today = perth_today().isoformat()
+    live = _unique("LivePaidOne")
+    live_id = _create_job(
+        live,
+        real_today,
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="11:30",
+        callout_fee=92.5,
+        hourly_rate=185,
+        status="Completed",
+    )
+    db.save_booking_actual_times(live_id, "08:00", "11:30", 210)
+    html = _staff_client("Yasu").get("/staff").get_data(as_text=True)
+    assert "staff-today-summary" in html
+    assert "Total Paid Hours" in html
+    assert "staff-today-paid-value" in html
+    assert live in html
+    return True
+
+
 def test_this_week_tab_includes_later_week_jobs():
     today = perth_today()
     later = _later_this_week(today)
@@ -1403,6 +1463,7 @@ def main():
         test_url_staff_param_cannot_view_other_staff_jobs,
         test_today_shows_all_assigned_jobs_including_completed,
         test_today_tab_shows_only_today_jobs,
+        test_today_total_paid_hours_sums_recorded_jobs_only,
         test_this_week_tab_includes_later_week_jobs,
         test_staff_portal_hides_financial_data_and_booking_admin_links,
         test_staff_portal_reflects_booking_updates,
