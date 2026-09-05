@@ -421,9 +421,9 @@ def _status_badge(booking: Dict[str, Any]) -> Tuple[str, bool]:
 
 def _job_hours_payload(row: Dict[str, Any], today: date) -> Dict[str, Any]:
     scheduled = staff_job_times.scheduled_hours(row)
-    actual = staff_job_times.actual_hours(row)
+    actual = staff_job_times.actual_hours(row, today)
     callout = staff_job_times.callout_hours(row)
-    paid = staff_job_times.paid_hours(row)
+    paid = staff_job_times.paid_hours(row, today)
     move = staff_job_times.booking_move_date(row)
     is_future = move is not None and move > today
     if actual is None:

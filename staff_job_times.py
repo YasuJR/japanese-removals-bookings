@@ -3,8 +3,10 @@
 Scheduled hours use start_time / finish_time, else duration_hours.
 Actual hours prefer actual_start_time / actual_finish_time / actual_duration.
 Completed / Invoiced / Paid jobs fall back to the saved booking start/finish
-or duration_hours when dedicated actual_* columns are empty. Quote schedules
-are never copied into Actual.
+or duration_hours when dedicated actual_* columns are empty. Issued invoices
+with confirmed labour times use the same start/finish (or billed duration when
+times are absent). Quote schedules on un-invoiced jobs are never copied into
+Actual.
 """
 
 import re
@@ -319,22 +321,45 @@ def _recorded_completed_hours(booking: Dict[str, Any]) -> Optional[float]:
     return _hours_from_duration_hours(booking)
 
 
-def actual_hours(booking: Dict[str, Any]) -> Optional[float]:
+def _invoice_confirmed_labour_hours(
+    booking: Dict[str, Any], today: Optional[date] = None
+) -> Optional[float]:
+    """Labour hours fixed on an issued invoice when actual_* columns are empty."""
+    from dashboard_data import perth_today
+    from outstanding_invoices_data import invoice_has_been_issued
+
+    if not invoice_has_been_issued(booking):
+        return None
+    move = booking_move_date(booking)
+    reference = today or perth_today()
+    if move is not None and move > reference:
+        return None
+    from_times = _hours_from_booking_start_finish(booking)
+    if from_times is not None:
+        return from_times
+    return _hours_from_duration_hours(booking)
+
+
+def actual_hours(
+    booking: Dict[str, Any], today: Optional[date] = None
+) -> Optional[float]:
     """Recorded work hours for Staff Portal Actual.
 
     Prefer actual_start_time / actual_finish_time, then actual_duration.
     For Completed / Invoiced / Paid jobs with those columns empty, use the
-    saved booking start/finish or duration_hours. Quote/Confirmed schedules
-    are never treated as Actual.
+    saved booking start/finish or duration_hours. When an invoice has been
+    issued and labour time is fixed on the booking, use that same source
+    even if job status is still Confirmed. Quote/Confirmed schedules without
+    an issued invoice are never treated as Actual.
     """
     if job_status.display(booking) == "Cancelled":
         return None
     dedicated = _dedicated_actual_hours(booking)
     if dedicated is not None:
         return dedicated
-    if job_status.display(booking) not in _COMPLETED_WORK_STATUSES:
-        return None
-    return _recorded_completed_hours(booking)
+    if job_status.display(booking) in _COMPLETED_WORK_STATUSES:
+        return _recorded_completed_hours(booking)
+    return _invoice_confirmed_labour_hours(booking, today)
 
 
 def callout_hours(booking: Dict[str, Any]) -> Optional[float]:
@@ -352,9 +377,11 @@ def callout_hours(booking: Dict[str, Any]) -> Optional[float]:
     return hours
 
 
-def paid_hours(booking: Dict[str, Any]) -> Optional[float]:
+def paid_hours(
+    booking: Dict[str, Any], today: Optional[date] = None
+) -> Optional[float]:
     """Actual Hours + Call Out. None when actual time is not recorded."""
-    actual = actual_hours(booking)
+    actual = actual_hours(booking, today)
     if actual is None:
         return None
     extra = callout_hours(booking) or 0.0

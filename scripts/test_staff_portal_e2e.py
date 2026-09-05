@@ -345,16 +345,20 @@ def test_today_shows_all_assigned_jobs_including_completed():
     ken_only = _unique("KenOnlyToday")
     tomorrow_live = _unique("LiveTomorrow")
     past_paid = _unique("PastPaid")
-    _create_job(first, today.isoformat(), crew="Yasu", start_time="08:00", status="Confirmed")
+    first_id = _create_job(first, today.isoformat(), crew="Yasu", start_time="08:00", status="Confirmed")
     completed_id = _create_job(
         second, today.isoformat(), crew="Yasu,Ken", start_time="15:00", status="Completed"
     )
-    _create_job(third, today.isoformat(), crew="Yasu", start_time="17:00", status="Confirmed")
+    third_id = _create_job(third, today.isoformat(), crew="Yasu", start_time="17:00", status="Confirmed")
     _create_job(cancelled, today.isoformat(), crew="Yasu", start_time="09:00", status="Cancelled")
     _create_job(ken_only, today.isoformat(), crew="Ken", start_time="10:00", status="Confirmed")
     _create_job(tomorrow_live, tomorrow.isoformat(), crew="Yasu", start_time="08:00", status="Confirmed")
     _create_job(past_paid, yesterday.isoformat(), crew="Yasu", start_time="09:00", status="Paid")
     db.save_booking_actual_times(completed_id, "15:10", "18:00", 170)
+    for booking_id in (first_id, third_id):
+        db.update_booking_invoice_fields(
+            booking_id, {"invoice_number": "", "invoice_status": ""}
+        )
 
     portal = build_staff_portal("Yasu", "today", today)
     names = [job["customer_name"] for job in portal["jobs"]]
@@ -455,7 +459,10 @@ def test_today_total_paid_hours_sums_recorded_jobs_only():
         status="Completed",
     )
     db.save_booking_actual_times(second_id, "12:00", "15:30", 210)
-    _create_job(pending, today.isoformat(), crew="Yasu", status="Confirmed")
+    pending_id = _create_job(pending, today.isoformat(), crew="Yasu", status="Confirmed")
+    db.update_booking_invoice_fields(
+        pending_id, {"invoice_number": "", "invoice_status": ""}
+    )
 
     portal = build_staff_portal("Yasu", "today", today)
     assert portal["today_summary"]["job_count"] == 3
@@ -1108,6 +1115,185 @@ def test_weekly_worked_format_examples():
             "hourly_rate": 185,
         }
     ) == 3.25
+    assert staff_job_times.actual_hours(
+        {
+            "status": "Confirmed",
+            "start_time": "13:15",
+            "finish_time": "17:30",
+            "invoice_number": "INV-99",
+            "invoice_status": "AUTHORISED",
+            "move_date": "2026-09-04",
+        }
+    ) == 4.25
+    assert staff_job_times.paid_hours(
+        {
+            "status": "Confirmed",
+            "start_time": "13:15",
+            "finish_time": "17:30",
+            "invoice_number": "INV-99",
+            "invoice_status": "AUTHORISED",
+            "move_date": "2026-09-04",
+            "callout_fee": 92.5,
+            "hourly_rate": 185,
+        }
+    ) == 4.75
+    return True
+
+
+def test_paid_hours_invoice_confirmed_when_status_still_confirmed():
+    """Case B/C — invoiced labour times count even when status is Confirmed."""
+    from staff_portal import build_staff_portal
+
+    monday = _isolated_monday()
+    andrew = _create_job(
+        _unique("AndrewCarroll"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="13:15",
+        finish_time="17:30",
+        duration_hours="4.25",
+        callout_fee=92.5,
+        hourly_rate=185,
+        status="Confirmed",
+    )
+    db.update_booking_invoice_fields(
+        andrew,
+        {
+            "invoice_number": "INV-{0}".format(andrew),
+            "invoice_status": "AUTHORISED",
+        },
+    )
+    christine = _create_job(
+        _unique("Christine"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="10:00",
+        finish_time="12:30",
+        duration_hours="2.5",
+        callout_fee=92.5,
+        hourly_rate=185,
+        status="Completed",
+    )
+
+    portal = build_staff_portal("Yasu", "week", monday)
+    by_name = {job["customer_name"]: job for job in portal["jobs"]}
+    andrew_job = [job for job in portal["jobs"] if job["id"] == andrew][0]
+    christine_job = [job for job in portal["jobs"] if job["id"] == christine][0]
+
+    assert andrew_job["actual_hours_display"] == "4.25hr"
+    assert andrew_job["paid_hours_display"] == "4.75hr"
+    assert christine_job["actual_hours_display"] == "2.5hr"
+    assert christine_job["paid_hours_display"] == "3hr"
+    assert portal["weekly_worked"]["paid_display"] == "7.75hr"
+    assert by_name[christine_job["customer_name"]]["paid_hours_display"] == "3hr"
+    return True
+
+
+def test_paid_hours_regression_cases():
+    """Cases A–G for Staff Portal paid hours rules."""
+    import staff_job_times
+    from staff_portal import build_staff_portal
+
+    monday = _isolated_monday()
+    wednesday = monday + timedelta(days=2)
+
+    case_a = _create_job(
+        _unique("CaseA"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="10:00",
+        finish_time="12:30",
+        callout_fee=92.5,
+        hourly_rate=185,
+        status="Completed",
+    )
+    db.save_booking_actual_times(case_a, "10:00", "12:30", 150)
+
+    case_b = _create_job(
+        _unique("CaseB"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="13:15",
+        finish_time="17:30",
+        duration_hours="4.25",
+        callout_fee=92.5,
+        hourly_rate=185,
+        status="Confirmed",
+    )
+    db.update_booking_invoice_fields(
+        case_b,
+        {"invoice_number": "INV-{0}".format(case_b), "invoice_status": "AUTHORISED"},
+    )
+
+    case_c = _create_job(
+        _unique("CaseC"),
+        (monday + timedelta(days=1)).isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="12:00",
+        duration_hours="4",
+        callout_fee=0,
+        hourly_rate=185,
+        status="Confirmed",
+    )
+    db.update_booking_invoice_fields(
+        case_c,
+        {"invoice_number": "INV-{0}".format(case_c), "invoice_status": "AUTHORISED"},
+    )
+
+    case_d = _create_job(
+        _unique("CaseD"),
+        (monday + timedelta(days=3)).isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="16:00",
+        duration_hours="8",
+        callout_fee=92.5,
+        hourly_rate=185,
+        status="Confirmed",
+    )
+    db.update_booking_invoice_fields(
+        case_d, {"invoice_number": "", "invoice_status": ""}
+    )
+
+    case_e = _create_job(
+        _unique("CaseE"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="",
+        finish_time="",
+        duration_hours="5",
+        callout_fee=92.5,
+        hourly_rate=185,
+        status="Confirmed",
+    )
+    db.update_booking_invoice_fields(
+        case_e, {"invoice_number": "", "invoice_status": ""}
+    )
+
+    portal = build_staff_portal("Yasu", "week", wednesday)
+    by_id = {job["id"]: job for job in portal["jobs"]}
+
+    assert by_id[case_a]["paid_hours_display"] == "3hr"
+    assert by_id[case_b]["actual_hours_display"] == "4.25hr"
+    assert by_id[case_b]["paid_hours_display"] == "4.75hr"
+    assert by_id[case_c]["actual_hours_display"] == "4hr"
+    assert by_id[case_c]["paid_hours_display"] == "4hr"
+    assert by_id[case_d]["actual_hours_display"] == "Not completed"
+    assert by_id[case_d]["paid_hours_display"] == "—"
+    assert by_id[case_e]["actual_hours_display"] == "—"
+    assert by_id[case_e]["paid_hours_display"] == "—"
+
+    monday_jobs = [job for job in portal["week_days"] if job["date_iso"] == monday.isoformat()][0]
+    assert monday_jobs["paid_display"] == "7.75hr"
+    assert portal["weekly_worked"]["paid_display"] == "11.75hr"
+
+    pdf = build_staff_weekly_pdf_schedule(_crew_id("Yasu"), 0, wednesday)
+    pdf_bytes = weekly_schedule_pdf.render_staff_weekly_schedule_pdf(pdf)
+    text = _pdf_plain_text(pdf_bytes)
+    assert "Daily Paid: 7.75hr" in text
+    assert "Weekly Paid Hours: 11.75hr" in text
+    assert staff_job_times.paid_hours(dict(db.get_booking(case_b)), wednesday) == 4.75
     return True
 
 
@@ -1686,6 +1872,8 @@ def main():
         test_staff_weekly_pdf_individual_one_page,
         test_staff_weekly_pdf_all_staff_one_page,
         test_staff_weekly_pdf_week_offset,
+        test_paid_hours_invoice_confirmed_when_status_still_confirmed,
+        test_paid_hours_regression_cases,
     ]
     passed = 0
     for test in tests:
