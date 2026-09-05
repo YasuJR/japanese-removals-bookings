@@ -45,7 +45,7 @@ from integrations import executive_config, review_config, sms_config, xero_confi
 from integrations import stripe as stripe_service
 from booking_helpers import apple_maps_url, mailto_href, sms_href, tel_href
 from driver_run_sheet_data import build_driver_run_sheet
-from staff_portal import STAFF_VIEW_ALL, build_staff_portal, portal_nav_params
+from staff_portal import STAFF_VIEW_ALL, build_staff_portal, build_staff_weekly_pdf_schedule, portal_nav_params
 import staff_auth
 import staff_job_times
 from outstanding_invoices_data import (
@@ -1936,6 +1936,35 @@ def staff_portal():
         staff_portal_open=staff_auth.staff_portal_open_access(),
         staff_logged_in=staff_auth.is_staff_logged_in(),
         can_edit_actual=auth.get_current_user_id() is not None,
+    )
+
+
+@app.route("/staff/weekly/schedule.pdf", endpoint="staff_portal_weekly_pdf")
+@staff_auth.staff_login_required
+def staff_portal_weekly_pdf():
+    if request.args.get("staff_id") is not None:
+        view_staff_id = request.args.get("staff_id", "").strip() or STAFF_VIEW_ALL
+    elif staff_auth.is_staff_logged_in():
+        view_staff_id = (
+            staff_auth.logged_in_staff_id()
+            or _crew_id_for_name(staff_auth.logged_in_staff_name())
+            or STAFF_VIEW_ALL
+        )
+    else:
+        view_staff_id = STAFF_VIEW_ALL
+    week_offset = request.args.get("week", "0").strip()
+    schedule = build_staff_weekly_pdf_schedule(
+        view_staff_id, week_offset, perth_today()
+    )
+    pdf_bytes = weekly_schedule_pdf.render_staff_weekly_schedule_pdf(schedule)
+    staff_key = schedule.get("staff_id_key") or STAFF_VIEW_ALL
+    filename = "staff-weekly-{0}-{1}.pdf".format(staff_key, schedule.get("week_start"))
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": "attachment; filename={0}".format(filename)
+        },
     )
 
 

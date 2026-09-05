@@ -2,6 +2,7 @@
 """E2E tests — Staff Portal at /staff."""
 
 import os
+import re
 import sys
 import time
 from datetime import timedelta
@@ -22,6 +23,8 @@ import database as db
 import staff_auth
 from app import app
 from dashboard_data import perth_today, week_range
+from integrations import weekly_schedule_pdf
+from staff_portal import build_staff_weekly_pdf_schedule
 
 DESKTOP_PRIMARY = [
     "Home",
@@ -204,6 +207,26 @@ def _crew_id(name):
         if str(row.get("name") or "").strip() == name:
             return row["id"]
     return None
+
+
+def _pdf_page_count(pdf_bytes: bytes) -> int:
+    return len(re.findall(rb"/Type\s*/Page[^s]", pdf_bytes))
+
+
+def _pdf_plain_text(pdf_bytes: bytes) -> str:
+    import pymupdf
+
+    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    return "\n".join(page.get_text() for page in doc)
+
+
+def _pdf_mediabox(pdf_bytes: bytes):
+    match = re.search(
+        rb"/MediaBox\s*\[\s*([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)\s*\]",
+        pdf_bytes,
+    )
+    assert match, "MediaBox missing from PDF"
+    return tuple(float(match.group(i)) for i in range(1, 5))
 
 
 def test_staff_open_access_without_login():
@@ -1520,6 +1543,110 @@ def test_owner_can_edit_and_clear_actual_times_from_staff_portal():
     return True
 
 
+def test_staff_weekly_pdf_button_on_week_tab():
+    client = app.test_client()
+    html = client.get("/staff?range=week").get_data(as_text=True)
+    assert "Download Weekly PDF" in html
+    assert "/staff/weekly/schedule.pdf" in html
+    assert "week=" in html
+    return True
+
+
+def test_staff_weekly_pdf_individual_one_page():
+    monday = _isolated_monday()
+    wednesday = monday + timedelta(days=2)
+    customer = _unique("PdfYasuJob")
+    _create_job(
+        customer,
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="12:00",
+        status="Completed",
+    )
+    yasu_id = _crew_id("Yasu")
+    assert yasu_id is not None
+    schedule = build_staff_weekly_pdf_schedule(yasu_id, 0, wednesday)
+    pdf_bytes = weekly_schedule_pdf.render_staff_weekly_schedule_pdf(schedule)
+    assert _pdf_page_count(pdf_bytes) == 1
+    width, height = _pdf_mediabox(pdf_bytes)[2], _pdf_mediabox(pdf_bytes)[3]
+    assert width > height
+    text = _pdf_plain_text(pdf_bytes)
+    assert "WEEKLY STAFF SCHEDULE" in text
+    assert "Staff: Yasu" in text
+    assert customer in text
+    assert "Daily Paid:" in text
+    assert "Weekly Paid Hours:" in text
+    assert "NO JOBS" in text
+    assert "Ph:" not in text
+    assert "Movers:" not in text
+
+    client = app.test_client()
+    response = client.get(
+        "/staff/weekly/schedule.pdf?staff_id={0}&week=0".format(yasu_id)
+    )
+    assert response.status_code == 200
+    assert response.mimetype == "application/pdf"
+    assert _pdf_page_count(response.data) == 1
+    return True
+
+
+def test_staff_weekly_pdf_all_staff_one_page():
+    monday = _isolated_monday()
+    wednesday = monday + timedelta(days=2)
+    shared = _unique("PdfAllShared")
+    _create_job(
+        shared,
+        monday.isoformat(),
+        crew="Yasu,Ken",
+        start_time="08:00",
+        finish_time="11:00",
+        status="Completed",
+    )
+    schedule = build_staff_weekly_pdf_schedule("all", 0, wednesday)
+    pdf_bytes = weekly_schedule_pdf.render_staff_weekly_schedule_pdf(schedule)
+    assert _pdf_page_count(pdf_bytes) == 1
+    text = _pdf_plain_text(pdf_bytes)
+    assert "WEEKLY STAFF SCHEDULE" in text
+    assert shared in text
+    assert "Yasu" in text
+    assert "Ken" in text
+    assert "Weekly Paid Hours:" in text
+    assert "Yasu:" in text
+    assert "Ken:" in text
+
+    response = app.test_client().get(
+        "/staff/weekly/schedule.pdf?staff_id=all&week=0"
+    )
+    assert response.status_code == 200
+    assert _pdf_page_count(response.data) == 1
+    return True
+
+
+def test_staff_weekly_pdf_week_offset():
+    monday = _isolated_monday()
+    next_monday = monday + timedelta(days=7)
+    customer = _unique("PdfNextWeek")
+    _create_job(
+        customer,
+        next_monday.isoformat(),
+        crew="Yasu",
+        start_time="09:00",
+        finish_time="13:00",
+    )
+    yasu_id = _crew_id("Yasu")
+    this_week = build_staff_weekly_pdf_schedule(yasu_id, 0, monday + timedelta(days=1))
+    next_week = build_staff_weekly_pdf_schedule(yasu_id, 1, monday + timedelta(days=1))
+    assert this_week["week_start"] != next_week["week_start"]
+    assert next_week["week_start"] == next_monday.isoformat()
+    pdf_bytes = weekly_schedule_pdf.render_staff_weekly_schedule_pdf(next_week)
+    assert customer in _pdf_plain_text(pdf_bytes)
+    assert customer not in _pdf_plain_text(
+        weekly_schedule_pdf.render_staff_weekly_schedule_pdf(this_week)
+    )
+    return True
+
+
 def main():
     tests = [
         test_staff_open_access_without_login,
@@ -1555,6 +1682,10 @@ def main():
         test_calendar_shows_only_staff_jobs_and_day_detail,
         test_week_navigation_changes_week,
         test_owner_can_edit_and_clear_actual_times_from_staff_portal,
+        test_staff_weekly_pdf_button_on_week_tab,
+        test_staff_weekly_pdf_individual_one_page,
+        test_staff_weekly_pdf_all_staff_one_page,
+        test_staff_weekly_pdf_week_offset,
     ]
     passed = 0
     for test in tests:

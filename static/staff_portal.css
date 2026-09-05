@@ -743,6 +743,31 @@ a.staff-job-btn:active {
   border-color: var(--navy);
 }
 
+.staff-week-download {
+  margin: 0 0 1rem;
+}
+
+.staff-week-pdf-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.55rem 0.85rem;
+  border-radius: 12px;
+  font-size: 0.98rem;
+  font-weight: 800;
+  text-decoration: none;
+  text-align: center;
+  color: #fff;
+  background: var(--navy);
+  border: 1px solid var(--navy);
+}
+
+.staff-week-pdf-btn:hover {
+  background: #16304d;
+  border-color: #16304d;
+}
+
 .staff-weekly-week-label {
   margin: 0 0 0.85rem;
   font-size: 0.92rem;

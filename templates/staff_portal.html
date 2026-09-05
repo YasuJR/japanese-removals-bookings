@@ -172,6 +172,9 @@
       <a class="staff-week-nav-btn{% if portal.week_offset == 0 %} active{% endif %}" href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='week', week=0) }}">This Week</a>
       <a class="staff-week-nav-btn" href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='week', week=portal.next_week_offset) }}">Next Week</a>
     </section>
+    <section class="staff-week-download" aria-label="Weekly PDF download">
+      <a class="staff-week-pdf-btn" href="{{ url_for('staff_portal_weekly_pdf', staff_id=portal.selected_staff_id, week=portal.week_offset) }}">Download Weekly PDF</a>
+    </section>
 
     {% if portal.is_all_staff and portal.all_staff_week %}
     <section class="staff-all-week-total" aria-label="All staff weekly paid hours">
