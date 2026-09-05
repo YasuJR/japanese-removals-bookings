@@ -1,11 +1,12 @@
-"""Staff Portal — one crew member's jobs, weekly hours, and history.
+"""Staff Portal — crew schedules, weekly hours, and job history.
 
 Reads the existing bookings table only. Serializes operational fields and
 never copies pricing, invoice, cost, or profit data into the page payload.
-Staff identity comes from the login session, not URL parameters.
+Staff view is selected via staff_id query parameter (or session when login is on).
 """
 
 from calendar import monthrange
+from collections import defaultdict
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 import re
@@ -28,6 +29,7 @@ RANGE_TODAY = "today"
 RANGE_CALENDAR = "calendar"
 RANGE_WEEK = "week"
 RANGE_HISTORY = "history"
+STAFF_VIEW_ALL = "all"
 
 RANGE_TABS: List[Tuple[str, str]] = [
     (RANGE_TODAY, "Today"),
@@ -42,6 +44,92 @@ HISTORY_LOOKBACK_DAYS = 400
 MAX_WEEK_OFFSET_PAST = 104
 MAX_WEEK_OFFSET_FUTURE = 12
 MAX_CALENDAR_MONTH_OFFSET = 24
+
+
+def normalize_staff_view(value: Any) -> Any:
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if text in ("all", "everyone"):
+        return STAFF_VIEW_ALL
+    if not text:
+        return None
+    try:
+        return int(text)
+    except (TypeError, ValueError):
+        return None
+
+
+def _staff_roster() -> List[Dict[str, Any]]:
+    roster: List[Dict[str, Any]] = []
+    for member in db.list_crew_members(active_only=True):
+        try:
+            roster.append(
+                {
+                    "id": int(member.get("id") or 0),
+                    "name": str(member.get("name") or "").strip(),
+                    "active": int(member.get("active") or 0),
+                }
+            )
+        except (TypeError, ValueError):
+            continue
+    roster = [row for row in roster if row["id"] and row["name"]]
+    if roster:
+        return roster
+    return [
+        {"id": 0, "name": name, "active": 1}
+        for name in (_crew_options() or CREW_OPTIONS)
+    ]
+
+
+def resolve_portal_staff(
+    view_staff_id: Any,
+    session_staff_name: str = "",
+    session_staff_id: Any = None,
+) -> Tuple[str, Any, bool]:
+    """Return (staff_name, selected_staff_id, is_all_staff)."""
+    roster = _staff_roster()
+    view = normalize_staff_view(view_staff_id)
+    if view == STAFF_VIEW_ALL:
+        return "", STAFF_VIEW_ALL, True
+    if view is not None:
+        staff = resolve_staff_id(view)
+        if staff:
+            return staff, int(view), False
+
+    session_name = resolve_staff_name(session_staff_name)
+    if session_name:
+        for member in roster:
+            if member["name"] == session_name:
+                return session_name, member["id"], False
+        return session_name, session_staff_id, False
+
+    if roster:
+        return roster[0]["name"], roster[0]["id"], False
+    return "", STAFF_VIEW_ALL, True
+
+
+def portal_nav_params(
+    *,
+    staff_id: Any,
+    range_key: str,
+    week_offset: int = 0,
+    calendar_year: Any = None,
+    calendar_month: Any = None,
+    calendar_day: Any = None,
+) -> Dict[str, Any]:
+    params: Dict[str, Any] = {
+        "staff_id": staff_id if staff_id is not None else STAFF_VIEW_ALL,
+        "range": range_key,
+        "week": week_offset,
+    }
+    if calendar_year:
+        params["year"] = calendar_year
+    if calendar_month:
+        params["month"] = calendar_month
+    if calendar_day:
+        params["day"] = calendar_day
+    return params
 
 
 def normalize_range(value: Any) -> str:
@@ -402,6 +490,7 @@ def _serialize_job(booking: Dict[str, Any], today: date) -> Dict[str, Any]:
         "dropoff_address": dropoff,
         "dropoff_label": dropoff_label or dropoff,
         "crew": _crew_slash_display(row),
+        "crew_names": crew_from_storage(row.get("crew")),
         "estimated_duration": estimated_duration,
         "estimated_minutes": estimated_minutes,
         "actual_worked_display": hours["actual_hours_display"],
@@ -444,6 +533,23 @@ def _hours_summary(jobs: List[Dict[str, Any]]) -> Dict[str, Any]:
         "callout_display": staff_job_times.format_hours_short(callout) or "0hr",
         "paid_hours": paid,
         "paid_display": staff_job_times.format_hours_short(paid) or "0hr",
+    }
+
+
+def _paid_hours_summary(jobs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    paid_total = 0.0
+    counted = 0
+    for job in jobs:
+        paid = job.get("paid_hours")
+        if paid is None:
+            continue
+        paid_total += float(paid)
+        counted += 1
+    paid_total = round(paid_total, 2)
+    return {
+        "paid_hours": paid_total,
+        "paid_display": staff_job_times.format_hours_short(paid_total) or "0hr",
+        "paid_job_count": counted,
     }
 
 
@@ -498,21 +604,24 @@ def _week_days(
     while current <= end:
         iso = current.isoformat()
         day_jobs = by_date.get(iso, [])
-        summary = _hours_summary(day_jobs)
+        hours = _hours_summary(day_jobs)
+        paid_summary = _paid_hours_summary(day_jobs)
         days.append(
             {
                 "date_iso": iso,
                 "heading": weekdays[current.weekday()],
                 "date_display": _date_display(iso),
+                "date_heading": _date_display(iso),
                 "is_today": iso == today_iso,
                 "jobs": day_jobs,
-                "job_count": summary["job_count"],
-                "scheduled_display": summary["scheduled_display"],
-                "actual_display": summary["actual_display"],
-                "callout_display": summary["callout_display"],
-                "paid_display": summary["paid_display"],
-                "worked_minutes": int(round(summary["paid_hours"] * 60)),
-                "worked_display": summary["paid_display"],
+                "job_count": hours["job_count"],
+                "scheduled_display": hours["scheduled_display"],
+                "actual_display": hours["actual_display"],
+                "callout_display": hours["callout_display"],
+                "paid_display": paid_summary["paid_display"],
+                "paid_hours": paid_summary["paid_hours"],
+                "worked_minutes": int(round(paid_summary["paid_hours"] * 60)),
+                "worked_display": paid_summary["paid_display"],
             }
         )
         current += timedelta(days=1)
@@ -574,6 +683,137 @@ def _staff_assigned(booking: Dict[str, Any], staff: str) -> bool:
     if not staff:
         return False
     return staff in crew_from_storage(booking.get("crew"))
+
+
+def _load_all_rows(start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
+    if not start_iso or not end_iso:
+        return []
+    rows = [dict(row) for row in db.list_between_dates(start_iso, end_iso)]
+    matched: List[Dict[str, Any]] = []
+    for row in rows:
+        if _should_hide_status(row):
+            continue
+        move_iso = _booking_date_iso(row)
+        if move_iso and start_iso <= move_iso <= end_iso:
+            matched.append(row)
+    return matched
+
+
+def _jobs_for_staff_name(
+    jobs: List[Dict[str, Any]], staff_name: str
+) -> List[Dict[str, Any]]:
+    if not staff_name:
+        return []
+    matched = [
+        job
+        for job in jobs
+        if staff_name in (job.get("crew_names") or [])
+    ]
+    matched.sort(
+        key=lambda job: (
+            job.get("start_hm") or "",
+            job.get("customer_name") or "",
+        )
+    )
+    return matched
+
+
+def _build_today_by_staff(
+    jobs: List[Dict[str, Any]], roster: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    blocks: List[Dict[str, Any]] = []
+    for member in roster:
+        member_jobs = _jobs_for_staff_name(jobs, member["name"])
+        paid_summary = _today_paid_summary(member_jobs)
+        blocks.append(
+            {
+                "staff_id": member["id"],
+                "staff": member["name"],
+                "jobs": member_jobs,
+                "job_count": len(member_jobs),
+                "paid_display": paid_summary["paid_display"],
+            }
+        )
+    return blocks
+
+
+def _build_all_staff_week(
+    jobs: List[Dict[str, Any]],
+    start_iso: str,
+    end_iso: str,
+    today: date,
+    roster: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    by_date: Dict[str, Dict[str, List[Dict[str, Any]]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
+    for job in jobs:
+        iso = job.get("date_iso") or ""
+        for member in roster:
+            if member["name"] in (job.get("crew_names") or []):
+                by_date[iso][member["name"]].append(job)
+    try:
+        start = date.fromisoformat(start_iso)
+        end = date.fromisoformat(end_iso)
+    except ValueError:
+        return {"days": [], "week_label": "", "week_paid_display": "0hr"}
+
+    weekdays = (
+        "MONDAY",
+        "TUESDAY",
+        "WEDNESDAY",
+        "THURSDAY",
+        "FRIDAY",
+        "SATURDAY",
+        "SUNDAY",
+    )
+    days: List[Dict[str, Any]] = []
+    week_paid_total = 0.0
+    current = start
+    today_iso = today.isoformat()
+    while current <= end:
+        iso = current.isoformat()
+        staff_blocks: List[Dict[str, Any]] = []
+        for member in roster:
+            member_jobs = sorted(
+                by_date.get(iso, {}).get(member["name"], []),
+                key=lambda job: (
+                    job.get("start_hm") or "",
+                    job.get("customer_name") or "",
+                ),
+            )
+            paid_summary = _paid_hours_summary(member_jobs)
+            week_paid_total += paid_summary["paid_hours"]
+            staff_blocks.append(
+                {
+                    "staff_id": member["id"],
+                    "staff": member["name"],
+                    "jobs": member_jobs,
+                    "job_count": len(member_jobs),
+                    "paid_display": paid_summary["paid_display"],
+                }
+            )
+        days.append(
+            {
+                "date_iso": iso,
+                "heading": weekdays[current.weekday()],
+                "date_display": _date_display(iso),
+                "is_today": iso == today_iso,
+                "staff_blocks": staff_blocks,
+                "has_jobs": any(block["job_count"] for block in staff_blocks),
+            }
+        )
+        current += timedelta(days=1)
+    week_paid_total = round(week_paid_total, 2)
+    return {
+        "week_label": _week_label(start_iso, end_iso),
+        "week_start": start_iso,
+        "week_end": end_iso,
+        "days": days,
+        "week_paid_display": staff_job_times.format_hours_short(week_paid_total)
+        or "0hr",
+        "week_paid_hours": week_paid_total,
+    }
 
 
 def _load_rows(staff: str, start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
@@ -645,12 +885,17 @@ def build_staff_portal(
     calendar_year: Any = None,
     calendar_month: Any = None,
     calendar_day: Any = None,
+    view_staff_id: Any = None,
 ) -> Dict[str, Any]:
     if today is None:
         today = perth_today()
 
-    crew_names = _crew_options()
-    staff = bound_staff_identity(staff_name, staff_id)
+    roster = _staff_roster()
+    staff, selected_staff_id, is_all_staff = resolve_portal_staff(
+        view_staff_id,
+        staff_name,
+        staff_id,
+    )
     active_range = normalize_range(range_key)
     offset = normalize_week_offset(week_offset)
     cal_year, cal_month = normalize_calendar_month(calendar_year, calendar_month, today)
@@ -659,10 +904,16 @@ def build_staff_portal(
         active_range, today, offset, cal_year, cal_month
     )
 
+    if is_all_staff:
+        bookings = _load_all_rows(start_iso, end_iso)
+    elif staff:
+        bookings = _load_rows(staff, start_iso, end_iso)
+    else:
+        bookings = []
+
     jobs: List[Dict[str, Any]] = []
-    if staff:
-        for booking in _load_rows(staff, start_iso, end_iso):
-            jobs.append(_serialize_job(booking, today))
+    for booking in bookings:
+        jobs.append(_serialize_job(booking, today))
 
     if active_range == RANGE_TODAY:
         jobs.sort(
@@ -683,59 +934,91 @@ def build_staff_portal(
     range_label = dict(RANGE_TABS).get(active_range, "Today")
     count = len(jobs)
     today_summary = None
+    today_by_staff: List[Dict[str, Any]] = []
+    all_staff_week = None
     if active_range == RANGE_TODAY:
-        today_summary = _today_paid_summary(jobs)
-        jobs_label = today_summary["jobs_heading"]
+        if is_all_staff:
+            today_by_staff = _build_today_by_staff(jobs, roster)
+            jobs_label = "{0} Job{1} today".format(
+                count, "" if count == 1 else "s"
+            )
+        else:
+            staff_jobs = jobs
+            today_summary = _today_paid_summary(staff_jobs)
+            jobs_label = today_summary["jobs_heading"]
     elif active_range == RANGE_CALENDAR:
         jobs_label = _month_heading(cal_year, cal_month)
     elif active_range == RANGE_WEEK:
-        jobs_label = "{0} Job{1} This Week".format(count, "" if count == 1 else "s")
+        if is_all_staff:
+            jobs_label = "All Staff This Week"
+        else:
+            jobs_label = "{0} shift{1} this week".format(count, "" if count == 1 else "s")
     elif active_range == RANGE_HISTORY:
         jobs_label = "{0} past Job{1}".format(count, "" if count == 1 else "s")
     else:
         jobs_label = "{0} Job{1}".format(count, "" if count == 1 else "s")
 
     calendar_view = None
-    if active_range == RANGE_CALENDAR:
+    if active_range == RANGE_CALENDAR and not is_all_staff:
         calendar_view = _build_staff_calendar(
             jobs, cal_year, cal_month, today, selected_day
         )
 
-    week_days = (
-        _week_days(jobs, start_iso, end_iso, today)
-        if active_range == RANGE_WEEK
+    week_days: List[Dict[str, Any]] = []
+    if active_range == RANGE_WEEK:
+        if is_all_staff:
+            all_staff_week = _build_all_staff_week(
+                jobs, start_iso, end_iso, today, roster
+            )
+        else:
+            week_days = _week_days(jobs, start_iso, end_iso, today)
+
+    history_weeks = (
+        _history_weeks(jobs, today)
+        if active_range == RANGE_HISTORY and not is_all_staff
         else []
     )
-    history_weeks = (
-        _history_weeks(jobs, today) if active_range == RANGE_HISTORY else []
-    )
-    summary = _hours_summary(jobs)
-    work_days = _work_days_count(jobs)
+    summary = _hours_summary(jobs if not is_all_staff else [])
+    paid_summary = _paid_hours_summary(jobs if not is_all_staff else [])
+    work_days = _work_days_count(jobs if not is_all_staff else [])
     weekly_worked = None
-    if active_range == RANGE_WEEK:
+    if active_range == RANGE_WEEK and not is_all_staff:
         weekly_worked = {
             "staff": staff,
             "week_start": start_iso,
             "week_end": end_iso,
             "week_label": _week_label(start_iso, end_iso),
-            "minutes": int(round(summary["paid_hours"] * 60)),
-            "display": summary["paid_display"],
+            "minutes": int(round(paid_summary["paid_hours"] * 60)),
+            "display": paid_summary["paid_display"],
             "estimated_minutes": int(round(summary["scheduled_hours"] * 60)),
             "estimated_display": summary["scheduled_display"],
             "work_days": work_days,
             "scheduled_display": summary["scheduled_display"],
             "actual_display": summary["actual_display"],
             "callout_display": summary["callout_display"],
-            "paid_display": summary["paid_display"],
+            "paid_display": paid_summary["paid_display"],
             "scheduled_hours": summary["scheduled_hours"],
             "actual_hours": summary["actual_hours"],
             "callout_hours": summary["callout_hours"],
-            "paid_hours": summary["paid_hours"],
+            "paid_hours": paid_summary["paid_hours"],
         }
+
+    nav = portal_nav_params(
+        staff_id=selected_staff_id,
+        range_key=active_range,
+        week_offset=offset,
+        calendar_year=cal_year,
+        calendar_month=cal_month,
+        calendar_day=selected_day,
+    )
 
     return {
         "staff": staff,
-        "staff_options": crew_names,
+        "staff_options": [member["name"] for member in roster],
+        "staff_roster": roster,
+        "selected_staff_id": selected_staff_id,
+        "is_all_staff": is_all_staff,
+        "nav_params": nav,
         "range": active_range,
         "range_label": range_label,
         "range_tabs": RANGE_TABS,
@@ -752,6 +1035,8 @@ def build_staff_portal(
         "job_count": count,
         "jobs_label": jobs_label,
         "week_days": week_days,
+        "all_staff_week": all_staff_week,
+        "today_by_staff": today_by_staff,
         "history_weeks": history_weeks,
         "weekly_worked": weekly_worked,
         "summary": summary,

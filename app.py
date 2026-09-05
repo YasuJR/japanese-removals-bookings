@@ -45,7 +45,7 @@ from integrations import executive_config, review_config, sms_config, xero_confi
 from integrations import stripe as stripe_service
 from booking_helpers import apple_maps_url, mailto_href, sms_href, tel_href
 from driver_run_sheet_data import build_driver_run_sheet
-from staff_portal import build_staff_portal
+from staff_portal import STAFF_VIEW_ALL, build_staff_portal, portal_nav_params
 import staff_auth
 import staff_job_times
 from outstanding_invoices_data import (
@@ -1906,38 +1906,76 @@ def staff_logout():
 @app.route("/staff", endpoint="staff_portal")
 @staff_auth.staff_login_required
 def staff_portal():
-    staff = staff_auth.logged_in_staff_name()
-    staff_id = staff_auth.logged_in_staff_id()
+    session_staff = staff_auth.logged_in_staff_name() if staff_auth.is_staff_logged_in() else ""
+    session_staff_id = staff_auth.logged_in_staff_id() if staff_auth.is_staff_logged_in() else None
+    if request.args.get("staff_id") is not None:
+        view_staff_id = request.args.get("staff_id", "").strip() or STAFF_VIEW_ALL
+    elif session_staff:
+        view_staff_id = session_staff_id or _crew_id_for_name(session_staff) or session_staff
+    else:
+        view_staff_id = STAFF_VIEW_ALL
     range_key = request.args.get("range", "today").strip()
     week_offset = request.args.get("week", "0").strip()
     cal_year = request.args.get("year", "").strip() or None
     cal_month = request.args.get("month", "").strip() or None
     cal_day = request.args.get("day", "").strip() or None
     portal = build_staff_portal(
-        staff,
+        session_staff,
         range_key,
         perth_today(),
         week_offset=week_offset,
-        staff_id=staff_id,
+        staff_id=session_staff_id,
         calendar_year=cal_year,
         calendar_month=cal_month,
         calendar_day=cal_day,
+        view_staff_id=view_staff_id,
     )
-    if not portal["staff"]:
-        response = redirect(url_for("staff_login"))
-        staff_auth.clear_staff_session(response)
-        return response
     return render_template(
         "staff_portal.html",
         portal=portal,
+        staff_portal_open=staff_auth.staff_portal_open_access(),
+        staff_logged_in=staff_auth.is_staff_logged_in(),
         can_edit_actual=auth.get_current_user_id() is not None,
     )
+
+
+@app.route(
+    "/staff/crew/<int:crew_id>/rename",
+    methods=["POST"],
+    endpoint="staff_portal_rename_crew",
+)
+@staff_auth.staff_login_required
+def staff_portal_rename_crew(crew_id: int):
+    new_name = (request.form.get("name") or "").strip()
+    range_key = (request.form.get("range") or "week").strip()
+    week_offset = (request.form.get("week") or "0").strip()
+    if not new_name:
+        flash("Enter a staff name.", "error")
+    elif db.rename_crew_member(crew_id, new_name):
+        flash("Staff name updated.", "success")
+    else:
+        flash("Could not update staff name.", "error")
+    params = portal_nav_params(
+        staff_id=crew_id,
+        range_key=range_key,
+        week_offset=week_offset,
+    )
+    return redirect(url_for("staff_portal", **params))
 
 
 def _staff_portal_redirect():
     range_key = (request.form.get("range") or request.args.get("range") or "today").strip()
     week_offset = (request.form.get("week") or request.args.get("week") or "0").strip()
-    params = {"range": range_key, "week": week_offset}
+    staff_id = (
+        request.form.get("staff_id")
+        or request.args.get("staff_id")
+        or STAFF_VIEW_ALL
+    )
+    params = portal_nav_params(
+        staff_id=staff_id,
+        range_key=range_key,
+        week_offset=week_offset,
+    )
     cal_year = (request.form.get("year") or request.args.get("year") or "").strip()
     cal_month = (request.form.get("month") or request.args.get("month") or "").strip()
     cal_day = (request.form.get("day") or request.args.get("day") or "").strip()

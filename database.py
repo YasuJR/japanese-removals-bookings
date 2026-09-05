@@ -1974,6 +1974,53 @@ def update_crew_member(
         return cursor.rowcount > 0
 
 
+def rename_crew_member(crew_id: int, new_name: str) -> bool:
+    """Rename crew member by id and update bookings.crew CSV references."""
+    from crew import crew_from_storage, crew_storage_value
+
+    member = get_crew_member(crew_id)
+    if member is None:
+        return False
+    old_name = str(member["name"] or "").strip()
+    cleaned = str(new_name or "").strip()
+    if not cleaned:
+        return False
+    if cleaned == old_name:
+        return True
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, crew FROM bookings
+            WHERE crew IS NOT NULL AND TRIM(crew) != ''
+            """
+        ).fetchall()
+        for row in rows:
+            names = crew_from_storage(row["crew"])
+            if old_name not in names:
+                continue
+            updated = [cleaned if name == old_name else name for name in names]
+            conn.execute(
+                "UPDATE bookings SET crew = ? WHERE id = ?",
+                (crew_storage_value(updated), int(row["id"])),
+            )
+        cursor = conn.execute(
+            """
+            UPDATE crew_members
+            SET name = ?, phone = ?, role = ?, active = ?
+            WHERE id = ?
+            """,
+            (
+                cleaned,
+                str(member["phone"] or "").strip(),
+                str(member["role"] or "").strip(),
+                int(member["active"] or 0),
+                crew_id,
+            ),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
 def set_crew_member_active(crew_id: int, active: int) -> bool:
     with get_connection() as conn:
         cursor = conn.execute(

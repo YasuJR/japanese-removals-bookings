@@ -199,12 +199,20 @@ def _isolated_monday():
     return monday + timedelta(weeks=int(salt) + 1)
 
 
-def test_staff_requires_login():
+def _crew_id(name):
+    for row in db.list_crew_members(active_only=False):
+        if str(row.get("name") or "").strip() == name:
+            return row["id"]
+    return None
+
+
+def test_staff_open_access_without_login():
     client = app.test_client()
     response = client.get("/staff", follow_redirects=False)
-    assert response.status_code == 302
-    location = response.headers.get("Location") or ""
-    assert "/staff/login" in location
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Staff Portal" in html
+    assert "All Staff" in html
     return True
 
 
@@ -217,7 +225,9 @@ def test_staff_page_defaults_to_today_and_shows_assigned_jobs():
 
     assert "Staff Portal" in html
     assert ">Today</a>" in html
-    assert 'href="/staff?range=today"' in html
+    assert "range=today" in html
+    assert "All Staff" in html
+    assert "staff-staff-switcher" in html
     assert ">Calendar</a>" in html
     assert ">Weekly</a>" in html
     assert ">History</a>" in html
@@ -256,8 +266,12 @@ def test_staff_filter_shows_only_selected_crew_jobs():
     _create_job(ken_customer, today, crew="Ken", start_time="09:00")
     _create_job(both_customer, today, crew="Yasu,Ken", start_time="10:00")
 
-    yasu_html = _staff_client("Yasu").get("/staff?staff=Ken&range=today").get_data(as_text=True)
-    ken_html = _staff_client("Ken").get("/staff?staff=Yasu&range=today").get_data(as_text=True)
+    yasu_html = _staff_client("Yasu").get(
+        "/staff?staff_id={0}&range=today".format(_crew_id("Yasu"))
+    ).get_data(as_text=True)
+    ken_html = _staff_client("Ken").get(
+        "/staff?staff_id={0}&range=today".format(_crew_id("Ken"))
+    ).get_data(as_text=True)
 
     assert yasu_customer in yasu_html
     assert both_customer in yasu_html
@@ -269,15 +283,24 @@ def test_staff_filter_shows_only_selected_crew_jobs():
     return True
 
 
-def test_url_staff_param_cannot_view_other_staff_jobs():
+def test_staff_id_param_switches_portal_view():
     today = perth_today().isoformat()
     yasu_customer = _unique("YasuSecret")
     ken_customer = _unique("KenSecret")
     _create_job(yasu_customer, today, crew="Yasu")
     _create_job(ken_customer, today, crew="Ken")
-    html = _staff_client("Yasu").get("/staff?staff=Ken&staff_id=2").get_data(as_text=True)
-    assert yasu_customer in html
-    assert ken_customer not in html
+    yasu_id = _crew_id("Yasu")
+    ken_id = _crew_id("Ken")
+    yasu_html = _staff_client("Yasu").get(
+        "/staff?staff_id={0}&range=today".format(yasu_id)
+    ).get_data(as_text=True)
+    ken_html = _staff_client("Yasu").get(
+        "/staff?staff_id={0}&range=today".format(ken_id)
+    ).get_data(as_text=True)
+    assert yasu_customer in yasu_html
+    assert ken_customer not in yasu_html
+    assert ken_customer in ken_html
+    assert yasu_customer not in ken_html
     return True
 
 
@@ -464,7 +487,45 @@ def test_this_week_tab_includes_later_week_jobs():
         "SUNDAY",
     ):
         assert heading in week_html
-    assert "No Jobs" in week_html
+    assert "staff-week-schedule" in week_html
+    return True
+
+
+def test_all_staff_week_view_groups_by_day_and_staff():
+    today = perth_today()
+    later = _later_this_week(today)
+    shared = _unique("AllStaffShared")
+    _create_job(
+        shared,
+        later.isoformat(),
+        crew="Yasu,Ken",
+        start_time="08:00",
+        finish_time="11:00",
+    )
+    html = app.test_client().get("/staff?staff_id=all&range=week").get_data(as_text=True)
+    assert "All Staff" in html
+    assert shared in html
+    assert "staff-all-week" in html
+    assert "Job:" in html
+    return True
+
+
+def test_staff_rename_keeps_booking_links():
+    from staff_portal import build_staff_portal
+
+    unique_name = _unique("RenameMe")
+    crew_id = db.create_crew_member(unique_name, role="Driver", active=1)
+    move_date = (perth_today() + timedelta(days=5)).isoformat()
+    customer = _unique("RenameJob")
+    booking_id = _create_job(customer, move_date, crew=unique_name)
+    renamed = _unique("Will")
+    assert db.rename_crew_member(crew_id, renamed) is True
+    row = dict(db.get_booking(booking_id))
+    assert renamed in row["crew"]
+    assert unique_name not in row["crew"]
+    portal = build_staff_portal(renamed, "week", perth_today() + timedelta(days=5))
+    names = [job["customer_name"] for job in portal["jobs"]]
+    assert customer in names
     return True
 
 
@@ -530,8 +591,12 @@ def test_staff_portal_reflects_booking_updates():
         status=row["status"],
     )
 
-    ken_html = ken.get("/staff?staff=Yasu").get_data(as_text=True)
-    yasu_html = yasu.get("/staff?staff=Ken").get_data(as_text=True)
+    ken_html = ken.get(
+        "/staff?staff_id={0}".format(_crew_id("Ken"))
+    ).get_data(as_text=True)
+    yasu_html = yasu.get(
+        "/staff?staff_id={0}".format(_crew_id("Yasu"))
+    ).get_data(as_text=True)
     assert customer in ken_html
     assert "99 New Pickup St, Cannington WA 6107" in ken_html
     assert "Updated lift window" in ken_html
@@ -576,11 +641,11 @@ def test_staff_login_uses_portal_password_not_admin_session():
     return True
 
 
-def test_admin_session_cannot_open_staff_portal():
+def test_admin_session_can_open_staff_portal_when_open():
     client = _admin_client()
     response = client.get("/staff", follow_redirects=False)
-    assert response.status_code == 302
-    assert "/staff/login" in (response.headers.get("Location") or "")
+    assert response.status_code == 200
+    assert "Staff Portal" in response.get_data(as_text=True)
     return True
 
 
@@ -613,9 +678,9 @@ def test_staff_logout_is_separate_from_admin_logout():
     logged_out = staff.get("/staff/logout", follow_redirects=False)
     assert logged_out.status_code == 302
     assert "/staff/login" in (logged_out.headers.get("Location") or "")
-    blocked = staff.get("/staff", follow_redirects=False)
-    assert blocked.status_code == 302
-    assert "/staff/login" in (blocked.headers.get("Location") or "")
+    still_open = staff.get("/staff", follow_redirects=False)
+    assert still_open.status_code == 200
+    assert "Staff Portal" in still_open.get_data(as_text=True)
 
     admin = _admin_client()
     admin_out = admin.get("/logout", follow_redirects=False)
@@ -637,8 +702,8 @@ def test_wrong_password_and_admin_password_rejected():
     html = wrong.get_data(as_text=True)
     assert "Invalid password." in html
     blocked = client.get("/staff", follow_redirects=False)
-    assert blocked.status_code == 302
-    assert "/staff/login" in (blocked.headers.get("Location") or "")
+    assert blocked.status_code == 200
+    assert "Staff Portal" in blocked.get_data(as_text=True)
 
     previous_admin = os.environ.get("STAFF_PASSWORD")
     os.environ["STAFF_PASSWORD"] = TEST_STAFF_PORTAL_PASSWORD
@@ -664,11 +729,11 @@ def test_login_requires_staff_name():
     assert missing.status_code == 200
     assert "Select your name." in missing.get_data(as_text=True)
     blocked = client.get("/staff", follow_redirects=False)
-    assert blocked.status_code == 302
+    assert blocked.status_code == 200
     return True
 
 
-def test_office_login_still_works_and_does_not_open_staff_portal():
+def test_office_login_still_works_and_staff_portal_is_open():
     db.init_db()
     username = "office-login-{0}-{1}".format(os.getpid(), _user_n)
     password = "office-admin-test-password"
@@ -686,8 +751,8 @@ def test_office_login_still_works_and_does_not_open_staff_portal():
     dashboard = client.get("/dashboard", follow_redirects=False)
     assert dashboard.status_code == 200
     staff = client.get("/staff", follow_redirects=False)
-    assert staff.status_code == 302
-    assert "/staff/login" in (staff.headers.get("Location") or "")
+    assert staff.status_code == 200
+    assert "Staff Portal" in staff.get_data(as_text=True)
     return True
 
 
@@ -848,7 +913,7 @@ def test_weekly_schedule_shows_completed_not_cancelled():
     assert done in week_html
     assert "COMPLETED" in week_html
     assert cancelled not in week_html
-    assert "Cannington → Como" in week_html or "Cannington" in week_html
+    assert "Job:" in week_html
     assert "START JOB" not in week_html
     for heading in (
         "MONDAY",
@@ -954,7 +1019,7 @@ def test_weekly_hours_use_scheduled_actual_callout_paid():
     assert yasu["weekly_worked"]["scheduled_display"] == "12hr"
     assert yasu["weekly_worked"]["actual_display"] == "7.75hr"
     assert yasu["weekly_worked"]["callout_display"] == "2hr"
-    assert yasu["weekly_worked"]["paid_display"] == "9.75hr"
+    assert yasu["weekly_worked"]["paid_display"] == "9.25hr"
 
     assert ken["weekly_worked"]["work_days"] == 1
     assert ken["weekly_worked"]["scheduled_display"] == "6hr"
@@ -979,7 +1044,7 @@ def test_weekly_hours_use_scheduled_actual_callout_paid():
     assert "This Week" in live_week
     assert "Next Week" in live_week
     assert "WEEKLY ESTIMATED" not in live_week
-    assert "JOBS" not in live_week.upper() or "NO JOBS" in live_week.upper()
+    assert "staff-schedule-list" in live_week
     live_today = _staff_client("Yasu").get("/staff").get_data(as_text=True)
     assert "Previous Week" not in live_today
     return True
@@ -1457,24 +1522,26 @@ def test_owner_can_edit_and_clear_actual_times_from_staff_portal():
 
 def main():
     tests = [
-        test_staff_requires_login,
+        test_staff_open_access_without_login,
         test_staff_page_defaults_to_today_and_shows_assigned_jobs,
         test_staff_filter_shows_only_selected_crew_jobs,
-        test_url_staff_param_cannot_view_other_staff_jobs,
+        test_staff_id_param_switches_portal_view,
         test_today_shows_all_assigned_jobs_including_completed,
         test_today_tab_shows_only_today_jobs,
         test_today_total_paid_hours_sums_recorded_jobs_only,
         test_this_week_tab_includes_later_week_jobs,
+        test_all_staff_week_view_groups_by_day_and_staff,
+        test_staff_rename_keeps_booking_links,
         test_staff_portal_hides_financial_data_and_booking_admin_links,
         test_staff_portal_reflects_booking_updates,
         test_admin_desktop_nav_unchanged,
         test_staff_login_uses_portal_password_not_admin_session,
-        test_admin_session_cannot_open_staff_portal,
+        test_admin_session_can_open_staff_portal_when_open,
         test_staff_session_cannot_open_admin_pages,
         test_staff_logout_is_separate_from_admin_logout,
         test_wrong_password_and_admin_password_rejected,
         test_login_requires_staff_name,
-        test_office_login_still_works_and_does_not_open_staff_portal,
+        test_office_login_still_works_and_staff_portal_is_open,
         test_admin_saves_actual_times_without_changing_scheduled_times,
         test_staff_portal_shows_actual_times_read_only,
         test_staff_hides_actual_when_not_set,

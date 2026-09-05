@@ -1,0 +1,30 @@
+<article class="staff-schedule-job">
+  {% if job.status_display %}
+  <p class="staff-schedule-status">{{ job.status_display }}</p>
+  {% endif %}
+  <p class="staff-schedule-time">{{ job.scheduled_range_display or job.start_time }}</p>
+  <p class="staff-schedule-customer">Job: {{ job.customer_name }}</p>
+  {% if job.has_actual %}
+  <p class="staff-schedule-actual-range">Actual: {{ job.actual_range_display }}{% if job.worked_display %} · Worked: {{ job.worked_display }}{% endif %}</p>
+  {% endif %}
+  <dl class="staff-schedule-meta">
+    <div>
+      <dt>Estimated</dt>
+      <dd>{{ job.scheduled_hours_display }}</dd>
+    </div>
+    <div>
+      <dt>Actual</dt>
+      <dd>{{ job.actual_hours_display }}</dd>
+    </div>
+    <div>
+      <dt>Paid</dt>
+      <dd>{{ job.paid_hours_display }}</dd>
+    </div>
+    {% if job.callout_hours_label %}
+    <div>
+      <dt>Call Out</dt>
+      <dd>{{ job.callout_hours_label }}</dd>
+    </div>
+    {% endif %}
+  </dl>
+</article>

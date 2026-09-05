@@ -137,9 +137,16 @@ def safe_staff_next(value: Any) -> str:
     return "/staff"
 
 
+def staff_portal_open_access() -> bool:
+    """When true, /staff is open without login (default until per-staff login is enabled)."""
+    return os.environ.get("STAFF_PORTAL_OPEN", "1").strip() != "0"
+
+
 def staff_login_required(view: Callable) -> Callable:
     @wraps(view)
     def wrapped(*args: Any, **kwargs: Any):
+        if staff_portal_open_access():
+            return view(*args, **kwargs)
         if not is_staff_logged_in():
             nxt = request.full_path
             if nxt.endswith("?"):
