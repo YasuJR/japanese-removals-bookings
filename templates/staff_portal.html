@@ -176,34 +176,17 @@
       <a class="staff-week-pdf-btn" href="{{ url_for('staff_portal_weekly_pdf', staff_id=portal.selected_staff_id, week=portal.week_offset) }}">Download Weekly PDF</a>
     </section>
 
-    {% if portal.is_all_staff and portal.all_staff_week %}
-    <section class="staff-all-week-total" aria-label="All staff weekly paid hours">
-      <p class="staff-all-week-total-label">Week Total Paid Hours</p>
-      <p class="staff-all-week-total-value">{{ portal.all_staff_week.week_paid_display }}</p>
-      <p class="staff-all-week-label">{{ portal.all_staff_week.week_label }}</p>
+    {% if portal.is_all_staff and portal.owner_weekly %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='weekly_schedule.css') }}">
+    <section class="weekly-schedule-page staff-owner-weekly">
+      <header class="weekly-schedule-header">
+        <h2 class="weekly-schedule-title">WEEKLY SCHEDULE</h2>
+        <p class="weekly-schedule-range">{{ portal.owner_weekly.range_heading }}</p>
+      </header>
+      {% with weekly=portal.owner_weekly, link_jobs=false %}
+      {% include "_weekly_schedule_days.html" %}
+      {% endwith %}
     </section>
-    <div class="staff-all-week">
-      {% for day in portal.all_staff_week.days %}
-      <section class="staff-all-week-day{% if day.is_today %} staff-week-day-today{% endif %}">
-        <h2 class="staff-all-day-heading">{{ day.date_display }}</h2>
-        {% if day.has_jobs %}
-          {% for block in day.staff_blocks %}
-            {% if block.jobs %}
-            <div class="staff-all-staff-block">
-              <h3 class="staff-all-staff-name">{{ block.staff }}</h3>
-              {% for job in block.jobs %}
-              {% include "_staff_schedule_job.html" %}
-              {% endfor %}
-              <p class="staff-all-staff-paid">Paid: {{ block.paid_display }}</p>
-            </div>
-            {% endif %}
-          {% endfor %}
-        {% else %}
-        <p class="staff-week-empty">No jobs</p>
-        {% endif %}
-      </section>
-      {% endfor %}
-    </div>
 
     {% else %}
     {% if portal.weekly_worked %}

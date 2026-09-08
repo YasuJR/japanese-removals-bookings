@@ -24,7 +24,7 @@ from crew import CREW_OPTIONS, active_crew_names, all_crew_names, crew_from_stor
 from dashboard_data import perth_today, week_range
 from display_dates import format_display_date, normalize_move_date
 import staff_job_times
-from weekly_schedule_data import _day_heading, _week_range_heading
+from weekly_schedule_data import _day_heading, _week_range_heading, build_weekly_schedule
 
 RANGE_TODAY = "today"
 RANGE_CALENDAR = "calendar"
@@ -936,7 +936,7 @@ def build_staff_portal(
     count = len(jobs)
     today_summary = None
     today_by_staff: List[Dict[str, Any]] = []
-    all_staff_week = None
+    owner_weekly = None
     if active_range == RANGE_TODAY:
         if is_all_staff:
             today_by_staff = _build_today_by_staff(jobs, roster)
@@ -966,11 +966,10 @@ def build_staff_portal(
         )
 
     week_days: List[Dict[str, Any]] = []
+    owner_weekly = None
     if active_range == RANGE_WEEK:
         if is_all_staff:
-            all_staff_week = _build_all_staff_week(
-                jobs, start_iso, end_iso, today, roster
-            )
+            owner_weekly = build_weekly_schedule(start_iso, reference=today)
         else:
             week_days = _week_days(jobs, start_iso, end_iso, today)
 
@@ -1036,7 +1035,7 @@ def build_staff_portal(
         "job_count": count,
         "jobs_label": jobs_label,
         "week_days": week_days,
-        "all_staff_week": all_staff_week,
+        "owner_weekly": owner_weekly,
         "today_by_staff": today_by_staff,
         "history_weeks": history_weeks,
         "weekly_worked": weekly_worked,
@@ -1080,16 +1079,18 @@ def build_staff_weekly_pdf_schedule(
         today = perth_today()
     offset = normalize_week_offset(week_offset)
     start_iso, end_iso = _range_dates(RANGE_WEEK, today, offset)
-    roster = _staff_roster()
     staff, selected_staff_id, is_all_staff = resolve_portal_staff(view_staff_id)
 
     if is_all_staff:
-        bookings = _load_all_rows(start_iso, end_iso)
-    elif staff:
-        bookings = _load_rows(staff, start_iso, end_iso)
-    else:
-        bookings = []
+        weekly = build_weekly_schedule(start_iso, reference=today)
+        return {
+            "mode": "owner",
+            "staff_id_key": STAFF_VIEW_ALL,
+            "week_start": weekly["week_start"],
+            "weekly": weekly,
+        }
 
+    bookings = _load_rows(staff, start_iso, end_iso) if staff else []
     jobs: List[Dict[str, Any]] = []
     for booking in bookings:
         jobs.append(_serialize_job(booking, today))
@@ -1104,53 +1105,6 @@ def build_staff_weekly_pdf_schedule(
     monday = date.fromisoformat(start_iso)
     sunday = date.fromisoformat(end_iso)
     range_heading = _week_range_heading(monday, sunday)
-
-    if is_all_staff:
-        week_data = _build_all_staff_week(jobs, start_iso, end_iso, today, roster)
-        staff_totals = []
-        for member in roster:
-            member_jobs = _jobs_for_staff_name(jobs, member["name"])
-            paid = _paid_hours_summary(member_jobs)
-            staff_totals.append("{0}: {1}".format(member["name"], paid["paid_display"]))
-        days: List[Dict[str, Any]] = []
-        for day in week_data.get("days") or []:
-            day_date = date.fromisoformat(day["date_iso"])
-            staff_blocks: List[Dict[str, Any]] = []
-            for block in day.get("staff_blocks") or []:
-                block_jobs = block.get("jobs") or []
-                if not block_jobs:
-                    continue
-                staff_blocks.append(
-                    {
-                        "staff": block.get("staff") or "—",
-                        "staff_id": block.get("staff_id"),
-                        "paid_display": block.get("paid_display") or "0hr",
-                        "jobs": [
-                            _pdf_job_from_portal_job(job, is_all_staff=True)
-                            for job in block_jobs
-                        ],
-                    }
-                )
-            days.append(
-                {
-                    "date_iso": day["date_iso"],
-                    "heading": _day_heading(day_date),
-                    "is_weekend": day_date.weekday() >= 5,
-                    "is_empty": not staff_blocks,
-                    "staff_blocks": staff_blocks,
-                }
-            )
-        return {
-            "mode": "all",
-            "staff_id_key": STAFF_VIEW_ALL,
-            "week_start": start_iso,
-            "week_end": end_iso,
-            "range_heading": range_heading,
-            "subtitle_lines": [range_heading],
-            "weekly_paid_display": week_data.get("week_paid_display") or "0hr",
-            "staff_paid_lines": staff_totals,
-            "days": days,
-        }
 
     week_days = _week_days(jobs, start_iso, end_iso, today)
     paid_summary = _paid_hours_summary(jobs)

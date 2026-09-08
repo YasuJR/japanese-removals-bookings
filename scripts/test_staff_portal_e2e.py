@@ -521,7 +521,10 @@ def test_this_week_tab_includes_later_week_jobs():
     return True
 
 
-def test_all_staff_week_view_groups_by_day_and_staff():
+def test_all_staff_week_view_matches_owner_schedule():
+    from staff_portal import build_staff_portal
+    import weekly_schedule_data
+
     today = perth_today()
     later = _later_this_week(today)
     shared = _unique("AllStaffShared")
@@ -532,11 +535,26 @@ def test_all_staff_week_view_groups_by_day_and_staff():
         start_time="08:00",
         finish_time="11:00",
     )
+    portal = build_staff_portal(
+        view_staff_id="all", range_key="week", today=today
+    )
+    owner = weekly_schedule_data.build_weekly_schedule(
+        portal["start_date"], reference=today
+    )
+    assert portal["owner_weekly"] is not None
+    assert portal["owner_weekly"]["total_jobs"] == owner["total_jobs"]
+    assert portal["owner_weekly"]["total_jobs"] >= 1
+
     html = app.test_client().get("/staff?staff_id=all&range=week").get_data(as_text=True)
     assert "All Staff" in html
     assert shared in html
-    assert "staff-all-week" in html
-    assert "Job:" in html
+    assert html.count(shared) == 1
+    assert "weekly-schedule-days" in html
+    assert "Movers:" in html
+    assert "Crew:" in html
+    assert "staff-all-staff-block" not in html
+    assert "staff-all-week" not in html
+    assert "Job:" not in html
     return True
 
 
@@ -1790,16 +1808,20 @@ def test_staff_weekly_pdf_all_staff_one_page():
         status="Completed",
     )
     schedule = build_staff_weekly_pdf_schedule("all", 0, wednesday)
-    pdf_bytes = weekly_schedule_pdf.render_staff_weekly_schedule_pdf(schedule)
+    assert schedule.get("mode") == "owner"
+    weekly = schedule["weekly"]
+    pdf_bytes = weekly_schedule_pdf.render_weekly_schedule_pdf(weekly)
     assert _pdf_page_count(pdf_bytes) == 1
     text = _pdf_plain_text(pdf_bytes)
-    assert "WEEKLY STAFF SCHEDULE" in text
+    assert "WEEKLY SCHEDULE" in text
+    assert "WEEKLY STAFF SCHEDULE" not in text
     assert shared in text
-    assert "Yasu" in text
-    assert "Ken" in text
-    assert "Weekly Paid Hours:" in text
-    assert "Yasu:" in text
-    assert "Ken:" in text
+    assert text.count(shared) == 1
+    assert "Movers:" in text
+    assert "Ph:" in text
+    assert "Weekly Paid Hours:" not in text
+    assert "Yasu:" not in text
+    assert "Ken:" not in text
 
     response = app.test_client().get(
         "/staff/weekly/schedule.pdf?staff_id=all&week=0"
@@ -1843,7 +1865,7 @@ def main():
         test_today_tab_shows_only_today_jobs,
         test_today_total_paid_hours_sums_recorded_jobs_only,
         test_this_week_tab_includes_later_week_jobs,
-        test_all_staff_week_view_groups_by_day_and_staff,
+        test_all_staff_week_view_matches_owner_schedule,
         test_staff_rename_keeps_booking_links,
         test_staff_portal_hides_financial_data_and_booking_admin_links,
         test_staff_portal_reflects_booking_updates,

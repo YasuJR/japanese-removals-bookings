@@ -768,6 +768,18 @@ a.staff-job-btn:active {
   border-color: #16304d;
 }
 
+.staff-owner-weekly {
+  margin-top: 0;
+}
+
+.staff-owner-weekly .weekly-schedule-title {
+  font-size: 1.35rem;
+}
+
+.staff-owner-weekly .weekly-schedule-header {
+  margin-bottom: 0.85rem;
+}
+
 .staff-weekly-week-label {
   margin: 0 0 0.85rem;
   font-size: 0.92rem;

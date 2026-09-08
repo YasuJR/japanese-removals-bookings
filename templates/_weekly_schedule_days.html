@@ -1,0 +1,40 @@
+<div class="weekly-schedule-days">
+  {% for day in weekly.days %}
+  <section class="weekly-day{% if day.is_today %} weekly-day-today{% endif %}{% if day.is_weekend %} weekly-day-weekend{% endif %}" data-date="{{ day.date_iso }}">
+    <h2 class="weekly-day-heading">{{ day.heading }}</h2>
+    {% if day.jobs %}
+    <div class="weekly-day-jobs">
+      {% for job in day.jobs %}
+      <article class="weekly-job">
+        {% if link_jobs|default(true) %}
+        <a class="weekly-job-link" href="{{ url_for('view_booking', booking_id=job.id) }}">
+        {% else %}
+        <div class="weekly-job-body">
+        {% endif %}
+          <p class="weekly-job-time">
+            <span class="weekly-job-time-range">{{ job.time_range }}</span>
+            {% if job.duration_label %}
+            <span class="weekly-job-duration">{{ job.duration_label }}</span>
+            {% endif %}
+          </p>
+          <h3 class="weekly-job-customer">{{ job.customer_name }}</h3>
+          <p class="weekly-job-row"><span class="weekly-job-field">Movers:</span> {{ job.num_movers }}</p>
+          <p class="weekly-job-row"><span class="weekly-job-field">Crew:</span> {{ job.crew_display }}</p>
+          <p class="weekly-job-row"><span class="weekly-job-field">Pickup:</span> {{ job.pickup_address or '—' }}</p>
+          <p class="weekly-job-row"><span class="weekly-job-field">Delivery:</span> {{ job.delivery_address or '—' }}</p>
+          <p class="weekly-job-row"><span class="weekly-job-field">Phone:</span> {{ job.phone or '—' }}</p>
+          <p class="weekly-job-row"><span class="weekly-job-field">Status:</span> {{ job.status|upper }}</p>
+        {% if link_jobs|default(true) %}
+        </a>
+        {% else %}
+        </div>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="weekly-day-empty">NO JOBS</p>
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>

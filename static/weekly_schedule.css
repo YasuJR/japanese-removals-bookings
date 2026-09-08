@@ -93,6 +93,11 @@
   text-decoration: none;
 }
 
+.weekly-job-body {
+  display: block;
+  color: inherit;
+}
+
 .weekly-job-link:hover .weekly-job-customer {
   text-decoration: underline;
 }

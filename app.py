@@ -1956,9 +1956,16 @@ def staff_portal_weekly_pdf():
     schedule = build_staff_weekly_pdf_schedule(
         view_staff_id, week_offset, perth_today()
     )
-    pdf_bytes = weekly_schedule_pdf.render_staff_weekly_schedule_pdf(schedule)
-    staff_key = schedule.get("staff_id_key") or STAFF_VIEW_ALL
-    filename = "staff-weekly-{0}-{1}.pdf".format(staff_key, schedule.get("week_start"))
+    if schedule.get("mode") == "owner":
+        weekly = schedule["weekly"]
+        pdf_bytes = weekly_schedule_pdf.render_weekly_schedule_pdf(weekly)
+        filename = "weekly-schedule-{0}.pdf".format(weekly["week_start"])
+    else:
+        pdf_bytes = weekly_schedule_pdf.render_staff_weekly_schedule_pdf(schedule)
+        staff_key = schedule.get("staff_id_key") or STAFF_VIEW_ALL
+        filename = "staff-weekly-{0}-{1}.pdf".format(
+            staff_key, schedule.get("week_start")
+        )
     return Response(
         pdf_bytes,
         mimetype="application/pdf",
