@@ -21,6 +21,7 @@ from booking_times import (
     normalize_time_input,
 )
 from crew import CREW_OPTIONS, active_crew_names, all_crew_names, crew_from_storage
+from daily_jobs_data import _crew_slash_display
 from dashboard_data import perth_today, week_range
 from display_dates import format_display_date, normalize_move_date
 import staff_job_times
@@ -371,11 +372,6 @@ def _week_label(start_iso: str, end_iso: str) -> str:
     return "{0} – {1}".format(start_parts["day_month"], end_parts["day_month"])
 
 
-def _crew_slash_display(booking: Dict[str, Any]) -> str:
-    names = crew_from_storage(booking.get("crew"))
-    return " / ".join(names) if names else "—"
-
-
 def _notes_text(booking: Dict[str, Any]) -> str:
     text = str(booking.get("notes") or "").strip()
     if not text or text in ("—", "-", "–"):
@@ -480,6 +476,7 @@ def _serialize_job(booking: Dict[str, Any], today: date) -> Dict[str, Any]:
     status_display, is_done_status = _status_badge(row)
     status_value = job_status.display(row)
     callout_h = staff_job_times.callout_hours(row)
+    crew_display = _crew_slash_display(row)
     payload = {
         "id": int(row["id"]),
         "date_iso": move_date,
@@ -497,7 +494,8 @@ def _serialize_job(booking: Dict[str, Any], today: date) -> Dict[str, Any]:
         "pickup_label": pickup_label or pickup,
         "dropoff_address": dropoff,
         "dropoff_label": dropoff_label or dropoff,
-        "crew": _crew_slash_display(row),
+        "crew": crew_display,
+        "crew_display": crew_display,
         "crew_names": crew_from_storage(row.get("crew")),
         "estimated_duration": estimated_duration,
         "estimated_minutes": estimated_minutes,
@@ -1080,7 +1078,7 @@ def _pdf_job_from_portal_job(
         or "Time TBC",
         "duration_label": duration,
         "customer_name": job.get("customer_name") or "—",
-        "crew_display": job.get("crew") or "—",
+        "crew_display": job.get("crew_display") or job.get("crew") or "—",
         "pickup_address": job.get("pickup_address") or "—",
         "delivery_address": job.get("dropoff_address") or "—",
         "status": job.get("status_display") or "",

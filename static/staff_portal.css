@@ -1433,6 +1433,22 @@ a.staff-job-btn:active {
   color: var(--navy);
 }
 
+.staff-schedule-crew {
+  margin: 0.2rem 0 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--navy);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.staff-schedule-crew-label {
+  font-weight: 800;
+  color: var(--muted);
+  margin-right: 0.15rem;
+}
+
 .staff-schedule-status {
   margin: 0 0 0.25rem;
   display: inline-block;

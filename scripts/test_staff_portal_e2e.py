@@ -977,6 +977,89 @@ def test_weekly_schedule_shows_completed_not_cancelled():
     return True
 
 
+def test_weekly_schedule_shows_crew_on_job_cards():
+    from staff_portal import build_staff_portal
+    from dashboard_data import perth_today, week_range
+
+    real_today = perth_today()
+    monday, _ = week_range(real_today)
+    yasu_id = _crew_id("Yasu")
+    extra_name = _unique("ExtraCrew")
+    extra_id = db.create_crew_member(extra_name, role="Driver", active=1)
+
+    two_crew = _unique("CrewTwo")
+    three_crew = _unique("CrewThree")
+    four_crew = _unique("CrewFour")
+    rename_customer = _unique("CrewRename")
+
+    _create_job(
+        two_crew,
+        monday.isoformat(),
+        crew="Yasu,Ken",
+        start_time="07:00",
+        finish_time="09:00",
+    )
+    _create_job(
+        three_crew,
+        monday.isoformat(),
+        crew="Yasu,Ken,Tom",
+        start_time="10:00",
+        finish_time="12:00",
+    )
+    _create_job(
+        four_crew,
+        monday.isoformat(),
+        crew="Yasu,Ken,Tom,{0}".format(extra_name),
+        start_time="13:00",
+        finish_time="15:00",
+    )
+    _create_job(
+        rename_customer,
+        monday.isoformat(),
+        crew="Yasu,{0}".format(extra_name),
+        start_time="16:00",
+        finish_time="17:00",
+    )
+
+    portal = build_staff_portal("Yasu", "week", monday)
+    monday_jobs = [
+        day for day in portal["week_days"] if day["date_iso"] == monday.isoformat()
+    ][0]["jobs"]
+    by_customer = {job["customer_name"]: job for job in monday_jobs}
+
+    assert by_customer[two_crew]["crew_display"] == "Yasu / Ken"
+    assert by_customer[three_crew]["crew_display"] == "Yasu / Ken / Tom"
+    assert "Yasu" in by_customer[four_crew]["crew_display"]
+    assert extra_name in by_customer[four_crew]["crew_display"]
+    assert "Yasu" in by_customer[rename_customer]["crew_display"]
+
+    html = app.test_client().get(
+        "/staff?staff_id={0}&range=week&week=0".format(yasu_id)
+    ).get_data(as_text=True)
+    assert "staff-schedule-crew" in html
+    assert "Crew:" in html
+    assert "Yasu / Ken" in html
+    job_pos = html.index("Job: {0}".format(two_crew))
+    crew_pos = html.index("Yasu / Ken", job_pos)
+    meta_pos = html.index("Estimated", crew_pos)
+    assert job_pos < crew_pos < meta_pos
+
+    renamed = _unique("RenamedCrew")
+    assert db.rename_crew_member(extra_id, renamed) is True
+    portal_renamed = build_staff_portal("Yasu", "week", real_today)
+    monday_jobs_renamed = [
+        day
+        for day in portal_renamed["week_days"]
+        if day["date_iso"] == monday.isoformat()
+    ][0]["jobs"]
+    renamed_job = next(
+        job for job in monday_jobs_renamed if job["customer_name"] == rename_customer
+    )
+    assert renamed in renamed_job["crew_display"]
+    assert extra_name not in renamed_job["crew_display"]
+    return True
+
+
 def test_weekly_hours_use_scheduled_actual_callout_paid():
     from staff_portal import build_staff_portal
 
@@ -2210,6 +2293,7 @@ def main():
         test_staff_portal_shows_actual_times_read_only,
         test_staff_hides_actual_when_not_set,
         test_weekly_schedule_shows_completed_not_cancelled,
+        test_weekly_schedule_shows_crew_on_job_cards,
         test_weekly_hours_use_scheduled_actual_callout_paid,
         test_weekly_worked_format_examples,
         test_scheduled_hours_from_start_finish_not_duration_hours,
