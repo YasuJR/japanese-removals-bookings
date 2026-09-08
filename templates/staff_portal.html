@@ -219,9 +219,15 @@
     <div class="staff-week-schedule">
       {% for day in portal.week_days %}
       <section class="staff-week-day{% if day.is_today %} staff-week-day-today{% endif %}">
-        <h2 class="staff-week-heading">{{ day.date_display }}</h2>
-        <p class="staff-week-subheading">{{ day.heading }}</p>
-        <p class="staff-week-day-paid-total">Day Paid Hours {{ day.paid_display }}</p>
+        {% set date_parts = day.date_display.split(' ', 1) %}
+        <header class="staff-week-day-header">
+          <div class="staff-week-day-rule" aria-hidden="true"></div>
+          <h2 class="staff-week-section-title">
+            {{ day.heading }}{% if date_parts|length > 1 %} {{ date_parts[1] | upper }}{% endif %}
+          </h2>
+          <div class="staff-week-day-rule" aria-hidden="true"></div>
+        </header>
+        <p class="staff-week-day-paid-total">Day Paid Hours: {{ day.paid_display }}</p>
         {% if day.jobs %}
         <div class="staff-schedule-list">
           {% for job in day.jobs %}

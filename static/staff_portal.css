@@ -560,27 +560,46 @@ a.staff-job-btn:active {
 .staff-week-schedule {
   display: flex;
   flex-direction: column;
-  gap: 1.15rem;
+  gap: 2.25rem;
   overflow-x: hidden;
 }
 
 .staff-week-day {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.9rem 0.75rem 0.85rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
 
-.staff-week-day-today {
-  border-color: var(--navy);
+.staff-week-day-header {
+  margin: 0 0 0.65rem;
 }
 
-.staff-week-heading {
+.staff-week-day-rule {
+  height: 0;
   margin: 0;
-  font-size: 1.15rem;
+  border: none;
+  border-top: 3px solid var(--navy);
+  opacity: 0.88;
+}
+
+.staff-week-section-title {
+  margin: 0.7rem 0;
+  font-size: 1.28rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
+  line-height: 1.25;
+  text-align: center;
   color: var(--navy);
+}
+
+.staff-week-day-today .staff-week-day-rule {
+  border-top-width: 4px;
+  opacity: 1;
+}
+
+.staff-week-day-today .staff-week-section-title {
+  font-size: 1.34rem;
 }
 
 .staff-week-date {
@@ -1068,6 +1087,35 @@ a.staff-job-btn:active {
   }
 }
 
+@media (min-width: 768px) {
+  .staff-week-section-title {
+    font-size: 1.45rem;
+  }
+
+  .staff-week-day-today .staff-week-section-title {
+    font-size: 1.52rem;
+  }
+
+  .staff-week-schedule {
+    gap: 2.75rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .staff-week-day-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 0.35rem 0 0.15rem;
+    background: linear-gradient(
+      to bottom,
+      var(--cream) 0%,
+      var(--cream) 82%,
+      rgba(247, 244, 239, 0) 100%
+    );
+  }
+}
+
 .staff-schedule-list,
 .staff-all-week {
   display: flex;
@@ -1142,21 +1190,13 @@ a.staff-job-btn:active {
   color: var(--navy);
 }
 
-.staff-week-subheading {
-  margin: 0.15rem 0 0;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
 .staff-week-day-paid-total,
 .staff-all-staff-paid {
-  margin: 0.55rem 0 0.65rem;
+  margin: 0 0 1rem;
+  padding: 0 0.15rem;
   font-size: 0.95rem;
-  font-weight: 800;
-  color: var(--navy);
+  font-weight: 700;
+  color: var(--navy-light);
 }
 
 .staff-week-footer-total,
