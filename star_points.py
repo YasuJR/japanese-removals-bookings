@@ -30,7 +30,7 @@ def build_star_points_view(points: Any) -> Dict[str, Any]:
 
 
 def can_manage_star_points(user: Any) -> bool:
-    """Owner/Admin may adjust stars; staff viewers may not."""
-    import auth
+    """Owner/Admin may adjust stars; delegates to Staff Portal owner check."""
+    import staff_portal_owner
 
-    return auth.is_admin_user(user)
+    return staff_portal_owner.can_manage_staff_portal(user)

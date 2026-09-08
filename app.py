@@ -1938,7 +1938,6 @@ def staff_portal():
         staff_portal_open=staff_auth.staff_portal_open_access(),
         staff_logged_in=staff_auth.is_staff_logged_in(),
         can_manage_staff_portal=staff_portal_owner.can_manage_staff_portal(g.user),
-        can_manage_star_points=star_points.can_manage_star_points(g.user),
         crew_options=active_crew_names(),
         staff_portal_status_options=staff_portal_owner.STAFF_PORTAL_STATUS_OPTIONS,
     )
@@ -1985,7 +1984,7 @@ def staff_portal_weekly_pdf():
     methods=["POST"],
     endpoint="staff_portal_rename_crew",
 )
-@staff_auth.staff_login_required
+@staff_portal_owner.owner_required
 def staff_portal_rename_crew(crew_id: int):
     new_name = (request.form.get("name") or "").strip()
     range_key = (request.form.get("range") or "week").strip()

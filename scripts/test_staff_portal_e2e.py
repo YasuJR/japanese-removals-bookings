@@ -2018,7 +2018,8 @@ def test_star_points_persist_after_reload_and_rename():
         "/staff?staff_id={0}&range=week".format(crew_id)
     ).get_data(as_text=True)
     assert "0 / 10" in reset_html
-    assert "Reset Stars" not in reset_html
+    assert "Reset Stars" in reset_html
+    assert "disabled" in reset_html
     return True
 
 
@@ -2036,7 +2037,8 @@ def test_star_points_admin_only_and_viewer_sees_display():
     ).get_data(as_text=True)
     assert "STAR POINTS" in viewer_html
     assert "3 / 10" in viewer_html
-    assert "Manage Star Points" not in viewer_html
+    assert "Edit name for" not in viewer_html
+    assert "STAR POINTS MANAGEMENT" not in viewer_html
 
     blocked = viewer.post(
         "/staff/crew/{0}/star-points/adjust".format(yasu_id),
@@ -2060,7 +2062,8 @@ def test_star_points_admin_only_and_viewer_sees_display():
     admin_html = owner.get(
         "/staff?staff_id={0}&range=week".format(yasu_id)
     ).get_data(as_text=True)
-    assert "Manage Star Points" in admin_html
+    assert "Edit name for" in admin_html
+    assert "STAR POINTS MANAGEMENT" in admin_html
     assert "Reset Stars" in admin_html
     return True
 
@@ -2128,7 +2131,7 @@ def test_staff_portal_owner_edit_job_fields():
 
     html = owner.get("/staff?staff_id={0}&range=week".format(yasu_id)).get_data(as_text=True)
     assert "staff-job-edit-btn" in html
-    assert "Manage Star Points" in html
+    assert "STAR POINTS MANAGEMENT" in html
     assert ken_id != yasu_id
     return True
 

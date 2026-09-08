@@ -1,6 +1,6 @@
-{% if can_manage_star_points and portal.star_points and portal.selected_staff_id %}
-<section class="staff-star-admin" aria-label="Manage Star Points for {{ portal.staff }}">
-  <p class="staff-star-admin-label">Manage Star Points</p>
+{% if portal.star_points %}
+<section class="staff-star-admin" aria-label="Star Points management for {{ portal.staff }}">
+  <p class="staff-star-admin-label">STAR POINTS MANAGEMENT</p>
   <div class="staff-star-admin-controls">
     <form class="staff-star-admin-form" method="post" action="{{ url_for('staff_portal_adjust_star_points', crew_id=portal.selected_staff_id) }}">
       <input type="hidden" name="action" value="decrement">
@@ -27,7 +27,6 @@
       <button type="submit" class="staff-star-admin-btn"{% if portal.star_points.points >= portal.star_points.max_points %} disabled{% endif %} aria-label="Add one star">＋</button>
     </form>
   </div>
-  {% if portal.star_points.points > 0 %}
   <form class="staff-star-reset-form" method="post" action="{{ url_for('staff_portal_reset_star_points', crew_id=portal.selected_staff_id) }}"
         data-reset-message="Reset {{ portal.staff }}'s Star Points from {{ portal.star_points.points }} to 0?"
         onsubmit="return confirm(this.dataset.resetMessage);">
@@ -38,8 +37,7 @@
     {% if portal.calendar_year %}<input type="hidden" name="year" value="{{ portal.calendar_year }}">{% endif %}
     {% if portal.calendar_month %}<input type="hidden" name="month" value="{{ portal.calendar_month }}">{% endif %}
     {% if portal.calendar_day %}<input type="hidden" name="day" value="{{ portal.calendar_day }}">{% endif %}
-    <button type="submit" class="staff-star-reset-btn">Reset Stars</button>
+    <button type="submit" class="staff-star-reset-btn"{% if portal.star_points.points <= 0 %} disabled{% endif %}>Reset Stars</button>
   </form>
-  {% endif %}
 </section>
 {% endif %}

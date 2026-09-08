@@ -54,7 +54,7 @@
         {% endfor %}
       </nav>
 
-      {% if not portal.is_all_staff and portal.selected_staff_id %}
+      {% if can_manage_staff_portal and not portal.is_all_staff and portal.selected_staff_id %}
       <details class="staff-rename-panel">
         <summary class="staff-rename-toggle">Edit name for {{ portal.staff }}</summary>
         <form class="staff-rename-form" method="post" action="{{ url_for('staff_portal_rename_crew', crew_id=portal.selected_staff_id) }}">

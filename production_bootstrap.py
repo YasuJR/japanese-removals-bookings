@@ -137,5 +137,6 @@ def ensure_staff_user() -> None:
         username,
         auth.hash_password(password),
         config.STAFF_DISPLAY_NAME or username,
+        is_admin=1,
     )
     logger.info("Created initial staff user id=%s username=%s", user_id, username)

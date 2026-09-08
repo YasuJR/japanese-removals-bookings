@@ -110,16 +110,21 @@ def _ensure_columns(conn) -> None:
 
 
 def _ensure_staff_columns(conn) -> None:
+    import config
+
     existing = db_backend.table_columns(conn, "staff_users")
     for name, col_type in STAFF_EXTRA_COLUMNS:
         if name not in existing:
             conn.execute(
                 "ALTER TABLE staff_users ADD COLUMN {0} {1}".format(name, col_type)
             )
-    conn.execute(
-        "UPDATE staff_users SET is_admin = 1 WHERE username = ? AND is_admin = 0",
-        ("admin",),
-    )
+    for admin_username in ("admin", (config.STAFF_USERNAME or "").strip().lower()):
+        if not admin_username:
+            continue
+        conn.execute(
+            "UPDATE staff_users SET is_admin = 1 WHERE username = ? AND is_admin = 0",
+            (admin_username,),
+        )
 
 
 CREW_EXTRA_COLUMNS = [
