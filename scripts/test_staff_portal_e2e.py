@@ -85,6 +85,7 @@ def _admin_client():
         "staff-portal-admin-{0}-{1}".format(os.getpid(), _user_n),
         auth.hash_password("office-admin-test-password"),
         "Office Admin Test",
+        is_admin=1,
     )
     client = app.test_client()
     with client.session_transaction() as sess:
@@ -1679,11 +1680,27 @@ def test_owner_can_edit_and_clear_actual_times_from_staff_portal():
     live_today = _unique("OwnerEditToday")
     live_id = _create_job(live_today, perth_today().isoformat(), crew="Yasu")
     staff_html = staff.get("/staff").get_data(as_text=True)
-    assert "Edit Actual Time" not in staff_html
-    assert "Clear Actual Time" not in staff_html
-    assert "/bookings/{0}/actual-times".format(booking_id) not in staff_html
-    assert "/bookings/{0}/actual-times".format(live_id) not in staff_html
+    assert "staff-job-edit-btn" not in staff_html
+    assert "Edit</summary>" not in staff_html
+    assert "/staff/bookings/{0}/edit".format(booking_id) not in staff_html
+    assert "/staff/bookings/{0}/edit".format(live_id) not in staff_html
     blocked = staff.post(
+        "/staff/bookings/{0}/edit".format(booking_id),
+        data={
+            "range": "week",
+            "staff_id": _crew_id("Yasu"),
+            "start_time": "08:00",
+            "finish_time": "16:00",
+            "actual_start_time": "07:00",
+            "actual_finish_time": "15:30",
+            "status": "Completed",
+            "crew": "Yasu",
+        },
+        follow_redirects=False,
+    )
+    assert blocked.status_code == 302
+    assert "/login" in (blocked.headers.get("Location") or "")
+    blocked_legacy = staff.post(
         "/bookings/{0}/actual-times".format(booking_id),
         data={
             "range": "week",
@@ -1693,24 +1710,29 @@ def test_owner_can_edit_and_clear_actual_times_from_staff_portal():
         },
         follow_redirects=False,
     )
-    assert blocked.status_code == 302
-    assert "/login" in (blocked.headers.get("Location") or "")
+    assert blocked_legacy.status_code == 302
+    assert "/login" in (blocked_legacy.headers.get("Location") or "")
     row = dict(db.get_booking(booking_id))
     assert staff_job_times.parse_actual_clock(row["actual_start_time"]) == "21:18"
 
     owner = _admin_staff_client()
     owner_html = owner.get("/staff").get_data(as_text=True)
-    assert "Edit Actual Time" in owner_html
-    assert "Clear Actual Time" in owner_html
+    assert "staff-job-edit-btn" in owner_html
+    assert "> Edit</summary>" in owner_html or "Edit</summary>" in owner_html
     assert 'name="actual_start_time"' in owner_html
-    assert "/bookings/{0}/actual-times".format(live_id) in owner_html
+    assert "/staff/bookings/{0}/edit".format(live_id) in owner_html
     saved = owner.post(
-        "/bookings/{0}/actual-times".format(booking_id),
+        "/staff/bookings/{0}/edit".format(booking_id),
         data={
             "range": "week",
-            "action": "save",
+            "staff_id": _crew_id("Yasu"),
+            "start_time": "08:00",
+            "finish_time": "16:00",
             "actual_start_time": "07:00",
             "actual_finish_time": "15:30",
+            "status": "Completed",
+            "crew": ["Yasu"],
+            "notes": "Owner portal edit",
         },
         follow_redirects=False,
     )
@@ -1730,8 +1752,12 @@ def test_owner_can_edit_and_clear_actual_times_from_staff_portal():
     assert portal["weekly_worked"]["paid_display"] == "8.5hr"
 
     cleared = owner.post(
-        "/bookings/{0}/actual-times".format(booking_id),
-        data={"range": "week", "action": "clear"},
+        "/staff/bookings/{0}/edit".format(booking_id),
+        data={
+            "range": "week",
+            "staff_id": _crew_id("Yasu"),
+            "action": "clear_actual",
+        },
         follow_redirects=False,
     )
     assert cleared.status_code in (302, 303)
@@ -2021,12 +2047,135 @@ def test_star_points_admin_only_and_viewer_sees_display():
     assert "/login" in (blocked.headers.get("Location") or "")
     assert db.get_crew_star_points(yasu_id) == 3
 
+    office_user = _office_non_admin_client()
+    blocked_office = office_user.post(
+        "/staff/crew/{0}/star-points/adjust".format(yasu_id),
+        data={"action": "increment", **_star_nav(yasu_id)},
+        follow_redirects=False,
+    )
+    assert blocked_office.status_code == 403
+    assert db.get_crew_star_points(yasu_id) == 3
+
     owner = _admin_client()
     admin_html = owner.get(
         "/staff?staff_id={0}&range=week".format(yasu_id)
     ).get_data(as_text=True)
     assert "Manage Star Points" in admin_html
     assert "Reset Stars" in admin_html
+    return True
+
+
+def _office_non_admin_client():
+    global _user_n
+    _user_n += 1
+    db.init_db()
+    uid = db.create_staff_user(
+        "staff-portal-user-{0}-{1}".format(os.getpid(), _user_n),
+        auth.hash_password("office-user-test-password"),
+        "Office User Test",
+        is_admin=0,
+    )
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = uid
+    return client
+
+
+def test_staff_portal_owner_edit_job_fields():
+    import staff_job_times
+
+    monday = _isolated_monday()
+    customer = _unique("OwnerEditFields")
+    booking_id = _create_job(
+        customer,
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="12:00",
+        callout_fee=92.5,
+        hourly_rate=185.0,
+        status="Confirmed",
+        notes="Before edit",
+    )
+    owner = _admin_staff_client()
+    yasu_id = _crew_id("Yasu")
+    ken_id = _crew_id("Ken")
+    response = owner.post(
+        "/staff/bookings/{0}/edit".format(booking_id),
+        data={
+            "range": "week",
+            "staff_id": yasu_id,
+            "start_time": "09:00",
+            "finish_time": "13:00",
+            "actual_start_time": "09:15",
+            "actual_finish_time": "12:45",
+            "callout_hours": "0.5",
+            "status": "Completed",
+            "crew": ["Yasu", "Ken"],
+            "notes": "After owner edit",
+        },
+        follow_redirects=True,
+    )
+    assert response.status_code == 200
+    row = dict(db.get_booking(booking_id))
+    assert row["start_time"] in ("09:00", "9:00")
+    assert row["finish_time"] in ("13:00",)
+    assert row["status"] == "Completed"
+    assert "Ken" in row["crew"]
+    assert row["notes"] == "After owner edit"
+    assert float(row["callout_fee"]) == 92.5
+    assert staff_job_times.parse_actual_clock(row["actual_start_time"]) == "09:15"
+
+    html = owner.get("/staff?staff_id={0}&range=week".format(yasu_id)).get_data(as_text=True)
+    assert "staff-job-edit-btn" in html
+    assert "Manage Star Points" in html
+    assert ken_id != yasu_id
+    return True
+
+
+def test_staff_portal_owner_edit_forbidden_for_non_admin():
+    booking_id = _create_job(
+        _unique("ForbiddenEdit"),
+        perth_today().isoformat(),
+        crew="Yasu",
+    )
+    viewer = app.test_client()
+    viewer_html = viewer.get("/staff").get_data(as_text=True)
+    assert "staff-job-edit-btn" not in viewer_html
+
+    blocked_viewer = viewer.post(
+        "/staff/bookings/{0}/edit".format(booking_id),
+        data={
+            "range": "today",
+            "staff_id": _crew_id("Yasu"),
+            "start_time": "08:00",
+            "finish_time": "12:00",
+            "status": "Confirmed",
+            "crew": "Yasu",
+        },
+        follow_redirects=False,
+    )
+    assert blocked_viewer.status_code == 302
+    assert "/login" in (blocked_viewer.headers.get("Location") or "")
+
+    office_user = _office_non_admin_client()
+    office_html = office_user.get("/staff").get_data(as_text=True)
+    assert "staff-job-edit-btn" not in office_html
+    blocked_office = office_user.post(
+        "/staff/bookings/{0}/edit".format(booking_id),
+        data={
+            "range": "today",
+            "staff_id": _crew_id("Yasu"),
+            "start_time": "10:00",
+            "finish_time": "14:00",
+            "status": "Confirmed",
+            "crew": "Yasu",
+        },
+        follow_redirects=False,
+    )
+    assert blocked_office.status_code == 403
+    row = dict(db.get_booking(booking_id))
+    assert row["start_time"] not in ("10:00",)
     return True
 
 
@@ -2074,6 +2223,8 @@ def main():
         test_star_points_adjust_bounds_and_isolation,
         test_star_points_persist_after_reload_and_rename,
         test_star_points_admin_only_and_viewer_sees_display,
+        test_staff_portal_owner_edit_job_fields,
+        test_staff_portal_owner_edit_forbidden_for_non_admin,
     ]
     passed = 0
     for test in tests:

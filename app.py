@@ -49,6 +49,7 @@ from staff_portal import STAFF_VIEW_ALL, build_staff_portal, build_staff_weekly_
 import staff_auth
 import staff_job_times
 import star_points
+import staff_portal_owner
 from outstanding_invoices_data import (
     INVOICE_FILTERS,
     build_outstanding_dashboard,
@@ -1936,10 +1937,10 @@ def staff_portal():
         portal=portal,
         staff_portal_open=staff_auth.staff_portal_open_access(),
         staff_logged_in=staff_auth.is_staff_logged_in(),
-        can_edit_actual=auth.get_current_user_id() is not None,
-        can_manage_star_points=star_points.can_manage_star_points(
-            auth.get_current_user_id()
-        ),
+        can_manage_staff_portal=staff_portal_owner.can_manage_staff_portal(g.user),
+        can_manage_star_points=star_points.can_manage_star_points(g.user),
+        crew_options=active_crew_names(),
+        staff_portal_status_options=staff_portal_owner.STAFF_PORTAL_STATUS_OPTIONS,
     )
 
 
@@ -2033,7 +2034,7 @@ def _staff_portal_form_nav_params() -> dict:
     methods=["POST"],
     endpoint="staff_portal_adjust_star_points",
 )
-@auth.login_required
+@staff_portal_owner.owner_required
 def staff_portal_adjust_star_points(crew_id: int):
     action = (request.form.get("action") or "").strip().lower()
     delta = 1 if action == "increment" else -1 if action == "decrement" else 0
@@ -2053,7 +2054,7 @@ def staff_portal_adjust_star_points(crew_id: int):
     methods=["POST"],
     endpoint="staff_portal_reset_star_points",
 )
-@auth.login_required
+@staff_portal_owner.owner_required
 def staff_portal_reset_star_points(crew_id: int):
     if (request.form.get("confirm") or "").strip() != "1":
         flash("Star Points reset cancelled.", "error")
@@ -2094,11 +2095,39 @@ def _staff_portal_redirect():
 
 
 @app.route(
+    "/staff/bookings/<int:booking_id>/edit",
+    methods=["POST"],
+    endpoint="staff_portal_edit_booking",
+)
+@staff_portal_owner.owner_required
+def staff_portal_edit_booking(booking_id: int):
+    row = db.get_booking(booking_id)
+    if row is None:
+        abort(404)
+    dest = _staff_portal_redirect()
+    action = str(request.form.get("action") or "").strip().lower()
+    if action == "clear_actual":
+        db.save_booking_actual_times(booking_id, "", "", None)
+        flash("Actual time cleared.", "success")
+        return dest
+    ok, errors = staff_portal_owner.save_owner_job_edit(booking_id, request.form)
+    if errors:
+        for message in errors:
+            flash(message, "error")
+        return dest
+    if ok:
+        flash("Job updated.", "success")
+    else:
+        flash("Could not save job.", "error")
+    return dest
+
+
+@app.route(
     "/bookings/<int:booking_id>/actual-times",
     methods=["POST"],
     endpoint="save_booking_actual_times",
 )
-@auth.login_required
+@staff_portal_owner.owner_required
 def save_booking_actual_times_view(booking_id: int):
     """Owner/Admin overwrite or clear Actual Start / Finish only."""
     row = db.get_booking(booking_id)

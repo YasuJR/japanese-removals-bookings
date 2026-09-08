@@ -1,7 +1,10 @@
 <article class="staff-schedule-job">
-  {% if job.status_display %}
-  <p class="staff-schedule-status">{{ job.status_display }}</p>
-  {% endif %}
+  <div class="staff-schedule-job-top">
+    {% if job.status_display %}
+    <p class="staff-schedule-status">{{ job.status_display }}</p>
+    {% endif %}
+    {% include "_staff_job_owner_edit_toggle.html" %}
+  </div>
   <p class="staff-schedule-time">{{ job.scheduled_range_display or job.start_time }}</p>
   <p class="staff-schedule-customer">Job: {{ job.customer_name }}</p>
   {% if job.has_actual %}

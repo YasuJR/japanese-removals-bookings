@@ -478,6 +478,8 @@ def _serialize_job(booking: Dict[str, Any], today: date) -> Dict[str, Any]:
         row.get("duration_hours")
     ) or "—"
     status_display, is_done_status = _status_badge(row)
+    status_value = job_status.display(row)
+    callout_h = staff_job_times.callout_hours(row)
     payload = {
         "id": int(row["id"]),
         "date_iso": move_date,
@@ -486,6 +488,10 @@ def _serialize_job(booking: Dict[str, Any], today: date) -> Dict[str, Any]:
         "start_hm": start_hm,
         "owner_start_hm": owner_start_hm,
         "owner_finish_hm": owner_finish_hm,
+        "status": status_value,
+        "callout_hours_input": ""
+        if callout_h is None
+        else ("{0:.2f}".format(callout_h).rstrip("0").rstrip(".")),
         "customer_name": str(row.get("customer_name") or "").strip() or "—",
         "pickup_address": pickup,
         "pickup_label": pickup_label or pickup,

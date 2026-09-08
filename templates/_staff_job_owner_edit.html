@@ -1,0 +1,61 @@
+<form class="staff-job-owner-form" method="post" action="{{ url_for('staff_portal_edit_booking', booking_id=job.id) }}">
+  <input type="hidden" name="range" value="{{ portal.range }}">
+  <input type="hidden" name="week" value="{{ portal.week_offset }}">
+  <input type="hidden" name="staff_id" value="{{ portal.selected_staff_id }}">
+  {% if portal.calendar_year %}<input type="hidden" name="year" value="{{ portal.calendar_year }}">{% endif %}
+  {% if portal.calendar_month %}<input type="hidden" name="month" value="{{ portal.calendar_month }}">{% endif %}
+  {% if portal.calendar_day %}<input type="hidden" name="day" value="{{ portal.calendar_day }}">{% endif %}
+
+  <div class="staff-job-owner-grid">
+    <label>
+      Start time
+      <input type="time" name="start_time" value="{{ job.owner_start_hm or job.start_hm }}">
+    </label>
+    <label>
+      Finish time
+      <input type="time" name="finish_time" value="{{ job.owner_finish_hm }}">
+    </label>
+    <label>
+      Actual start
+      <input type="time" name="actual_start_time" value="{{ job.actual_start_hm }}">
+    </label>
+    <label>
+      Actual finish
+      <input type="time" name="actual_finish_time" value="{{ job.actual_finish_hm }}">
+    </label>
+    <label>
+      Call-out (hours)
+      <input type="number" name="callout_hours" min="0" step="0.25" inputmode="decimal" value="{{ job.callout_hours_input }}">
+    </label>
+    <label>
+      Status
+      <select name="status">
+        {% for status in staff_portal_status_options %}
+        <option value="{{ status }}"{% if job.status == status %} selected{% endif %}>{{ status }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+
+  <fieldset class="staff-job-owner-crew">
+    <legend>Crew</legend>
+    <div class="staff-job-owner-crew-list">
+      {% for name in crew_options %}
+      <label class="staff-job-owner-crew-item">
+        <input type="checkbox" name="crew" value="{{ name }}"{% if name in job.crew_names %} checked{% endif %}>
+        {{ name }}
+      </label>
+      {% endfor %}
+    </div>
+  </fieldset>
+
+  <label class="staff-job-owner-notes">
+    Notes
+    <textarea name="notes" rows="3">{{ job.notes }}</textarea>
+  </label>
+
+  <div class="staff-job-owner-actions">
+    <button type="submit" class="staff-job-btn staff-job-owner-save">Save changes</button>
+    <button type="submit" class="staff-job-btn staff-job-owner-clear" name="action" value="clear_actual">Clear actual time</button>
+  </div>
+</form>

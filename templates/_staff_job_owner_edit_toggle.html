@@ -1,0 +1,6 @@
+{% if can_manage_staff_portal %}
+<details class="staff-job-owner-edit">
+  <summary class="staff-job-edit-btn"><span class="staff-job-edit-icon" aria-hidden="true">✎</span> Edit</summary>
+  {% include "_staff_job_owner_edit.html" %}
+</details>
+{% endif %}

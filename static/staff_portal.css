@@ -292,6 +292,142 @@
   word-break: break-word;
 }
 
+.staff-job-card-top,
+.staff-schedule-job-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-bottom: 0.35rem;
+}
+
+.staff-job-card-top .staff-job-status,
+.staff-schedule-job-top .staff-schedule-status {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.staff-job-owner-edit {
+  flex: 0 0 auto;
+}
+
+.staff-job-edit-btn {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-height: 2rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(26, 39, 68, 0.18);
+  background: #fff;
+  color: var(--navy);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.staff-job-edit-btn::-webkit-details-marker {
+  display: none;
+}
+
+.staff-job-edit-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.staff-job-owner-form {
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+
+.staff-job-owner-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem 0.65rem;
+}
+
+.staff-job-owner-grid label,
+.staff-job-owner-notes {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.staff-job-owner-grid input,
+.staff-job-owner-grid select,
+.staff-job-owner-notes textarea {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font: inherit;
+  color: var(--navy);
+  background: var(--cream);
+}
+
+.staff-job-owner-notes textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.staff-job-owner-crew {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.staff-job-owner-crew legend {
+  padding: 0 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.staff-job-owner-crew-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.65rem;
+}
+
+.staff-job-owner-crew-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.staff-job-owner-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.staff-job-owner-save {
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
+}
+
+.staff-job-owner-clear {
+  background: #fff;
+}
+
 .staff-job-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

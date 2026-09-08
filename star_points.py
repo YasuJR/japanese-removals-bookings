@@ -29,6 +29,8 @@ def build_star_points_view(points: Any) -> Dict[str, Any]:
     }
 
 
-def can_manage_star_points(admin_user_id: Optional[Any]) -> bool:
-    """Owner/Admin may adjust stars; staff viewers may not (future per-staff login)."""
-    return admin_user_id is not None
+def can_manage_star_points(user: Any) -> bool:
+    """Owner/Admin may adjust stars; staff viewers may not."""
+    import auth
+
+    return auth.is_admin_user(user)
