@@ -1,6 +1,5 @@
-{% if portal.star_points %}
-<section class="staff-star-admin" aria-label="Star Points management for {{ portal.staff }}">
-  <p class="staff-star-admin-label">STAR POINTS MANAGEMENT</p>
+<section class="staff-star-admin" aria-label="Star Points for {{ portal.staff }}">
+  <p class="staff-star-admin-label">STAR POINTS</p>
   <div class="staff-star-admin-controls">
     <form class="staff-star-admin-form" method="post" action="{{ url_for('staff_portal_adjust_star_points', crew_id=portal.selected_staff_id) }}">
       <input type="hidden" name="action" value="decrement">
@@ -40,4 +39,3 @@
     <button type="submit" class="staff-star-reset-btn"{% if portal.star_points.points <= 0 %} disabled{% endif %}>Reset Stars</button>
   </form>
 </section>
-{% endif %}

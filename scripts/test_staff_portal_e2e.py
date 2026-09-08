@@ -2038,7 +2038,8 @@ def test_star_points_admin_only_and_viewer_sees_display():
     assert "STAR POINTS" in viewer_html
     assert "3 / 10" in viewer_html
     assert "Edit name for" not in viewer_html
-    assert "STAR POINTS MANAGEMENT" not in viewer_html
+    assert "staff-star-admin-btn" not in viewer_html
+    assert "Reset Stars" not in viewer_html
 
     blocked = viewer.post(
         "/staff/crew/{0}/star-points/adjust".format(yasu_id),
@@ -2063,8 +2064,9 @@ def test_star_points_admin_only_and_viewer_sees_display():
         "/staff?staff_id={0}&range=week".format(yasu_id)
     ).get_data(as_text=True)
     assert "Edit name for" in admin_html
-    assert "STAR POINTS MANAGEMENT" in admin_html
+    assert "staff-star-admin-btn" in admin_html
     assert "Reset Stars" in admin_html
+    assert admin_html.index("staff-star-admin") < admin_html.index("staff-portal-tabs")
     return True
 
 
@@ -2131,7 +2133,7 @@ def test_staff_portal_owner_edit_job_fields():
 
     html = owner.get("/staff?staff_id={0}&range=week".format(yasu_id)).get_data(as_text=True)
     assert "staff-job-edit-btn" in html
-    assert "STAR POINTS MANAGEMENT" in html
+    assert "staff-star-admin-btn" in html
     assert ken_id != yasu_id
     return True
 
