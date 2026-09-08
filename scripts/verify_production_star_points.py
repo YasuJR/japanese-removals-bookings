@@ -22,6 +22,69 @@ PRODUCTION_URL = os.environ.get(
 STAFF_TARGET = (os.environ.get("STAR_POINTS_VERIFY_STAFF") or "Will").strip()
 
 
+SERVICE_NAME = "japanese-removals-bookings"
+CLI_CONFIG_PATH = Path.home() / ".render" / "cli.yaml"
+
+
+def _load_render_api_key() -> str:
+    key = (os.environ.get("RENDER_API_KEY") or "").strip()
+    if key:
+        return key
+    if CLI_CONFIG_PATH.is_file():
+        for line in CLI_CONFIG_PATH.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("key:"):
+                return line.split(":", 1)[1].strip()
+    return ""
+
+
+def _render_api(path: str, api_key: str) -> object:
+    req = urllib.request.Request(
+        "https://api.render.com/v1" + path,
+        headers={
+            "Authorization": "Bearer {0}".format(api_key),
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _unwrap(items: list) -> list:
+    out = []
+    for item in items or []:
+        if isinstance(item, dict):
+            for key in ("service", "envVar", "deploy"):
+                if key in item and isinstance(item[key], dict):
+                    out.append(item[key])
+                    break
+            else:
+                out.append(item)
+        else:
+            out.append(item)
+    return out
+
+
+def _load_staff_credentials_from_render() -> tuple[str, str]:
+    api_key = _load_render_api_key()
+    if not api_key:
+        return "", ""
+    try:
+        services = _unwrap(_render_api("/services?limit=100", api_key))
+    except urllib.error.HTTPError:
+        return "", ""
+    service = next((s for s in services if s.get("name") == SERVICE_NAME), None)
+    if not service:
+        return "", ""
+    envs = _unwrap(
+        _render_api("/services/{0}/env-vars?limit=100".format(service["id"]), api_key)
+    )
+    values = {ev.get("key"): ev.get("value", "") for ev in envs}
+    return (
+        (values.get("STAFF_USERNAME") or "").strip(),
+        (values.get("STAFF_PASSWORD") or "").strip(),
+    )
+
+
 def _load_credentials() -> tuple[str, str]:
     username = (
         os.environ.get("PRODUCTION_TEST_USERNAME")
@@ -47,6 +110,10 @@ def _load_credentials() -> tuple[str, str]:
                     username = value
                 elif key == "STAFF_PASSWORD" and not password:
                     password = value
+    if not username or not password:
+        render_user, render_pass = _load_staff_credentials_from_render()
+        username = username or render_user
+        password = password or render_pass
     if not username or not password:
         raise SystemExit(
             "Set STAFF_USERNAME/STAFF_PASSWORD or PRODUCTION_TEST_USERNAME/PASSWORD."

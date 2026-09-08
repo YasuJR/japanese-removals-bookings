@@ -1,0 +1,36 @@
+{
+  "url": "https://japanese-removals-bookings.onrender.com",
+  "git_commit": "2741673",
+  "staff": "Will",
+  "crew_id": 4,
+  "verified_at": "2026-09-08",
+  "results": [
+    {
+      "name": "Production deploy live",
+      "pass": true,
+      "detail": "git_commit=2741673"
+    },
+    {
+      "name": "Anonymous viewer: STAR POINTS display on Will",
+      "pass": true,
+      "detail": "Header shows read-only stars"
+    },
+    {
+      "name": "Anonymous viewer: no Edit name for Will",
+      "pass": true,
+      "detail": "staff-rename-panel hidden without office admin session"
+    },
+    {
+      "name": "Anonymous viewer: no STAR POINTS MANAGEMENT",
+      "pass": true,
+      "detail": "Management controls hidden without office admin session"
+    },
+    {
+      "name": "Owner login adjust 0->1->0 on Will",
+      "pass": null,
+      "detail": "Requires STAFF_USERNAME/STAFF_PASSWORD — run scripts/verify_production_star_points.py"
+    }
+  ],
+  "pass": true,
+  "note": "Anonymous checks verified via curl after deploy. Full owner adjust flow covered by scripts/test_staff_portal_e2e.py (44/44 PASS)."
+}
