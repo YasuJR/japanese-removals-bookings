@@ -122,6 +122,23 @@ def _ensure_staff_columns(conn) -> None:
     )
 
 
+CREW_EXTRA_COLUMNS = [
+    ("star_points", "INTEGER NOT NULL DEFAULT 0"),
+]
+
+
+def _ensure_crew_columns(conn) -> None:
+    existing = db_backend.table_columns(conn, "crew_members")
+    for name, col_type in CREW_EXTRA_COLUMNS:
+        if name not in existing:
+            conn.execute(
+                "ALTER TABLE crew_members ADD COLUMN {0} {1}".format(name, col_type)
+            )
+    conn.execute(
+        "UPDATE crew_members SET star_points = 0 WHERE star_points IS NULL"
+    )
+
+
 def _seed_crew_and_trucks(conn) -> None:
     crew_count = conn.execute("SELECT COUNT(*) AS c FROM crew_members").fetchone()["c"]
     if int(crew_count) == 0:
@@ -489,6 +506,7 @@ def init_db() -> None:
                 _ensure_bank_transactions_table(conn)
                 _ensure_columns(conn)
                 _ensure_staff_columns(conn)
+                _ensure_crew_columns(conn)
                 _ensure_invoice_sequence(conn)
                 _seed_crew_and_trucks(conn)
                 _ensure_indexes(conn)
@@ -670,6 +688,7 @@ def init_db() -> None:
         _ensure_bank_transactions_table(conn)
         _ensure_columns(conn)
         _ensure_staff_columns(conn)
+        _ensure_crew_columns(conn)
         _ensure_invoice_sequence(conn)
         _seed_crew_and_trucks(conn)
         _ensure_indexes(conn)
@@ -1972,6 +1991,58 @@ def update_crew_member(
         )
         conn.commit()
         return cursor.rowcount > 0
+
+
+def get_crew_star_points(crew_id: int) -> int:
+    """Return persisted star points for a crew member (0–10)."""
+    import star_points
+
+    member = get_crew_member(crew_id)
+    if not member:
+        return 0
+    try:
+        raw = member["star_points"]
+    except (KeyError, IndexError, TypeError):
+        raw = 0
+    return star_points.clamp_star_points(raw)
+
+
+def adjust_crew_star_points(crew_id: int, delta: int) -> Optional[int]:
+    """Add or remove one star point. Returns new value, or None if crew missing."""
+    import star_points
+
+    member = get_crew_member(crew_id)
+    if not member:
+        return None
+    if delta not in (-1, 1):
+        return get_crew_star_points(crew_id)
+    try:
+        raw = member["star_points"]
+    except (KeyError, IndexError, TypeError):
+        raw = 0
+    current = star_points.clamp_star_points(raw)
+    new_value = star_points.clamp_star_points(current + delta)
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE crew_members SET star_points = ? WHERE id = ?",
+            (new_value, crew_id),
+        )
+        conn.commit()
+    return new_value
+
+
+def reset_crew_star_points(crew_id: int) -> bool:
+    """Reset star points to zero for one crew member."""
+    member = get_crew_member(crew_id)
+    if not member:
+        return False
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE crew_members SET star_points = 0 WHERE id = ?",
+            (crew_id,),
+        )
+        conn.commit()
+    return True
 
 
 def rename_crew_member(crew_id: int, new_name: str) -> bool:

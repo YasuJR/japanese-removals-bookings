@@ -1,0 +1,12 @@
+{% if portal.star_points %}
+<div class="staff-star-points-header{% if portal.star_points.bonus_ready %} staff-star-points-bonus{% endif %}">
+  {% if portal.star_points.bonus_ready %}
+  <p class="staff-star-bonus-ready">⭐ BONUS READY</p>
+  {% endif %}
+  <p class="staff-star-kicker">⭐ STAR POINTS</p>
+  <p class="staff-star-row" aria-label="Star Points {{ portal.star_points.count_display }}">
+    <span class="staff-star-icons" aria-hidden="true">{{ portal.star_points.stars_display }}</span>
+    <span class="staff-star-count">{{ portal.star_points.count_display }}</span>
+  </p>
+</div>
+{% endif %}

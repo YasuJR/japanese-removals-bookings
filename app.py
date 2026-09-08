@@ -48,6 +48,7 @@ from driver_run_sheet_data import build_driver_run_sheet
 from staff_portal import STAFF_VIEW_ALL, build_staff_portal, build_staff_weekly_pdf_schedule, portal_nav_params
 import staff_auth
 import staff_job_times
+import star_points
 from outstanding_invoices_data import (
     INVOICE_FILTERS,
     build_outstanding_dashboard,
@@ -1936,6 +1937,9 @@ def staff_portal():
         staff_portal_open=staff_auth.staff_portal_open_access(),
         staff_logged_in=staff_auth.is_staff_logged_in(),
         can_edit_actual=auth.get_current_user_id() is not None,
+        can_manage_star_points=star_points.can_manage_star_points(
+            auth.get_current_user_id()
+        ),
     )
 
 
@@ -1997,6 +2001,71 @@ def staff_portal_rename_crew(crew_id: int):
         week_offset=week_offset,
     )
     return redirect(url_for("staff_portal", **params))
+
+
+def _staff_portal_form_nav_params() -> dict:
+    range_key = (request.form.get("range") or request.args.get("range") or "week").strip()
+    week_offset = (request.form.get("week") or request.args.get("week") or "0").strip()
+    staff_id = (
+        request.form.get("staff_id")
+        or request.args.get("staff_id")
+        or STAFF_VIEW_ALL
+    )
+    params = portal_nav_params(
+        staff_id=staff_id,
+        range_key=range_key,
+        week_offset=week_offset,
+    )
+    cal_year = (request.form.get("year") or request.args.get("year") or "").strip()
+    cal_month = (request.form.get("month") or request.args.get("month") or "").strip()
+    cal_day = (request.form.get("day") or request.args.get("day") or "").strip()
+    if cal_year:
+        params["year"] = cal_year
+    if cal_month:
+        params["month"] = cal_month
+    if cal_day:
+        params["day"] = cal_day
+    return params
+
+
+@app.route(
+    "/staff/crew/<int:crew_id>/star-points/adjust",
+    methods=["POST"],
+    endpoint="staff_portal_adjust_star_points",
+)
+@auth.login_required
+def staff_portal_adjust_star_points(crew_id: int):
+    action = (request.form.get("action") or "").strip().lower()
+    delta = 1 if action == "increment" else -1 if action == "decrement" else 0
+    if delta == 0:
+        flash("Invalid Star Points action.", "error")
+    else:
+        new_value = db.adjust_crew_star_points(crew_id, delta)
+        if new_value is None:
+            flash("Staff member not found.", "error")
+        else:
+            flash("Star Points updated to {0} / 10.".format(new_value), "success")
+    return redirect(url_for("staff_portal", **_staff_portal_form_nav_params()))
+
+
+@app.route(
+    "/staff/crew/<int:crew_id>/star-points/reset",
+    methods=["POST"],
+    endpoint="staff_portal_reset_star_points",
+)
+@auth.login_required
+def staff_portal_reset_star_points(crew_id: int):
+    if (request.form.get("confirm") or "").strip() != "1":
+        flash("Star Points reset cancelled.", "error")
+        return redirect(url_for("staff_portal", **_staff_portal_form_nav_params()))
+    member = db.get_crew_member(crew_id)
+    if not member:
+        flash("Staff member not found.", "error")
+    elif db.reset_crew_star_points(crew_id):
+        flash("Star Points reset to 0 / 10.", "success")
+    else:
+        flash("Could not reset Star Points.", "error")
+    return redirect(url_for("staff_portal", **_staff_portal_form_nav_params()))
 
 
 def _staff_portal_redirect():

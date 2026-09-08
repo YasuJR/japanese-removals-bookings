@@ -20,6 +20,9 @@
           <p class="staff-portal-who">
             {% if portal.is_all_staff %}All Staff{% else %}{{ portal.staff }}{% endif %}
           </p>
+          {% if not portal.is_all_staff %}
+          {% include "_staff_star_points_display.html" %}
+          {% endif %}
         </div>
       </div>
       {% if staff_logged_in %}
@@ -63,6 +66,7 @@
           </label>
           <button type="submit" class="staff-rename-save">Save name</button>
         </form>
+        {% include "_staff_star_points_admin.html" %}
       </details>
       {% endif %}
 

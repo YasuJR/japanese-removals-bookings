@@ -1855,6 +1855,181 @@ def test_staff_weekly_pdf_week_offset():
     return True
 
 
+def _star_nav(crew_id, week=0):
+    return {
+        "staff_id": crew_id,
+        "range": "week",
+        "week": week,
+    }
+
+
+def _post_star_adjust(client, crew_id, action, **extra):
+    data = dict(_star_nav(crew_id))
+    data["action"] = action
+    data.update(extra)
+    return client.post(
+        "/staff/crew/{0}/star-points/adjust".format(crew_id),
+        data=data,
+        follow_redirects=True,
+    )
+
+
+def _post_star_reset(client, crew_id, confirm=True, **extra):
+    data = dict(_star_nav(crew_id))
+    data["confirm"] = "1" if confirm else "0"
+    data.update(extra)
+    return client.post(
+        "/staff/crew/{0}/star-points/reset".format(crew_id),
+        data=data,
+        follow_redirects=True,
+    )
+
+
+def test_star_points_adjust_bounds_and_isolation():
+    import star_points
+    from staff_portal import build_staff_portal
+
+    _ensure_default_crew()
+    yasu_id = _crew_id("Yasu")
+    ken_id = _crew_id("Ken")
+    assert yasu_id and ken_id
+
+    db.reset_crew_star_points(yasu_id)
+    db.reset_crew_star_points(ken_id)
+    owner = _admin_client()
+
+    assert db.get_crew_star_points(yasu_id) == 0
+    _post_star_adjust(owner, yasu_id, "increment")
+    assert db.get_crew_star_points(yasu_id) == 1
+    _post_star_adjust(owner, yasu_id, "increment")
+    assert db.get_crew_star_points(yasu_id) == 2
+    assert db.get_crew_star_points(ken_id) == 0
+
+    for _ in range(8):
+        _post_star_adjust(owner, yasu_id, "increment")
+    assert db.get_crew_star_points(yasu_id) == 10
+    _post_star_adjust(owner, yasu_id, "increment")
+    assert db.get_crew_star_points(yasu_id) == 10
+
+    _post_star_adjust(owner, yasu_id, "decrement")
+    assert db.get_crew_star_points(yasu_id) == 9
+    for _ in range(9):
+        _post_star_adjust(owner, yasu_id, "decrement")
+    assert db.get_crew_star_points(yasu_id) == 0
+    _post_star_adjust(owner, yasu_id, "decrement")
+    assert db.get_crew_star_points(yasu_id) == 0
+
+    _post_star_adjust(owner, ken_id, "increment")
+    assert db.get_crew_star_points(ken_id) == 1
+    assert db.get_crew_star_points(yasu_id) == 0
+
+    view = star_points.build_star_points_view(5)
+    assert view["stars_display"] == "⭐⭐⭐⭐⭐☆☆☆☆☆"
+    assert view["count_display"] == "5 / 10"
+    assert view["bonus_ready"] is False
+    bonus = star_points.build_star_points_view(10)
+    assert bonus["bonus_ready"] is True
+
+    wednesday = perth_today()
+    db.reset_crew_star_points(yasu_id)
+    for _ in range(3):
+        db.adjust_crew_star_points(yasu_id, 1)
+    week0 = build_staff_portal("Yasu", "week", wednesday, week_offset=0)
+    week1 = build_staff_portal("Yasu", "week", wednesday, week_offset=1)
+    assert week0["star_points"]["points"] == 3
+    assert week1["star_points"]["points"] == 3
+    return True
+
+
+def test_star_points_persist_after_reload_and_rename():
+    from staff_portal import build_staff_portal
+
+    _ensure_default_crew()
+    unique = _unique("StarCrew")
+    crew_id = db.create_crew_member(unique, role="Driver", active=1)
+    db.reset_crew_star_points(crew_id)
+    owner = _admin_client()
+
+    for _ in range(4):
+        _post_star_adjust(owner, crew_id, "increment")
+    assert db.get_crew_star_points(crew_id) == 4
+
+    db.init_db()
+    assert db.get_crew_star_points(crew_id) == 4
+
+    html = owner.get(
+        "/staff?staff_id={0}&range=week".format(crew_id)
+    ).get_data(as_text=True)
+    assert "STAR POINTS" in html
+    assert "4 / 10" in html
+    assert "⭐⭐⭐⭐" in html
+
+    renamed = _unique("StarRenamed")
+    assert db.rename_crew_member(crew_id, renamed) is True
+    assert db.get_crew_star_points(crew_id) == 4
+    portal = build_staff_portal(renamed, "week", perth_today())
+    assert portal["star_points"]["points"] == 4
+
+    owner.get("/staff?staff_id={0}&range=week".format(crew_id))
+    _post_star_adjust(owner, crew_id, "increment")
+    for _ in range(5):
+        _post_star_adjust(owner, crew_id, "increment")
+    assert db.get_crew_star_points(crew_id) == 10
+    bonus_html = owner.get(
+        "/staff?staff_id={0}&range=week".format(crew_id)
+    ).get_data(as_text=True)
+    assert "BONUS READY" in bonus_html
+    assert "10 / 10" in bonus_html
+    assert "data-reset-message" in bonus_html
+
+    cancelled = _post_star_reset(owner, crew_id, confirm=False)
+    assert cancelled.status_code == 200
+    assert db.get_crew_star_points(crew_id) == 10
+
+    _post_star_reset(owner, crew_id, confirm=True)
+    assert db.get_crew_star_points(crew_id) == 0
+    reset_html = owner.get(
+        "/staff?staff_id={0}&range=week".format(crew_id)
+    ).get_data(as_text=True)
+    assert "0 / 10" in reset_html
+    assert "Reset Stars" not in reset_html
+    return True
+
+
+def test_star_points_admin_only_and_viewer_sees_display():
+    _ensure_default_crew()
+    yasu_id = _crew_id("Yasu")
+    db.reset_crew_star_points(yasu_id)
+    db.adjust_crew_star_points(yasu_id, 1)
+    db.adjust_crew_star_points(yasu_id, 1)
+    db.adjust_crew_star_points(yasu_id, 1)
+
+    viewer = app.test_client()
+    viewer_html = viewer.get(
+        "/staff?staff_id={0}&range=week".format(yasu_id)
+    ).get_data(as_text=True)
+    assert "STAR POINTS" in viewer_html
+    assert "3 / 10" in viewer_html
+    assert "Manage Star Points" not in viewer_html
+
+    blocked = viewer.post(
+        "/staff/crew/{0}/star-points/adjust".format(yasu_id),
+        data={"action": "increment", **_star_nav(yasu_id)},
+        follow_redirects=False,
+    )
+    assert blocked.status_code == 302
+    assert "/login" in (blocked.headers.get("Location") or "")
+    assert db.get_crew_star_points(yasu_id) == 3
+
+    owner = _admin_client()
+    admin_html = owner.get(
+        "/staff?staff_id={0}&range=week".format(yasu_id)
+    ).get_data(as_text=True)
+    assert "Manage Star Points" in admin_html
+    assert "Reset Stars" in admin_html
+    return True
+
+
 def main():
     tests = [
         test_staff_open_access_without_login,
@@ -1896,6 +2071,9 @@ def main():
         test_staff_weekly_pdf_week_offset,
         test_paid_hours_invoice_confirmed_when_status_still_confirmed,
         test_paid_hours_regression_cases,
+        test_star_points_adjust_bounds_and_isolation,
+        test_star_points_persist_after_reload_and_rename,
+        test_star_points_admin_only_and_viewer_sees_display,
     ]
     passed = 0
     for test in tests:

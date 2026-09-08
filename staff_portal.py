@@ -24,6 +24,7 @@ from crew import CREW_OPTIONS, active_crew_names, all_crew_names, crew_from_stor
 from dashboard_data import perth_today, week_range
 from display_dates import format_display_date, normalize_move_date
 import staff_job_times
+import star_points
 from weekly_schedule_data import _day_heading, _week_range_heading, build_weekly_schedule
 
 RANGE_TODAY = "today"
@@ -1012,6 +1013,17 @@ def build_staff_portal(
         calendar_day=selected_day,
     )
 
+    star_points_view = None
+    if not is_all_staff and selected_staff_id not in (None, "", STAFF_VIEW_ALL):
+        try:
+            crew_id = int(selected_staff_id)
+        except (TypeError, ValueError):
+            crew_id = 0
+        if crew_id:
+            star_points_view = star_points.build_star_points_view(
+                db.get_crew_star_points(crew_id)
+            )
+
     return {
         "staff": staff,
         "staff_options": [member["name"] for member in roster],
@@ -1042,6 +1054,7 @@ def build_staff_portal(
         "summary": summary,
         "work_days": work_days,
         "today_summary": today_summary,
+        "star_points": star_points_view,
     }
 
 
