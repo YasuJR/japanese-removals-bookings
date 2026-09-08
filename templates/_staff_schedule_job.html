@@ -10,6 +10,26 @@
   {% if job.crew_display %}
   <p class="staff-schedule-crew"><span class="staff-schedule-crew-label">Crew:</span> {{ job.crew_display }}</p>
   {% endif %}
+  {% if job.pickup_address %}
+  <p class="staff-schedule-address">
+    <span class="staff-schedule-address-label">Pickup:</span>
+    {% if job.pickup_map_url %}
+    <a href="{{ job.pickup_map_url }}" target="_blank" rel="noopener noreferrer">{{ job.pickup_address }}</a>
+    {% else %}
+    {{ job.pickup_address }}
+    {% endif %}
+  </p>
+  {% endif %}
+  {% if job.delivery_address %}
+  <p class="staff-schedule-address">
+    <span class="staff-schedule-address-label">Delivery:</span>
+    {% if job.delivery_map_url %}
+    <a href="{{ job.delivery_map_url }}" target="_blank" rel="noopener noreferrer">{{ job.delivery_address }}</a>
+    {% else %}
+    {{ job.delivery_address }}
+    {% endif %}
+  </p>
+  {% endif %}
   {% if job.has_actual %}
   <p class="staff-schedule-actual-range">Actual: {{ job.actual_range_display }}{% if job.worked_display %} · Worked: {{ job.worked_display }}{% endif %}</p>
   {% endif %}

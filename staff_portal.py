@@ -493,6 +493,7 @@ def _serialize_job(booking: Dict[str, Any], today: date) -> Dict[str, Any]:
         "pickup_address": pickup,
         "pickup_label": pickup_label or pickup,
         "dropoff_address": dropoff,
+        "delivery_address": dropoff,
         "dropoff_label": dropoff_label or dropoff,
         "crew": crew_display,
         "crew_display": crew_display,
@@ -507,6 +508,7 @@ def _serialize_job(booking: Dict[str, Any], today: date) -> Dict[str, Any]:
         "sms_href": sms_href(phone),
         "pickup_map_url": apple_maps_url(pickup),
         "dropoff_map_url": apple_maps_url(dropoff),
+        "delivery_map_url": apple_maps_url(dropoff),
         "status_display": status_display,
         "is_completed_status": bool(times.get("is_completed_status")) or is_done_status,
     }

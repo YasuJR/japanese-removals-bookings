@@ -1449,6 +1449,28 @@ a.staff-job-btn:active {
   margin-right: 0.15rem;
 }
 
+.staff-schedule-address {
+  margin: 0.12rem 0 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--navy);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.staff-schedule-address-label {
+  font-weight: 800;
+  color: var(--muted);
+  margin-right: 0.15rem;
+}
+
+.staff-schedule-address a {
+  color: var(--navy);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .staff-schedule-status {
   margin: 0 0 0.25rem;
   display: inline-block;

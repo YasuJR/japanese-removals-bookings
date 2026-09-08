@@ -1060,6 +1060,85 @@ def test_weekly_schedule_shows_crew_on_job_cards():
     return True
 
 
+def test_weekly_schedule_shows_pickup_delivery_on_job_cards():
+    from staff_portal import build_staff_portal
+    from dashboard_data import perth_today, week_range
+
+    real_today = perth_today()
+    monday, _ = week_range(real_today)
+    yasu_id = _crew_id("Yasu")
+    long_pickup = (
+        "Unit 1801/659 Murray Street West Perth Western Australia 6005 "
+        "Long Address Overflow Test Building Name"
+    )
+    both = _unique("AddrBoth")
+    pickup_only = _unique("AddrPickupOnly")
+    delivery_only = _unique("AddrDeliveryOnly")
+
+    _create_job(
+        both,
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="10:00",
+        pickup="16 staples Street, North Fremantle",
+        dropoff="16b John Street, North Fremantle",
+    )
+    _create_job(
+        pickup_only,
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="11:00",
+        finish_time="12:00",
+        pickup=long_pickup,
+        dropoff="",
+    )
+    _create_job(
+        delivery_only,
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="13:00",
+        finish_time="14:00",
+        pickup="",
+        dropoff="35 Bramley Way Bibra Lake",
+    )
+
+    portal = build_staff_portal("Yasu", "week", real_today)
+    monday_jobs = [
+        day for day in portal["week_days"] if day["date_iso"] == monday.isoformat()
+    ][0]["jobs"]
+    by_customer = {job["customer_name"]: job for job in monday_jobs}
+
+    assert by_customer[both]["pickup_address"] == "16 staples Street, North Fremantle"
+    assert by_customer[both]["delivery_address"] == "16b John Street, North Fremantle"
+    assert by_customer[pickup_only]["pickup_address"] == long_pickup
+    assert not by_customer[pickup_only]["delivery_address"]
+    assert not by_customer[delivery_only]["pickup_address"]
+    assert by_customer[delivery_only]["delivery_address"] == "35 Bramley Way Bibra Lake"
+    assert by_customer[both]["pickup_map_url"].startswith("https://maps.apple.com/")
+    assert by_customer[both]["delivery_map_url"].startswith("https://maps.apple.com/")
+
+    html = app.test_client().get(
+        "/staff?staff_id={0}&range=week&week=0".format(yasu_id)
+    ).get_data(as_text=True)
+    assert "staff-schedule-address" in html
+    assert "Pickup:" in html
+    assert "Delivery:" in html
+    assert long_pickup in html
+    assert "maps.apple.com" in html
+    both_pos = html.index("Job: {0}".format(both))
+    pickup_only_pos = html.index("Job: {0}".format(pickup_only))
+    assert html.index("Pickup:", both_pos) < html.index("Estimated", both_pos)
+    assert "Delivery:" in html[both_pos:pickup_only_pos]
+    pickup_only_block = html[pickup_only_pos:html.index("Job: {0}".format(delivery_only))]
+    assert "Pickup:" in pickup_only_block
+    assert "Delivery:" not in pickup_only_block
+    delivery_only_block = html[html.index("Job: {0}".format(delivery_only)):]
+    assert "Delivery:" in delivery_only_block
+    assert "Pickup:" not in delivery_only_block.split("Delivery:")[0].split("Job:")[-1]
+    return True
+
+
 def test_weekly_hours_use_scheduled_actual_callout_paid():
     from staff_portal import build_staff_portal
 
@@ -2294,6 +2373,7 @@ def main():
         test_staff_hides_actual_when_not_set,
         test_weekly_schedule_shows_completed_not_cancelled,
         test_weekly_schedule_shows_crew_on_job_cards,
+        test_weekly_schedule_shows_pickup_delivery_on_job_cards,
         test_weekly_hours_use_scheduled_actual_callout_paid,
         test_weekly_worked_format_examples,
         test_scheduled_hours_from_start_finish_not_duration_hours,
