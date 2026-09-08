@@ -1,7 +1,7 @@
 <section class="staff-star-admin" aria-label="Star Points for {{ portal.staff }}">
   <p class="staff-star-admin-label">STAR POINTS</p>
   <div class="staff-star-admin-controls">
-    <form class="staff-star-admin-form" method="post" action="{{ url_for('staff_portal_adjust_star_points', crew_id=portal.selected_staff_id) }}">
+    <form id="staff-star-dec-form" class="staff-star-admin-form staff-star-admin-form-dec" method="post" action="{{ url_for('staff_portal_adjust_star_points', crew_id=portal.selected_staff_id) }}">
       <input type="hidden" name="action" value="decrement">
       <input type="hidden" name="range" value="{{ portal.range }}">
       <input type="hidden" name="week" value="{{ portal.week_offset }}">
@@ -9,13 +9,17 @@
       {% if portal.calendar_year %}<input type="hidden" name="year" value="{{ portal.calendar_year }}">{% endif %}
       {% if portal.calendar_month %}<input type="hidden" name="month" value="{{ portal.calendar_month }}">{% endif %}
       {% if portal.calendar_day %}<input type="hidden" name="day" value="{{ portal.calendar_day }}">{% endif %}
+      <label class="staff-star-reason-label">
+        Reason (optional)
+        <input type="text" name="reason" maxlength="200" placeholder="e.g. Great customer feedback">
+      </label>
       <button type="submit" class="staff-star-admin-btn"{% if portal.star_points.points <= 0 %} disabled{% endif %} aria-label="Remove one star">−</button>
     </form>
     <p class="staff-star-admin-value" aria-live="polite">
       <span class="staff-star-admin-icons" aria-hidden="true">⭐</span>
       {{ portal.star_points.points }} / {{ portal.star_points.max_points }}
     </p>
-    <form class="staff-star-admin-form" method="post" action="{{ url_for('staff_portal_adjust_star_points', crew_id=portal.selected_staff_id) }}">
+    <form id="staff-star-inc-form" class="staff-star-admin-form staff-star-admin-form-inc" method="post" action="{{ url_for('staff_portal_adjust_star_points', crew_id=portal.selected_staff_id) }}">
       <input type="hidden" name="action" value="increment">
       <input type="hidden" name="range" value="{{ portal.range }}">
       <input type="hidden" name="week" value="{{ portal.week_offset }}">
@@ -23,6 +27,10 @@
       {% if portal.calendar_year %}<input type="hidden" name="year" value="{{ portal.calendar_year }}">{% endif %}
       {% if portal.calendar_month %}<input type="hidden" name="month" value="{{ portal.calendar_month }}">{% endif %}
       {% if portal.calendar_day %}<input type="hidden" name="day" value="{{ portal.calendar_day }}">{% endif %}
+      <label class="staff-star-reason-label">
+        Reason (optional)
+        <input type="text" name="reason" maxlength="200" placeholder="e.g. Great customer feedback">
+      </label>
       <button type="submit" class="staff-star-admin-btn"{% if portal.star_points.points >= portal.star_points.max_points %} disabled{% endif %} aria-label="Add one star">＋</button>
     </form>
   </div>
@@ -36,6 +44,10 @@
     {% if portal.calendar_year %}<input type="hidden" name="year" value="{{ portal.calendar_year }}">{% endif %}
     {% if portal.calendar_month %}<input type="hidden" name="month" value="{{ portal.calendar_month }}">{% endif %}
     {% if portal.calendar_day %}<input type="hidden" name="day" value="{{ portal.calendar_day }}">{% endif %}
+    <label class="staff-star-reason-label">
+      Reset reason (optional)
+      <input type="text" name="reason" maxlength="200">
+    </label>
     <button type="submit" class="staff-star-reset-btn"{% if portal.star_points.points <= 0 %} disabled{% endif %}>Reset Stars</button>
   </form>
 </section>

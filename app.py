@@ -2036,11 +2036,15 @@ def _staff_portal_form_nav_params() -> dict:
 @staff_portal_owner.owner_required
 def staff_portal_adjust_star_points(crew_id: int):
     action = (request.form.get("action") or "").strip().lower()
+    reason = (request.form.get("reason") or "").strip()
     delta = 1 if action == "increment" else -1 if action == "decrement" else 0
+    user_id = auth.get_current_user_id()
     if delta == 0:
         flash("Invalid Star Points action.", "error")
     else:
-        new_value = db.adjust_crew_star_points(crew_id, delta)
+        new_value = db.adjust_crew_star_points(
+            crew_id, delta, reason=reason, user_id=user_id
+        )
         if new_value is None:
             flash("Staff member not found.", "error")
         else:
@@ -2061,7 +2065,11 @@ def staff_portal_reset_star_points(crew_id: int):
     member = db.get_crew_member(crew_id)
     if not member:
         flash("Staff member not found.", "error")
-    elif db.reset_crew_star_points(crew_id):
+    elif db.reset_crew_star_points(
+        crew_id,
+        reason=(request.form.get("reason") or "").strip(),
+        user_id=auth.get_current_user_id(),
+    ):
         flash("Star Points reset to 0 / 10.", "success")
     else:
         flash("Could not reset Star Points.", "error")

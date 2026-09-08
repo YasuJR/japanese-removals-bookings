@@ -1618,3 +1618,214 @@ a.staff-job-btn:active {
   font-weight: 700;
   color: var(--muted);
 }
+
+.staff-today-enhanced {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.staff-today-next-block {
+  margin-bottom: 0.25rem;
+}
+
+.staff-today-next-kicker {
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--accent, #c9a227);
+}
+
+.staff-today-remaining-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.staff-today-job-card {
+  padding: 0.85rem 0.8rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.staff-today-job-next {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 1px rgba(26, 39, 68, 0.08);
+}
+
+.staff-today-job-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.staff-today-job-status {
+  margin: 0;
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #fff;
+  background: var(--success);
+}
+
+.staff-today-job-status-done {
+  background: var(--muted);
+}
+
+.staff-today-job-time {
+  margin: 0.35rem 0 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.staff-today-job-name {
+  margin: 0.2rem 0 0;
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.staff-today-job-crew,
+.staff-today-job-address,
+.staff-today-job-phone {
+  margin: 0.18rem 0 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--navy);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.staff-today-job-crew span,
+.staff-today-job-address span,
+.staff-today-job-phone span {
+  font-weight: 800;
+  color: var(--muted);
+  margin-right: 0.15rem;
+}
+
+.staff-today-job-address a {
+  color: var(--navy);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.staff-job-note {
+  margin: 0.55rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  background: #fff8e6;
+  border: 1px solid #f0dfa8;
+}
+
+.staff-job-note-kicker {
+  margin: 0 0 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #8a6d1d;
+}
+
+.staff-job-note-body {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--navy);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.staff-job-actions-compact {
+  margin-top: 0.65rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.staff-job-actions-compact .staff-job-btn {
+  min-height: 2.5rem;
+  font-size: 0.88rem;
+}
+
+.staff-schedule-phone {
+  margin: 0.15rem 0 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.staff-star-history {
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.staff-star-history-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.staff-star-history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 8rem;
+  overflow-y: auto;
+}
+
+.staff-star-history-item {
+  margin: 0 0 0.45rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #fff;
+}
+
+.staff-star-history-date {
+  margin: 0;
+  font-weight: 800;
+  opacity: 0.85;
+}
+
+.staff-star-history-change {
+  margin: 0;
+  font-weight: 800;
+}
+
+.staff-star-history-reason {
+  margin: 0.1rem 0 0;
+  opacity: 0.9;
+}
+
+.staff-star-reason-label {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.staff-star-reason-label input {
+  min-height: 2.25rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+}

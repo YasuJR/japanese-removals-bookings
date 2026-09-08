@@ -144,6 +144,43 @@ def _ensure_crew_columns(conn) -> None:
     )
 
 
+def _ensure_star_point_history_table(conn) -> None:
+    if db_backend.is_postgres():
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS crew_star_point_events (
+                id SERIAL PRIMARY KEY,
+                crew_id INTEGER NOT NULL,
+                change_type TEXT NOT NULL,
+                points_delta INTEGER NOT NULL,
+                points_after INTEGER NOT NULL,
+                reason TEXT NOT NULL DEFAULT '',
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_by_user_id INTEGER
+            )
+            """
+        )
+    else:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS crew_star_point_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                crew_id INTEGER NOT NULL,
+                change_type TEXT NOT NULL,
+                points_delta INTEGER NOT NULL,
+                points_after INTEGER NOT NULL,
+                reason TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                created_by_user_id INTEGER
+            )
+            """
+        )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_star_events_crew_id "
+        "ON crew_star_point_events(crew_id)"
+    )
+
+
 def _seed_crew_and_trucks(conn) -> None:
     crew_count = conn.execute("SELECT COUNT(*) AS c FROM crew_members").fetchone()["c"]
     if int(crew_count) == 0:
@@ -512,6 +549,7 @@ def init_db() -> None:
                 _ensure_columns(conn)
                 _ensure_staff_columns(conn)
                 _ensure_crew_columns(conn)
+                _ensure_star_point_history_table(conn)
                 _ensure_invoice_sequence(conn)
                 _seed_crew_and_trucks(conn)
                 _ensure_indexes(conn)
@@ -694,6 +732,7 @@ def init_db() -> None:
         _ensure_columns(conn)
         _ensure_staff_columns(conn)
         _ensure_crew_columns(conn)
+        _ensure_star_point_history_table(conn)
         _ensure_invoice_sequence(conn)
         _seed_crew_and_trucks(conn)
         _ensure_indexes(conn)
@@ -2012,7 +2051,12 @@ def get_crew_star_points(crew_id: int) -> int:
     return star_points.clamp_star_points(raw)
 
 
-def adjust_crew_star_points(crew_id: int, delta: int) -> Optional[int]:
+def adjust_crew_star_points(
+    crew_id: int,
+    delta: int,
+    reason: str = "",
+    user_id: Optional[int] = None,
+) -> Optional[int]:
     """Add or remove one star point. Returns new value, or None if crew missing."""
     import star_points
 
@@ -2027,27 +2071,96 @@ def adjust_crew_star_points(crew_id: int, delta: int) -> Optional[int]:
         raw = 0
     current = star_points.clamp_star_points(raw)
     new_value = star_points.clamp_star_points(current + delta)
+    if new_value == current:
+        return new_value
+    change_type = "increment" if delta > 0 else "decrement"
     with get_connection() as conn:
         conn.execute(
             "UPDATE crew_members SET star_points = ? WHERE id = ?",
             (new_value, crew_id),
         )
+        _insert_star_point_event(
+            conn,
+            crew_id,
+            change_type,
+            new_value - current,
+            new_value,
+            reason,
+            user_id,
+        )
         conn.commit()
     return new_value
 
 
-def reset_crew_star_points(crew_id: int) -> bool:
+def reset_crew_star_points(
+    crew_id: int,
+    reason: str = "",
+    user_id: Optional[int] = None,
+) -> bool:
     """Reset star points to zero for one crew member."""
     member = get_crew_member(crew_id)
     if not member:
         return False
+    current = get_crew_star_points(crew_id)
     with get_connection() as conn:
         conn.execute(
             "UPDATE crew_members SET star_points = 0 WHERE id = ?",
             (crew_id,),
         )
+        if current > 0:
+            _insert_star_point_event(
+                conn,
+                crew_id,
+                "reset",
+                -current,
+                0,
+                reason,
+                user_id,
+            )
         conn.commit()
     return True
+
+
+def _insert_star_point_event(
+    conn,
+    crew_id: int,
+    change_type: str,
+    points_delta: int,
+    points_after: int,
+    reason: str = "",
+    user_id: Optional[int] = None,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO crew_star_point_events (
+            crew_id, change_type, points_delta, points_after, reason, created_by_user_id
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            crew_id,
+            change_type,
+            int(points_delta),
+            int(points_after),
+            str(reason or "").strip()[:500],
+            user_id,
+        ),
+    )
+
+
+def list_crew_star_point_events(crew_id: int, limit: int = 50) -> List[Dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, crew_id, change_type, points_delta, points_after,
+                   reason, created_at, created_by_user_id
+            FROM crew_star_point_events
+            WHERE crew_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (crew_id, max(1, int(limit))),
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def rename_crew_member(crew_id: int, new_name: str) -> bool:

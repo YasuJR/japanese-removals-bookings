@@ -30,6 +30,11 @@
     {% endif %}
   </p>
   {% endif %}
+  {% include "_staff_job_note.html" %}
+  {% if job.phone %}
+  <p class="staff-schedule-phone"><span class="staff-schedule-address-label">Phone:</span> {{ job.phone }}</p>
+  {% endif %}
+  {% with compact_actions=true %}{% include "_staff_job_actions.html" %}{% endwith %}
   {% if job.has_actual %}
   <p class="staff-schedule-actual-range">Actual: {{ job.actual_range_display }}{% if job.worked_display %} · Worked: {{ job.worked_display }}{% endif %}</p>
   {% endif %}

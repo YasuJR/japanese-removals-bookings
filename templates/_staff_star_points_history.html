@@ -1,0 +1,16 @@
+{% if portal.star_points_history %}
+<section class="staff-star-history" aria-label="Star Points history for {{ portal.staff }}">
+  <p class="staff-star-history-label">STAR POINTS HISTORY</p>
+  <ul class="staff-star-history-list">
+    {% for event in portal.star_points_history %}
+    <li class="staff-star-history-item">
+      <p class="staff-star-history-date">{{ event.date_label }}</p>
+      <p class="staff-star-history-change">{{ event.delta_label }}</p>
+      {% if event.reason %}
+      <p class="staff-star-history-reason">{{ event.reason }}</p>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

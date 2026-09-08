@@ -1,0 +1,17 @@
+{% set has_actions = job.pickup_map_url or job.delivery_map_url or job.tel_href or job.sms_href %}
+{% if has_actions %}
+<div class="staff-job-actions{% if compact_actions %} staff-job-actions-compact{% endif %}">
+  {% if job.pickup_map_url %}
+  <a class="staff-job-btn" href="{{ job.pickup_map_url }}" target="_blank" rel="noopener noreferrer">Map Pickup</a>
+  {% endif %}
+  {% if job.delivery_map_url %}
+  <a class="staff-job-btn" href="{{ job.delivery_map_url }}" target="_blank" rel="noopener noreferrer">Map Delivery</a>
+  {% endif %}
+  {% if job.tel_href %}
+  <a class="staff-job-btn" href="{{ job.tel_href }}">Call</a>
+  {% endif %}
+  {% if job.sms_href %}
+  <a class="staff-job-btn" href="{{ job.sms_href }}">Text</a>
+  {% endif %}
+</div>
+{% endif %}

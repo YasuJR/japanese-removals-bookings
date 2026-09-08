@@ -26,7 +26,11 @@ from dashboard_data import perth_today, week_range
 from display_dates import format_display_date, normalize_move_date
 import staff_job_times
 import star_points
-from weekly_schedule_data import _day_heading, _week_range_heading, build_weekly_schedule
+from weekly_schedule_data import (
+    _day_heading,
+    _week_range_heading,
+    build_weekly_schedule,
+)
 
 RANGE_TODAY = "today"
 RANGE_CALENDAR = "calendar"
@@ -64,6 +68,14 @@ def normalize_staff_view(value: Any) -> Any:
 
 
 def _staff_roster() -> List[Dict[str, Any]]:
+    try:
+        from flask import g
+
+        cached = getattr(g, "staff_portal_roster", None)
+        if cached is not None:
+            return cached
+    except RuntimeError:
+        cached = None
     roster: List[Dict[str, Any]] = []
     for member in db.list_crew_members(active_only=True):
         try:
@@ -77,12 +89,18 @@ def _staff_roster() -> List[Dict[str, Any]]:
         except (TypeError, ValueError):
             continue
     roster = [row for row in roster if row["id"] and row["name"]]
-    if roster:
-        return roster
-    return [
-        {"id": 0, "name": name, "active": 1}
-        for name in (_crew_options() or CREW_OPTIONS)
-    ]
+    if not roster:
+        roster = [
+            {"id": 0, "name": name, "active": 1}
+            for name in (_crew_options() or CREW_OPTIONS)
+        ]
+    try:
+        from flask import g
+
+        g.staff_portal_roster = roster
+    except RuntimeError:
+        pass
+    return roster
 
 
 def resolve_portal_staff(
@@ -230,12 +248,9 @@ def resolve_staff_id(staff_id: Any) -> str:
         wanted = int(raw)
     except (TypeError, ValueError):
         return ""
-    for member in db.list_crew_members(active_only=False):
-        try:
-            if int(member.get("id") or 0) == wanted:
-                return str(member.get("name") or "").strip()
-        except (TypeError, ValueError):
-            continue
+    for member in _staff_roster():
+        if int(member.get("id") or 0) == wanted:
+            return str(member.get("name") or "").strip()
     return ""
 
 
@@ -490,6 +505,7 @@ def _serialize_job(booking: Dict[str, Any], today: date) -> Dict[str, Any]:
         if callout_h is None
         else ("{0:.2f}".format(callout_h).rstrip("0").rstrip(".")),
         "customer_name": str(row.get("customer_name") or "").strip() or "—",
+        "num_movers": int(row.get("num_movers") or 0),
         "pickup_address": pickup,
         "pickup_label": pickup_label or pickup,
         "dropoff_address": dropoff,
@@ -636,6 +652,101 @@ def _week_days(
     return days
 
 
+def _is_upcoming_today_job(job: Dict[str, Any]) -> bool:
+    if job.get("is_completed_status"):
+        return False
+    status = str(job.get("status") or "").strip().lower()
+    return status not in ("completed", "paid", "invoiced", "cancelled")
+
+
+def _build_today_individual_view(jobs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    count = len(jobs)
+    upcoming = [job for job in jobs if _is_upcoming_today_job(job)]
+    completed = [job for job in jobs if not _is_upcoming_today_job(job)]
+    completed = [
+        job for job in completed if str(job.get("status") or "").lower() != "cancelled"
+    ]
+    next_job = upcoming[0] if upcoming else None
+    remaining_jobs = list(upcoming[1:]) + completed
+    heading = "TODAY — {0} JOB{1}".format(count, "" if count == 1 else "S")
+    return {
+        "heading": heading,
+        "job_count": count,
+        "next_job": next_job,
+        "remaining_jobs": remaining_jobs,
+    }
+
+
+def _owner_weekly_job_from_portal(job: Dict[str, Any]) -> Dict[str, Any]:
+    duration = job.get("scheduled_hours_display") or ""
+    if duration in ("—", ""):
+        duration = ""
+    return {
+        "id": job.get("id"),
+        "time_range": job.get("scheduled_range_display")
+        or job.get("start_time")
+        or "Time TBC",
+        "duration_label": duration,
+        "customer_name": job.get("customer_name") or "—",
+        "num_movers": job.get("num_movers") or 0,
+        "crew_display": job.get("crew_display") or job.get("crew") or "—",
+        "pickup_address": job.get("pickup_address") or "—",
+        "delivery_address": job.get("delivery_address") or job.get("dropoff_address") or "—",
+        "phone": job.get("phone") or "—",
+        "status": job.get("status") or job.get("status_display") or "",
+    }
+
+
+def _build_owner_weekly_from_jobs(
+    jobs: List[Dict[str, Any]], start_iso: str, end_iso: str, today: date
+) -> Dict[str, Any]:
+    by_date: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for job in jobs:
+        iso = job.get("date_iso") or ""
+        if iso:
+            by_date[iso].append(_owner_weekly_job_from_portal(job))
+    try:
+        start = date.fromisoformat(start_iso)
+        end = date.fromisoformat(end_iso)
+    except ValueError:
+        return {"days": [], "range_heading": "", "week_start": start_iso, "week_end": end_iso}
+    days: List[Dict[str, Any]] = []
+    current = start
+    total_jobs = 0
+    while current <= end:
+        iso = current.isoformat()
+        day_jobs = sorted(
+            by_date.get(iso, []),
+            key=lambda job: (job.get("time_range") or "", job.get("customer_name") or ""),
+        )
+        total_jobs += len(day_jobs)
+        days.append(
+            {
+                "date_iso": iso,
+                "heading": _day_heading(current),
+                "weekday": current.strftime("%A").upper(),
+                "is_today": current == today,
+                "is_weekend": current.weekday() >= 5,
+                "jobs": day_jobs,
+                "is_empty": not day_jobs,
+            }
+        )
+        current += timedelta(days=1)
+    monday = start
+    sunday = end
+    return {
+        "week_start": start_iso,
+        "week_end": end_iso,
+        "range_heading": _week_range_heading(monday, sunday),
+        "prev_week": (monday - timedelta(days=7)).isoformat(),
+        "next_week": (monday + timedelta(days=7)).isoformat(),
+        "this_week": monday.isoformat(),
+        "is_this_week": False,
+        "days": days,
+        "total_jobs": total_jobs,
+    }
+
+
 def _history_weeks(
     jobs: List[Dict[str, Any]], today: date
 ) -> List[Dict[str, Any]]:
@@ -693,13 +804,15 @@ def _staff_assigned(booking: Dict[str, Any], staff: str) -> bool:
     return staff in crew_from_storage(booking.get("crew"))
 
 
-def _load_all_rows(start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
+def _load_all_rows(
+    start_iso: str, end_iso: str, *, hide_cancelled: bool = True
+) -> List[Dict[str, Any]]:
     if not start_iso or not end_iso:
         return []
     rows = [dict(row) for row in db.list_between_dates(start_iso, end_iso)]
     matched: List[Dict[str, Any]] = []
     for row in rows:
-        if _should_hide_status(row):
+        if hide_cancelled and _should_hide_status(row):
             continue
         move_iso = _booking_date_iso(row)
         if move_iso and start_iso <= move_iso <= end_iso:
@@ -913,7 +1026,8 @@ def build_staff_portal(
     )
 
     if is_all_staff:
-        bookings = _load_all_rows(start_iso, end_iso)
+        hide_cancelled = active_range != RANGE_WEEK
+        bookings = _load_all_rows(start_iso, end_iso, hide_cancelled=hide_cancelled)
     elif staff:
         bookings = _load_rows(staff, start_iso, end_iso)
     else:
@@ -942,6 +1056,7 @@ def build_staff_portal(
     range_label = dict(RANGE_TABS).get(active_range, "Today")
     count = len(jobs)
     today_summary = None
+    today_view = None
     today_by_staff: List[Dict[str, Any]] = []
     owner_weekly = None
     if active_range == RANGE_TODAY:
@@ -953,7 +1068,8 @@ def build_staff_portal(
         else:
             staff_jobs = jobs
             today_summary = _today_paid_summary(staff_jobs)
-            jobs_label = today_summary["jobs_heading"]
+            today_view = _build_today_individual_view(staff_jobs)
+            jobs_label = today_view["heading"]
     elif active_range == RANGE_CALENDAR:
         jobs_label = _month_heading(cal_year, cal_month)
     elif active_range == RANGE_WEEK:
@@ -976,7 +1092,9 @@ def build_staff_portal(
     owner_weekly = None
     if active_range == RANGE_WEEK:
         if is_all_staff:
-            owner_weekly = build_weekly_schedule(start_iso, reference=today)
+            owner_weekly = _build_owner_weekly_from_jobs(
+                jobs, start_iso, end_iso, today
+            )
         else:
             week_days = _week_days(jobs, start_iso, end_iso, today)
 
@@ -1020,6 +1138,7 @@ def build_staff_portal(
     )
 
     star_points_view = None
+    star_points_history: List[Dict[str, Any]] = []
     if not is_all_staff and selected_staff_id not in (None, "", STAFF_VIEW_ALL):
         try:
             crew_id = int(selected_staff_id)
@@ -1028,6 +1147,9 @@ def build_staff_portal(
         if crew_id:
             star_points_view = star_points.build_star_points_view(
                 db.get_crew_star_points(crew_id)
+            )
+            star_points_history = star_points.build_star_points_history_views(
+                db.list_crew_star_point_events(crew_id)
             )
 
     return {
@@ -1060,7 +1182,9 @@ def build_staff_portal(
         "summary": summary,
         "work_days": work_days,
         "today_summary": today_summary,
+        "today_view": today_view,
         "star_points": star_points_view,
+        "star_points_history": star_points_history,
     }
 
 

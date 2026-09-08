@@ -127,6 +127,14 @@ def _admin_staff_client(staff="Yasu"):
     return client
 
 
+def _job_schedule_article(html, customer):
+    marker = "Job: {0}".format(customer)
+    start = html.index(marker)
+    article_start = html.rfind("<article", 0, start)
+    article_end = html.index("</article>", start) + len("</article>")
+    return html[article_start:article_end]
+
+
 def _create_job(
     customer,
     move_date,
@@ -265,10 +273,10 @@ def test_staff_page_defaults_to_today_and_shows_assigned_jobs():
     assert "Yasu / Ken" in html
     assert "0412000456" in html
     assert "Apartment level 3. Lift booked 8:00–12:00." in html
-    assert "Call Customer" in html
-    assert "Text Customer" in html
-    assert "Pickup Map" in html
-    assert "Drop-off Map" in html
+    assert "Call" in html
+    assert "Text" in html
+    assert "Map Pickup" in html
+    assert "Map Delivery" in html
     assert 'href="tel:+61412000456"' in html
     assert 'href="sms:0412000456"' in html
     assert "https://maps.apple.com/?q=" in html
@@ -1129,13 +1137,15 @@ def test_weekly_schedule_shows_pickup_delivery_on_job_cards():
     both_pos = html.index("Job: {0}".format(both))
     pickup_only_pos = html.index("Job: {0}".format(pickup_only))
     assert html.index("Pickup:", both_pos) < html.index("Estimated", both_pos)
-    assert "Delivery:" in html[both_pos:pickup_only_pos]
-    pickup_only_block = html[pickup_only_pos:html.index("Job: {0}".format(delivery_only))]
+    both_block = _job_schedule_article(html, both)
+    assert "Pickup:" in both_block
+    assert "Delivery:" in both_block
+    pickup_only_block = _job_schedule_article(html, pickup_only)
     assert "Pickup:" in pickup_only_block
     assert "Delivery:" not in pickup_only_block
-    delivery_only_block = html[html.index("Job: {0}".format(delivery_only)):]
+    delivery_only_block = _job_schedule_article(html, delivery_only)
     assert "Delivery:" in delivery_only_block
-    assert "Pickup:" not in delivery_only_block.split("Delivery:")[0].split("Job:")[-1]
+    assert "Pickup:" not in delivery_only_block
     return True
 
 
@@ -2232,6 +2242,40 @@ def test_star_points_admin_only_and_viewer_sees_display():
     return True
 
 
+def test_star_points_history_logs_reason_and_survives_reset():
+    from staff_portal import build_staff_portal
+
+    _ensure_default_crew()
+    yasu_id = _crew_id("Yasu")
+    db.reset_crew_star_points(yasu_id)
+    owner = _admin_client()
+    reason = "Great customer feedback"
+    _post_star_adjust(owner, yasu_id, "increment", reason=reason)
+    events = db.list_crew_star_point_events(yasu_id)
+    assert events
+    assert events[0]["points_delta"] == 1
+    assert events[0]["reason"] == reason
+
+    portal = build_staff_portal("Yasu", "week", perth_today())
+    history = portal.get("star_points_history") or []
+    assert history
+    assert history[0]["delta_label"] == "+1"
+    assert reason in history[0]["reason"]
+
+    viewer_html = app.test_client().get(
+        "/staff?staff_id={0}&range=week".format(yasu_id)
+    ).get_data(as_text=True)
+    assert "STAR POINTS HISTORY" in viewer_html
+    assert reason in viewer_html
+
+    _post_star_reset(owner, yasu_id, confirm=True, reason="Quarter reset")
+    assert db.get_crew_star_points(yasu_id) == 0
+    after_reset = db.list_crew_star_point_events(yasu_id)
+    assert len(after_reset) >= 2
+    assert any(event["change_type"] == "reset" for event in after_reset)
+    return True
+
+
 def _office_non_admin_client():
     global _user_n
     _user_n += 1
@@ -2392,6 +2436,7 @@ def main():
         test_star_points_adjust_bounds_and_isolation,
         test_star_points_persist_after_reload_and_rename,
         test_star_points_admin_only_and_viewer_sees_display,
+        test_star_points_history_logs_reason_and_survives_reset,
         test_staff_portal_owner_edit_job_fields,
         test_staff_portal_owner_edit_forbidden_for_non_admin,
     ]

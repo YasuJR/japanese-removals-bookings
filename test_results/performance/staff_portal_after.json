@@ -1,0 +1,114 @@
+{
+  "results": [
+    {
+      "path": "/staff?range=today&staff_id=20",
+      "status": 200,
+      "bytes": 665673,
+      "ms_median": 65.09,
+      "ms_min": 63.73,
+      "ms_max": 111.78,
+      "db_queries_median": 7,
+      "db_queries_min": 7,
+      "db_queries_max": 7,
+      "db_ms_total_last": 1.01,
+      "sample_queries": [
+        "SELECT id, name, registration, truck_type, capacity, active, created_at FROM trucks WHERE active = 1 ORDER BY name ASC",
+        "SELECT * FROM bookings WHERE move_date >= ? AND move_date <= ? ORDER BY move_date ASC, start_time ASC, id ASC",
+        "SELECT id, crew_id, change_type, points_delta, points_after, reason, created_at, created_by_user_id FROM crew_star_point_events WHERE crew_id = ? ORDER BY id DE",
+        "SELECT * FROM crew_members WHERE id = ?",
+        "SELECT id, name, phone, role, active, created_at FROM crew_members WHERE active = 1 ORDER BY name ASC"
+      ]
+    },
+    {
+      "path": "/staff?range=week&staff_id=20",
+      "status": 200,
+      "bytes": 998546,
+      "ms_median": 101.61,
+      "ms_min": 100.45,
+      "ms_max": 107.36,
+      "db_queries_median": 7,
+      "db_queries_min": 7,
+      "db_queries_max": 7,
+      "db_ms_total_last": 0.55,
+      "sample_queries": [
+        "SELECT id, name, registration, truck_type, capacity, active, created_at FROM trucks WHERE active = 1 ORDER BY name ASC",
+        "SELECT * FROM bookings WHERE move_date >= ? AND move_date <= ? ORDER BY move_date ASC, start_time ASC, id ASC",
+        "SELECT id, crew_id, change_type, points_delta, points_after, reason, created_at, created_by_user_id FROM crew_star_point_events WHERE crew_id = ? ORDER BY id DE",
+        "SELECT * FROM crew_members WHERE id = ?",
+        "SELECT id, name, phone, role, active, created_at FROM crew_members WHERE active = 1 ORDER BY name ASC"
+      ]
+    },
+    {
+      "path": "/staff?range=history&staff_id=20",
+      "status": 200,
+      "bytes": 1352982,
+      "ms_median": 148.72,
+      "ms_min": 146.82,
+      "ms_max": 158.84,
+      "db_queries_median": 7,
+      "db_queries_min": 7,
+      "db_queries_max": 7,
+      "db_ms_total_last": 0.47,
+      "sample_queries": [
+        "SELECT id, name, registration, truck_type, capacity, active, created_at FROM trucks WHERE active = 1 ORDER BY name ASC",
+        "SELECT * FROM bookings WHERE move_date >= ? AND move_date <= ? ORDER BY move_date ASC, start_time ASC, id ASC",
+        "SELECT id, crew_id, change_type, points_delta, points_after, reason, created_at, created_by_user_id FROM crew_star_point_events WHERE crew_id = ? ORDER BY id DE",
+        "SELECT * FROM crew_members WHERE id = ?",
+        "SELECT id, name, phone, role, active, created_at FROM crew_members WHERE active = 1 ORDER BY name ASC"
+      ]
+    },
+    {
+      "path": "/staff?range=calendar&staff_id=20&year=2026&month=9",
+      "status": 200,
+      "bytes": 33316,
+      "ms_median": 168.31,
+      "ms_min": 167.38,
+      "ms_max": 172.27,
+      "db_queries_median": 7,
+      "db_queries_min": 7,
+      "db_queries_max": 7,
+      "db_ms_total_last": 0.65,
+      "sample_queries": [
+        "SELECT id, name, registration, truck_type, capacity, active, created_at FROM trucks WHERE active = 1 ORDER BY name ASC",
+        "SELECT * FROM bookings WHERE move_date >= ? AND move_date <= ? ORDER BY move_date ASC, start_time ASC, id ASC",
+        "SELECT id, crew_id, change_type, points_delta, points_after, reason, created_at, created_by_user_id FROM crew_star_point_events WHERE crew_id = ? ORDER BY id DE",
+        "SELECT * FROM crew_members WHERE id = ?",
+        "SELECT id, name, phone, role, active, created_at FROM crew_members WHERE active = 1 ORDER BY name ASC"
+      ]
+    },
+    {
+      "path": "/staff?range=week&staff_id=all",
+      "status": 200,
+      "bytes": 703518,
+      "ms_median": 105.22,
+      "ms_min": 104.33,
+      "ms_max": 109.7,
+      "db_queries_median": 5,
+      "db_queries_min": 5,
+      "db_queries_max": 5,
+      "db_ms_total_last": 0.49,
+      "sample_queries": [
+        "SELECT id, name, registration, truck_type, capacity, active, created_at FROM trucks WHERE active = 1 ORDER BY name ASC",
+        "SELECT id, name, phone, role, active, created_at FROM crew_members WHERE active = 1 ORDER BY name ASC",
+        "SELECT * FROM bookings WHERE move_date >= ? AND move_date <= ? ORDER BY move_date ASC, start_time ASC, id ASC"
+      ]
+    },
+    {
+      "path": "/staff?range=today&staff_id=all",
+      "status": 200,
+      "bytes": 768490,
+      "ms_median": 73.52,
+      "ms_min": 73.39,
+      "ms_max": 74.52,
+      "db_queries_median": 5,
+      "db_queries_min": 5,
+      "db_queries_max": 5,
+      "db_ms_total_last": 0.99,
+      "sample_queries": [
+        "SELECT id, name, registration, truck_type, capacity, active, created_at FROM trucks WHERE active = 1 ORDER BY name ASC",
+        "SELECT id, name, phone, role, active, created_at FROM crew_members WHERE active = 1 ORDER BY name ASC",
+        "SELECT * FROM bookings WHERE move_date >= ? AND move_date <= ? ORDER BY move_date ASC, start_time ASC, id ASC"
+      ]
+    }
+  ]
+}

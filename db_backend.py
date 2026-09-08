@@ -454,6 +454,19 @@ def postgres_ddl() -> List[str]:
         )
         """,
         """
+        CREATE TABLE IF NOT EXISTS crew_star_point_events (
+            id SERIAL PRIMARY KEY,
+            crew_id INTEGER NOT NULL,
+            change_type TEXT NOT NULL,
+            points_delta INTEGER NOT NULL,
+            points_after INTEGER NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            created_by_user_id INTEGER
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_star_events_crew_id ON crew_star_point_events(crew_id)",
+        """
         CREATE TABLE IF NOT EXISTS invoice_sequence (
             id INTEGER PRIMARY KEY CHECK (id = 1),
             next_number INTEGER NOT NULL DEFAULT 1

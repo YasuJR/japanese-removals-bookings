@@ -22,6 +22,7 @@
           </p>
           {% if not portal.is_all_staff %}
           {% include "_staff_star_points_display.html" %}
+          {% include "_staff_star_points_history.html" %}
           {% endif %}
         </div>
       </div>
@@ -82,7 +83,7 @@
       {% if portal.range == "today" and portal.today_summary and not portal.is_all_staff %}
       <section class="staff-today-summary" aria-label="Today's summary for {{ portal.staff }}">
         <p class="staff-today-kicker">Today</p>
-        <p class="staff-today-jobs">{{ portal.today_summary.jobs_heading }}</p>
+        <p class="staff-today-jobs">{{ portal.today_view.heading if portal.today_view else portal.today_summary.jobs_heading }}</p>
         <p class="staff-today-paid-label">Total Paid Hours</p>
         <p class="staff-today-paid-value">{{ portal.today_summary.paid_display }}</p>
       </section>
@@ -116,6 +117,28 @@
         {% else %}
         <section class="panel"><p class="empty">No jobs today</p></section>
         {% endif %}
+      {% elif portal.today_view %}
+      <section class="staff-today-enhanced" aria-label="Today's jobs for {{ portal.staff }}">
+        {% if portal.today_view.next_job %}
+        <section class="staff-today-next-block">
+          <p class="staff-today-next-kicker">NEXT JOB</p>
+          {% with job=portal.today_view.next_job, is_next=true %}
+          {% include "_staff_today_job.html" %}
+          {% endwith %}
+        </section>
+        {% endif %}
+        {% if portal.today_view.remaining_jobs %}
+        <div class="staff-today-remaining-list">
+          {% for job in portal.today_view.remaining_jobs %}
+          {% with is_next=false %}
+          {% include "_staff_today_job.html" %}
+          {% endwith %}
+          {% endfor %}
+        </div>
+        {% elif not portal.today_view.next_job %}
+        <section class="panel"><p class="empty">No jobs today</p></section>
+        {% endif %}
+      </section>
       {% elif portal.jobs %}
       <div class="staff-job-list">
         {% for job in portal.jobs %}
