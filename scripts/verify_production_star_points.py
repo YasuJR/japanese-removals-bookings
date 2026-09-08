@@ -221,7 +221,7 @@ def main() -> int:
     )
     record(
         "Star Points management visible for owner",
-        "STAR POINTS MANAGEMENT" in owner_html,
+        "staff-star-admin-btn" in owner_html,
     )
 
     start_points = _points_from_html(owner_html)
@@ -315,7 +315,7 @@ def main() -> int:
     record(
         "Anonymous viewer sees display only",
         "STAR POINTS" in viewer_html
-        and "STAR POINTS MANAGEMENT" not in viewer_html
+        and "staff-star-admin-btn" not in viewer_html
         and "Edit name for" not in viewer_html,
     )
 
