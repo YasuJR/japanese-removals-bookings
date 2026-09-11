@@ -135,6 +135,22 @@ def _job_schedule_article(html, customer):
     return html[article_start:article_end]
 
 
+def _add_break_deduction(booking_id, minutes=30, hourly_rate=185.0):
+    import extra_charges
+
+    items = db.list_extra_charges(booking_id)
+    items.append(
+        {
+            "description": extra_charges.break_deduction_description(minutes),
+            "quantity": 1,
+            "unit_price": extra_charges.break_deduction_unit_price(
+                hourly_rate, minutes
+            ),
+        }
+    )
+    db.replace_extra_charges(booking_id, items)
+
+
 def _create_job(
     customer,
     move_date,
@@ -1380,6 +1396,110 @@ def test_paid_hours_invoice_confirmed_when_status_still_confirmed():
     return True
 
 
+def test_paid_hours_break_deduction_cases():
+    """Paid = Actual - Break + Call Out; Actual unchanged."""
+    import staff_job_times
+    from staff_portal import build_staff_portal
+
+    monday = _isolated_monday()
+    callout_fee = 92.5
+    hourly_rate = 185.0
+
+    case_a = _create_job(
+        _unique("BreakCaseA"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="09:00",
+        finish_time="15:15",
+        duration_hours="6.25",
+        callout_fee=callout_fee,
+        hourly_rate=hourly_rate,
+        status="Completed",
+    )
+    _add_break_deduction(case_a, minutes=30, hourly_rate=hourly_rate)
+
+    case_b = _create_job(
+        _unique("BreakCaseB"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="12:00",
+        duration_hours="4",
+        callout_fee=callout_fee,
+        hourly_rate=hourly_rate,
+        status="Completed",
+    )
+
+    case_c = _create_job(
+        _unique("BreakCaseC"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="16:00",
+        duration_hours="8",
+        callout_fee=callout_fee,
+        hourly_rate=hourly_rate,
+        status="Completed",
+    )
+    _add_break_deduction(case_c, minutes=60, hourly_rate=hourly_rate)
+
+    case_d = _create_job(
+        _unique("BreakCaseD"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="08:00",
+        finish_time="13:00",
+        duration_hours="5",
+        callout_fee=0,
+        hourly_rate=hourly_rate,
+        status="Completed",
+    )
+    _add_break_deduction(case_d, minutes=30, hourly_rate=hourly_rate)
+
+    case_e = _create_job(
+        _unique("BreakCaseE"),
+        monday.isoformat(),
+        crew="Yasu",
+        start_time="10:00",
+        finish_time="13:00",
+        duration_hours="3",
+        callout_fee=callout_fee,
+        hourly_rate=hourly_rate,
+        status="Completed",
+    )
+
+    portal = build_staff_portal("Yasu", "week", monday)
+    by_id = {job["id"]: job for job in portal["jobs"]}
+
+    assert by_id[case_a]["actual_hours_display"] == "6.25hr"
+    assert by_id[case_a]["break_hours_label"] == "-0.5hr"
+    assert by_id[case_a]["paid_hours_display"] == "6.25hr"
+    assert by_id[case_b]["paid_hours_display"] == "4.5hr"
+    assert "break_hours_label" not in by_id[case_b] or not by_id[case_b].get(
+        "break_hours_label"
+    )
+    assert by_id[case_c]["paid_hours_display"] == "7.5hr"
+    assert by_id[case_d]["paid_hours_display"] == "4.5hr"
+    assert by_id[case_e]["paid_hours_display"] == "3.5hr"
+
+    monday_day = [
+        day for day in portal["week_days"] if day["date_iso"] == monday.isoformat()
+    ][0]
+    assert monday_day["paid_display"] == "26.25hr"
+
+    row = dict(db.get_booking(case_a))
+    row["extra_charges"] = db.list_extra_charges(case_a)
+    assert staff_job_times.actual_hours(row, monday) == 6.25
+    assert staff_job_times.break_hours(row) == 0.5
+    assert staff_job_times.paid_hours(row, monday) == 6.25
+
+    pdf = build_staff_weekly_pdf_schedule(_crew_id("Yasu"), 0, monday)
+    pdf_bytes = weekly_schedule_pdf.render_staff_weekly_schedule_pdf(pdf)
+    text = _pdf_plain_text(pdf_bytes)
+    assert "Daily Paid: 26.25hr" in text
+    return True
+
+
 def test_paid_hours_regression_cases():
     """Cases A–G for Staff Portal paid hours rules."""
     import staff_job_times
@@ -2432,6 +2552,7 @@ def main():
         test_staff_weekly_pdf_all_staff_one_page,
         test_staff_weekly_pdf_week_offset,
         test_paid_hours_invoice_confirmed_when_status_still_confirmed,
+        test_paid_hours_break_deduction_cases,
         test_paid_hours_regression_cases,
         test_star_points_adjust_bounds_and_isolation,
         test_star_points_persist_after_reload_and_rename,

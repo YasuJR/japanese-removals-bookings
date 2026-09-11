@@ -47,15 +47,21 @@
       <dt>Actual</dt>
       <dd>{{ job.actual_hours_display }}</dd>
     </div>
+    {% if job.break_hours_label %}
     <div>
-      <dt>Paid</dt>
-      <dd>{{ job.paid_hours_display }}</dd>
+      <dt>Break</dt>
+      <dd>{{ job.break_hours_label }}</dd>
     </div>
+    {% endif %}
     {% if job.callout_hours_label %}
     <div>
       <dt>Call Out</dt>
       <dd>{{ job.callout_hours_label }}</dd>
     </div>
     {% endif %}
+    <div>
+      <dt>Paid</dt>
+      <dd>{{ job.paid_hours_display }}</dd>
+    </div>
   </dl>
 </article>

@@ -377,15 +377,23 @@ def callout_hours(booking: Dict[str, Any]) -> Optional[float]:
     return hours
 
 
+def break_hours(booking: Dict[str, Any]) -> float:
+    """Unpaid break hours from booking_extra_charges (same rows Invoice uses)."""
+    from extra_charges import break_hours_from_booking
+
+    return break_hours_from_booking(booking)
+
+
 def paid_hours(
     booking: Dict[str, Any], today: Optional[date] = None
 ) -> Optional[float]:
-    """Actual Hours + Call Out. None when actual time is not recorded."""
+    """Actual Hours - Unpaid Break + Call Out. None when actual is not recorded."""
     actual = actual_hours(booking, today)
     if actual is None:
         return None
-    extra = callout_hours(booking) or 0.0
-    return round(actual + extra, 2)
+    callout = callout_hours(booking) or 0.0
+    break_deduction = break_hours(booking)
+    return round(actual - break_deduction + callout, 2)
 
 
 def hours_or_zero(value: Optional[float]) -> float:

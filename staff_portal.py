@@ -435,6 +435,7 @@ def _job_hours_payload(row: Dict[str, Any], today: date) -> Dict[str, Any]:
     scheduled = staff_job_times.scheduled_hours(row)
     actual = staff_job_times.actual_hours(row, today)
     callout = staff_job_times.callout_hours(row)
+    break_h = staff_job_times.break_hours(row)
     paid = staff_job_times.paid_hours(row, today)
     move = staff_job_times.booking_move_date(row)
     is_future = move is not None and move > today
@@ -451,6 +452,9 @@ def _job_hours_payload(row: Dict[str, Any], today: date) -> Dict[str, Any]:
         callout_label = "+ {0} call out".format(
             staff_job_times.format_hours_short(callout)
         )
+    break_label = ""
+    if break_h:
+        break_label = "-{0}".format(staff_job_times.format_hours_short(break_h))
     return {
         "scheduled_hours": scheduled,
         "scheduled_hours_display": staff_job_times.format_hours_short(scheduled)
@@ -461,6 +465,8 @@ def _job_hours_payload(row: Dict[str, Any], today: date) -> Dict[str, Any]:
         "has_actual_hours": has_actual_hours,
         "callout_hours": callout,
         "callout_hours_label": callout_label,
+        "break_hours": break_h if break_h else None,
+        "break_hours_label": break_label,
         "paid_hours": paid,
         "paid_hours_display": paid_display,
     }
@@ -539,14 +545,21 @@ def _hours_summary(jobs: List[Dict[str, Any]]) -> Dict[str, Any]:
     scheduled = 0.0
     actual = 0.0
     callout = 0.0
+    break_total = 0.0
+    paid = 0.0
     for job in jobs:
         scheduled += staff_job_times.hours_or_zero(job.get("scheduled_hours"))
         actual += staff_job_times.hours_or_zero(job.get("actual_hours"))
         callout += staff_job_times.hours_or_zero(job.get("callout_hours"))
+        break_total += staff_job_times.hours_or_zero(job.get("break_hours"))
+        job_paid = job.get("paid_hours")
+        if job_paid is not None:
+            paid += float(job_paid)
     scheduled = round(scheduled, 2)
     actual = round(actual, 2)
     callout = round(callout, 2)
-    paid = round(actual + callout, 2)
+    break_total = round(break_total, 2)
+    paid = round(paid, 2)
     return {
         "job_count": len(jobs),
         "scheduled_hours": scheduled,
@@ -817,6 +830,8 @@ def _load_all_rows(
         move_iso = _booking_date_iso(row)
         if move_iso and start_iso <= move_iso <= end_iso:
             matched.append(row)
+    if matched:
+        db.attach_extra_charges(matched)
     return matched
 
 
@@ -951,6 +966,8 @@ def _load_rows(staff: str, start_iso: str, end_iso: str) -> List[Dict[str, Any]]
         move_iso = _booking_date_iso(row)
         if move_iso and start_iso <= move_iso <= end_iso:
             matched.append(row)
+    if matched:
+        db.attach_extra_charges(matched)
     return matched
 
 

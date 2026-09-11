@@ -1,6 +1,12 @@
 """Extra charge line items on bookings."""
 
+import re
 from typing import Any, Dict, List, Tuple
+
+_BREAK_MINUTES_RE = re.compile(
+    r"^(\d+(?:\.\d+)?)\s*min\s+break",
+    re.IGNORECASE,
+)
 
 
 def _extra_charge_row_is_empty(description: str, qty_raw: str, price_raw: str) -> bool:
@@ -105,3 +111,51 @@ def break_deduction_description(break_minutes: Any) -> str:
     else:
         label = "{0:g}".format(minutes)
     return "{0} min break deduction".format(label)
+
+
+def is_break_deduction_charge(description: Any) -> bool:
+    """True when an extra charge line is an unpaid break deduction."""
+    text = str(description or "").strip().lower()
+    return "break" in text and "deduction" in text
+
+
+def break_minutes_from_charge(
+    item: Dict[str, Any], hourly_rate: Any = None
+) -> float:
+    """Minutes deducted for one break extra-charge row (same source as Invoice)."""
+    desc = str(item.get("description") or "").strip()
+    if not is_break_deduction_charge(desc):
+        return 0.0
+    try:
+        qty = float(item.get("quantity") or 1)
+    except (TypeError, ValueError):
+        qty = 1.0
+    if qty <= 0:
+        return 0.0
+    match = _BREAK_MINUTES_RE.match(desc)
+    if match:
+        return float(match.group(1)) * qty
+    try:
+        unit = float(item.get("unit_price") or 0)
+        rate = float(hourly_rate or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    if unit >= 0 or rate <= 0:
+        return 0.0
+    return abs(unit) * qty / rate * 60.0
+
+
+def break_hours_from_booking(booking: Dict[str, Any]) -> float:
+    """Unpaid break hours stored on booking extra charges (not from invoice totals)."""
+    charges = booking.get("extra_charges")
+    if charges is None and booking.get("id"):
+        import database as db
+
+        charges = db.list_extra_charges(int(booking["id"]))
+    total_minutes = 0.0
+    rate = booking.get("hourly_rate")
+    for item in charges or []:
+        total_minutes += break_minutes_from_charge(item, rate)
+    if total_minutes <= 0:
+        return 0.0
+    return round(total_minutes / 60.0, 2)

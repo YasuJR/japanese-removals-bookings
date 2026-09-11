@@ -27,6 +27,9 @@
       <p class="staff-hours-kicker">Actual</p>
       <p class="staff-hours-value{% if not job.has_actual_hours %} staff-job-hours-unset{% endif %}">Actual {{ job.actual_hours_display }}</p>
     </div>
+    {% if job.break_hours_label %}
+    <p class="staff-hours-break">Break: {{ job.break_hours_label }}</p>
+    {% endif %}
     {% if job.callout_hours_label %}
     <p class="staff-hours-callout">Call Out: {{ job.callout_hours_label }}</p>
     {% endif %}
