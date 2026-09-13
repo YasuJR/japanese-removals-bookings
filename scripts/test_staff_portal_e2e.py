@@ -1949,6 +1949,83 @@ def test_all_staff_calendar_shows_unique_jobs_in_month_grid():
     return True
 
 
+def test_staff_calendar_week_view_shows_monday_first_seven_days():
+    from staff_portal import CAL_VIEW_WEEK, build_staff_portal
+
+    monday = _isolated_monday()
+    portal = build_staff_portal(
+        "Yasu",
+        "calendar",
+        monday + timedelta(days=2),
+        week_offset=0,
+        cal_view=CAL_VIEW_WEEK,
+    )
+    cal = portal["calendar"]
+    assert cal is not None
+    assert cal["view"] == "week"
+    assert len(cal["days"]) == 7
+    assert cal["days"][0]["weekday_label"] == "MON"
+    assert cal["days"][6]["weekday_label"] == "SUN"
+    assert portal["start_date"] == monday.isoformat()
+    assert portal["end_date"] == (monday + timedelta(days=6)).isoformat()
+    return True
+
+
+def test_staff_calendar_week_navigation_offsets():
+    from staff_portal import CAL_VIEW_WEEK, build_staff_portal
+
+    monday = _isolated_monday()
+    previous = build_staff_portal(
+        "Yasu", "calendar", monday, week_offset=-1, cal_view=CAL_VIEW_WEEK
+    )
+    nxt = build_staff_portal(
+        "Yasu", "calendar", monday, week_offset=1, cal_view=CAL_VIEW_WEEK
+    )
+    assert previous["start_date"] == (monday - timedelta(days=7)).isoformat()
+    assert nxt["start_date"] == (monday + timedelta(days=7)).isoformat()
+    html = _staff_client("Yasu").get(
+        "/staff?range=calendar&cal_view=week"
+    ).get_data(as_text=True)
+    assert "Previous Week" in html
+    assert "This Week" in html
+    assert "Next Week" in html
+    assert "staff-cal-week-board" in html
+    assert "staff-cal-view-tab active" in html
+    assert ">WEEK</a>" in html
+    return True
+
+
+def test_individual_staff_calendar_week_shows_only_assigned_jobs():
+    from datetime import date as date_cls
+    from staff_portal import CAL_VIEW_WEEK, build_staff_portal
+
+    anchor = date_cls(2099, 7, 7)
+    yasu_customer = _unique("CalWeekYasu")
+    ken_customer = _unique("CalWeekKen")
+    _create_job(yasu_customer, anchor.isoformat(), crew="Yasu", start_time="08:00")
+    _create_job(
+        ken_customer,
+        (anchor + timedelta(days=1)).isoformat(),
+        crew="Ken",
+        start_time="09:00",
+    )
+    portal = build_staff_portal(
+        "Yasu",
+        "calendar",
+        anchor,
+        week_offset=0,
+        cal_view=CAL_VIEW_WEEK,
+    )
+    names = [
+        job["customer_name"]
+        for day in portal["calendar"]["days"]
+        for job in day["jobs"]
+    ]
+    assert yasu_customer in names
+    assert ken_customer not in names
+    return True
+
+
 def test_staff_calendar_grid_starts_on_monday():
     from staff_portal import build_staff_portal
 
@@ -2004,10 +2081,11 @@ def test_calendar_shows_only_staff_jobs_and_day_detail():
         )
     ).get_data(as_text=True)
     assert ">Calendar</a>" in yasu_html
-    assert "Previous Month" in yasu_html
-    assert "This Month" in yasu_html
-    assert "Next Month" in yasu_html
-    assert "staff-cal-day-has-jobs" in yasu_html
+    assert "MONTH" in yasu_html
+    assert "WEEK" in yasu_html
+    assert "Previous" in yasu_html
+    assert "Today" in yasu_html
+    assert "calendar-month" in yasu_html
     assert yasu_customer in yasu_html
     assert ken_customer not in yasu_html
     return True
@@ -2614,6 +2692,9 @@ def main():
         test_all_staff_week_view_matches_owner_schedule,
         test_all_staff_weekly_sorts_same_day_jobs_by_start_time,
         test_all_staff_calendar_shows_unique_jobs_in_month_grid,
+        test_staff_calendar_week_view_shows_monday_first_seven_days,
+        test_staff_calendar_week_navigation_offsets,
+        test_individual_staff_calendar_week_shows_only_assigned_jobs,
         test_staff_rename_keeps_booking_links,
         test_staff_portal_hides_financial_data_and_booking_admin_links,
         test_staff_portal_reflects_booking_updates,

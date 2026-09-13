@@ -1,0 +1,23 @@
+<section class="staff-cal-week-wrap" aria-label="{{ portal.calendar.range_heading }}">
+  <div class="staff-cal-week-scroll">
+    <div class="staff-cal-week-board">
+      {% for day in portal.calendar.days %}
+      <div class="staff-cal-week-col calendar-day{% if day.is_today %} calendar-day-today{% endif %}"
+           data-date="{{ day.date_iso }}">
+        <header class="staff-cal-week-col-head">
+          <span class="staff-cal-week-col-label">{{ day.weekday_label }}</span>
+          <span class="staff-cal-week-col-num">{{ day.day_num }}</span>
+        </header>
+        <div class="staff-cal-week-col-rule" aria-hidden="true"></div>
+        <div class="staff-cal-week-col-body calendar-day-body">
+          {% if day.jobs %}
+          {% for job in day.jobs %}
+          {% include "_staff_calendar_job.html" %}
+          {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>

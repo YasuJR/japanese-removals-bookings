@@ -47,10 +47,10 @@
 
     <section class="panel staff-portal-controls">
       <nav class="staff-staff-switcher" aria-label="Staff schedule">
-        <a href="{{ url_for('staff_portal', staff_id='all', range='week', week=portal.week_offset) }}"
+        <a href="{{ url_for('staff_portal', staff_id='all', range=portal.range, week=portal.week_offset, year=portal.calendar_year, month=portal.calendar_month, day=portal.calendar_day, cal_view=portal.cal_view) }}"
            class="staff-staff-tab{% if portal.is_all_staff %} active{% endif %}">All Staff</a>
         {% for member in portal.staff_roster %}
-        <a href="{{ url_for('staff_portal', staff_id=member.id, range='week', week=portal.week_offset) }}"
+        <a href="{{ url_for('staff_portal', staff_id=member.id, range=portal.range, week=portal.week_offset, year=portal.calendar_year, month=portal.calendar_month, day=portal.calendar_day, cal_view=portal.cal_view) }}"
            class="staff-staff-tab{% if not portal.is_all_staff and portal.selected_staff_id == member.id %} active{% endif %}">{{ member.name }}</a>
         {% endfor %}
       </nav>
@@ -75,7 +75,7 @@
 
       <nav class="staff-portal-tabs" aria-label="Staff portal views">
         {% for key, label in portal.range_tabs %}
-        <a href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range=key, week=portal.week_offset, year=portal.calendar_year, month=portal.calendar_month, day=portal.calendar_day) }}"
+        <a href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range=key, week=portal.week_offset, year=portal.calendar_year, month=portal.calendar_month, day=portal.calendar_day, cal_view=portal.cal_view) }}"
            class="staff-portal-tab{% if portal.range == key %} active{% endif %}">{{ label }}</a>
         {% endfor %}
       </nav>
@@ -152,11 +152,33 @@
       {% endif %}
 
     {% elif portal.range == "calendar" and portal.calendar %}
-    <section class="staff-cal-nav" aria-label="Month navigation">
-      <a class="staff-cal-nav-btn" href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='calendar', year=portal.calendar.prev_year, month=portal.calendar.prev_month) }}">Previous Month</a>
-      <a class="staff-cal-nav-btn{% if portal.calendar.is_current_month %} active{% endif %}" href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='calendar') }}">This Month</a>
-      <a class="staff-cal-nav-btn" href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='calendar', year=portal.calendar.next_year, month=portal.calendar.next_month) }}">Next Month</a>
+    <link rel="stylesheet" href="{{ url_for('static', filename='calendar.css') }}">
+    <nav class="staff-cal-view-tabs" aria-label="Calendar view">
+      <a class="staff-cal-view-tab{% if portal.cal_view == 'month' %} active{% endif %}"
+         href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='calendar', cal_view='month', year=portal.calendar.year, month=portal.calendar.month) }}">MONTH</a>
+      <a class="staff-cal-view-tab{% if portal.cal_view == 'week' %} active{% endif %}"
+         href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='calendar', cal_view='week', week=portal.calendar.week_offset if portal.cal_view == 'week' else 0, year=portal.calendar.year, month=portal.calendar.month) }}">WEEK</a>
+    </nav>
+
+    {% if portal.cal_view == 'week' %}
+    <section class="staff-cal-nav staff-cal-nav-week" aria-label="Week navigation">
+      <a class="staff-cal-nav-btn" href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='calendar', cal_view='week', week=portal.calendar.prev_week_offset) }}">Previous Week</a>
+      <a class="staff-cal-nav-btn{% if portal.calendar.is_current_week %} active{% endif %}" href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='calendar', cal_view='week', week=0) }}">This Week</a>
+      <a class="staff-cal-nav-btn" href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='calendar', cal_view='week', week=portal.calendar.next_week_offset) }}">Next Week</a>
     </section>
+    <p class="staff-cal-range-heading">{{ portal.calendar.range_heading }}</p>
+    {% include "_staff_calendar_week.html" %}
+
+    {% else %}
+    <section class="staff-cal-nav staff-cal-nav-month" aria-label="Month navigation">
+      <a class="staff-cal-nav-btn" href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='calendar', cal_view='month', year=portal.calendar.prev_year, month=portal.calendar.prev_month) }}">Previous</a>
+      <p class="staff-cal-month-title">{{ portal.calendar.month_label }}</p>
+      <a class="staff-cal-nav-btn" href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='calendar', cal_view='month', year=portal.calendar.next_year, month=portal.calendar.next_month) }}">Next</a>
+    </section>
+    <div class="staff-cal-today-row">
+      <a class="staff-cal-nav-btn staff-cal-today-btn{% if portal.calendar.is_current_month %} active{% endif %}"
+         href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='calendar', cal_view='month') }}">Today</a>
+    </div>
     {% include "_staff_calendar_month.html" %}
     {% if portal.calendar.selected_date_iso %}
     <section class="staff-cal-day-jobs" id="staff-cal-day-jobs" aria-label="Jobs on {{ portal.calendar.selected_date_display }}">
@@ -171,6 +193,7 @@
       <p class="staff-week-empty">No jobs on this day.</p>
       {% endif %}
     </section>
+    {% endif %}
     {% endif %}
 
     {% elif portal.range == "week" %}

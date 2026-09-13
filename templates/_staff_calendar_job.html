@@ -1,0 +1,58 @@
+<details class="staff-cal-job-details calendar-booking cal-{{ job.status_class }}">
+  <summary class="staff-cal-job-summary calendar-booking">
+    <span class="cal-booking-time">{{ job.time_range }}</span>
+    <strong class="cal-booking-customer">{{ job.customer_name }}</strong>
+    <span class="cal-booking-meta">Crew: {{ job.crew_display }}</span>
+    {% if job.status_display %}
+    <span class="cal-booking-status">{{ job.status_display }}</span>
+    {% endif %}
+  </summary>
+  <div class="staff-cal-job-detail">
+    <dl class="staff-cal-job-detail-list">
+      <div>
+        <dt>Start / Finish</dt>
+        <dd>{{ job.time_range }}</dd>
+      </div>
+      <div>
+        <dt>Customer</dt>
+        <dd>{{ job.customer_name }}</dd>
+      </div>
+      <div>
+        <dt>Crew</dt>
+        <dd>{{ job.crew_display }}</dd>
+      </div>
+      <div>
+        <dt>Pickup</dt>
+        <dd>{{ job.pickup_address or "—" }}</dd>
+      </div>
+      <div>
+        <dt>Delivery</dt>
+        <dd>{{ job.delivery_address or "—" }}</dd>
+      </div>
+      <div>
+        <dt>Phone</dt>
+        <dd>{{ job.phone or "—" }}</dd>
+      </div>
+      {% if job.notes %}
+      <div>
+        <dt>Notes</dt>
+        <dd>{{ job.notes }}</dd>
+      </div>
+      {% endif %}
+      <div>
+        <dt>Status</dt>
+        <dd>{{ job.status_display or "—" }}</dd>
+      </div>
+    </dl>
+    {% with job=job.job, compact_actions=true %}
+    {% include "_staff_job_actions.html" %}
+    {% endwith %}
+    {% if can_manage_staff_portal %}
+    <div class="staff-cal-job-owner-edit">
+      {% with job=job.job %}
+      {% include "_staff_job_owner_edit_toggle.html" %}
+      {% endwith %}
+    </div>
+    {% endif %}
+  </div>
+</details>

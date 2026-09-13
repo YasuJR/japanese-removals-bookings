@@ -1241,11 +1241,73 @@ a.staff-job-btn:active {
   color: var(--navy);
 }
 
+.staff-cal-view-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0 0 0.85rem;
+}
+
+.staff-cal-view-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.45rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-align: center;
+  color: var(--navy);
+  background: #fff;
+  border: 1px solid var(--border);
+}
+
+.staff-cal-view-tab.active {
+  color: #fff;
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
 .staff-cal-nav {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.45rem;
   margin: 0 0 0.85rem;
+}
+
+.staff-cal-nav-month {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr);
+  align-items: center;
+}
+
+.staff-cal-month-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: var(--navy);
+}
+
+.staff-cal-today-row {
+  display: flex;
+  justify-content: center;
+  margin: -0.35rem 0 0.75rem;
+}
+
+.staff-cal-today-btn {
+  min-width: 8rem;
+}
+
+.staff-cal-range-heading {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 800;
+  text-align: center;
+  color: var(--navy);
 }
 
 .staff-cal-nav-btn {
@@ -1282,11 +1344,130 @@ a.staff-job-btn:active {
   text-align: center;
 }
 
-.staff-cal-month-scroll {
+.staff-cal-month-scroll,
+.staff-cal-week-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   margin: 0 -0.15rem;
   padding: 0 0.15rem 0.35rem;
+  max-width: 100%;
+}
+
+.staff-cal-month-grid {
+  min-width: min(100%, 52rem);
+}
+
+.staff-cal-week-board {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(150px, 1fr));
+  gap: 0;
+  min-width: calc(150px * 7);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.staff-cal-week-col {
+  min-width: 150px;
+  border-right: 1px solid var(--border);
+  padding: 0.45rem 0.35rem 0.65rem;
+  vertical-align: top;
+  background: #fff;
+}
+
+.staff-cal-week-col:last-child {
+  border-right: none;
+}
+
+.staff-cal-week-col-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin: 0 0 0.35rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.staff-cal-week-col-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+.staff-cal-week-col-num {
+  font-size: 1rem;
+}
+
+.staff-cal-week-col-rule {
+  height: 1px;
+  margin: 0 0 0.45rem;
+  background: var(--border);
+}
+
+.staff-cal-week-col-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.staff-cal-day-num-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.staff-cal-job-details {
+  list-style: none;
+}
+
+.staff-cal-job-details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.staff-cal-job-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.staff-cal-job-summary {
+  display: grid;
+  gap: 0.08rem;
+  margin: 0;
+  padding: 0.35rem 0.35rem;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--navy);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.staff-cal-job-detail {
+  margin-top: 0.35rem;
+  padding: 0.45rem 0.35rem 0.5rem;
+  border-top: 1px dashed var(--border);
+}
+
+.staff-cal-job-detail-list {
+  margin: 0 0 0.45rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+}
+
+.staff-cal-job-detail-list dt {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.staff-cal-job-detail-list dd {
+  margin: 0.1rem 0 0;
+  word-break: break-word;
+}
+
+.staff-cal-job-owner-edit {
+  margin-top: 0.35rem;
 }
 
 .staff-cal-grid {
@@ -1422,8 +1603,12 @@ a.staff-job-btn:active {
 }
 
 @media (max-width: 767px) {
-  .staff-cal-grid-month {
+  .staff-cal-month-grid {
     min-width: 44rem;
+  }
+
+  .staff-cal-week-board {
+    min-width: calc(150px * 7);
   }
 
   .staff-cal-day-cell {
@@ -1432,7 +1617,8 @@ a.staff-job-btn:active {
 }
 
 @media (min-width: 420px) {
-  .staff-cal-nav {
+  .staff-cal-nav-week,
+  .staff-cal-nav:not(.staff-cal-nav-month) {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

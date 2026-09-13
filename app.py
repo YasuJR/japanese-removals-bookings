@@ -1921,6 +1921,7 @@ def staff_portal():
     cal_year = request.args.get("year", "").strip() or None
     cal_month = request.args.get("month", "").strip() or None
     cal_day = request.args.get("day", "").strip() or None
+    cal_view = request.args.get("cal_view", "").strip() or None
     portal = build_staff_portal(
         session_staff,
         range_key,
@@ -1931,6 +1932,7 @@ def staff_portal():
         calendar_month=cal_month,
         calendar_day=cal_day,
         view_staff_id=view_staff_id,
+        cal_view=cal_view,
     )
     return render_template(
         "staff_portal.html",

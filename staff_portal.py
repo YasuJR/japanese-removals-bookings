@@ -43,6 +43,8 @@ RANGE_CALENDAR = "calendar"
 RANGE_WEEK = "week"
 RANGE_HISTORY = "history"
 STAFF_VIEW_ALL = "all"
+CAL_VIEW_MONTH = "month"
+CAL_VIEW_WEEK = "week"
 
 RANGE_TABS: List[Tuple[str, str]] = [
     (RANGE_TODAY, "Today"),
@@ -144,6 +146,7 @@ def portal_nav_params(
     calendar_year: Any = None,
     calendar_month: Any = None,
     calendar_day: Any = None,
+    cal_view: str = CAL_VIEW_MONTH,
 ) -> Dict[str, Any]:
     params: Dict[str, Any] = {
         "staff_id": staff_id if staff_id is not None else STAFF_VIEW_ALL,
@@ -156,7 +159,16 @@ def portal_nav_params(
         params["month"] = calendar_month
     if calendar_day:
         params["day"] = calendar_day
+    if range_key == RANGE_CALENDAR:
+        params["cal_view"] = normalize_cal_view(cal_view)
     return params
+
+
+def normalize_cal_view(value: Any) -> str:
+    key = str(value or "").strip().lower()
+    if key == CAL_VIEW_WEEK:
+        return CAL_VIEW_WEEK
+    return CAL_VIEW_MONTH
 
 
 def normalize_range(value: Any) -> str:
@@ -274,13 +286,42 @@ def bound_staff_identity(
     return resolve_staff_name(from_id, names)
 
 
+def _calendar_week_anchor(
+    today: date, week_offset: int, cal_year: int, cal_month: int, cal_day: Any
+) -> date:
+    if cal_day:
+        try:
+            if isinstance(cal_day, str) and len(cal_day) >= 10:
+                return date.fromisoformat(cal_day[:10])
+        except ValueError:
+            pass
+    if cal_year and cal_month and cal_day:
+        try:
+            last = monthrange(cal_year, cal_month)[1]
+            return date(cal_year, cal_month, min(int(cal_day), last))
+        except (ValueError, TypeError):
+            pass
+    monday, _ = week_range(today)
+    return monday + timedelta(weeks=week_offset)
+
+
 def _range_dates(
-    range_key: str, today: date, week_offset: int = 0, cal_year: int = 0, cal_month: int = 0
+    range_key: str,
+    today: date,
+    week_offset: int = 0,
+    cal_year: int = 0,
+    cal_month: int = 0,
+    cal_view: str = CAL_VIEW_MONTH,
+    cal_day: int = 0,
 ) -> Tuple[str, str]:
     if range_key == RANGE_TODAY:
         iso = today.isoformat()
         return iso, iso
     if range_key == RANGE_CALENDAR:
+        if normalize_cal_view(cal_view) == CAL_VIEW_WEEK:
+            anchor = _calendar_week_anchor(today, week_offset, cal_year, cal_month, cal_day)
+            monday, sunday = week_range(anchor)
+            return monday.isoformat(), sunday.isoformat()
         year, month = cal_year, cal_month
         if not year or not month:
             year, month = today.year, today.month
@@ -331,7 +372,25 @@ def _dedupe_jobs_by_id(jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return unique
 
 
-def _calendar_job_summary(job: Dict[str, Any]) -> Dict[str, Any]:
+def _calendar_status_class(job: Dict[str, Any]) -> str:
+    status = str(job.get("status") or job.get("status_display") or "").strip().lower()
+    if status in ("cancelled", "canceled"):
+        return "cancelled"
+    if status in ("completed",) or str(job.get("status_display") or "").upper() == "COMPLETED":
+        return "completed"
+    if status in ("paid", "invoiced") or str(job.get("status_display") or "").upper() in (
+        "PAID",
+        "INVOICED",
+    ):
+        return "paid"
+    if status in ("confirmed", "on route", "in progress") or str(
+        job.get("status_display") or ""
+    ).upper() in ("CONFIRMED", "ON ROUTE", "IN PROGRESS"):
+        return "confirmed"
+    return "quote"
+
+
+def _calendar_job_card(job: Dict[str, Any]) -> Dict[str, Any]:
     status = str(job.get("status_display") or job.get("status") or "").strip()
     if status and status == status.upper() and " " not in status:
         status_label = status
@@ -341,10 +400,21 @@ def _calendar_job_summary(job: Dict[str, Any]) -> Dict[str, Any]:
         status_label = ""
     return {
         "id": job.get("id"),
+        "time_range": job.get("scheduled_range_display") or job.get("start_time") or "—",
         "start_display": job.get("start_time") or "—",
         "customer_name": job.get("customer_name") or "—",
         "crew_display": job.get("crew_display") or job.get("crew") or "—",
         "status_display": status_label,
+        "status_class": _calendar_status_class(job),
+        "pickup_address": job.get("pickup_address") or "",
+        "delivery_address": job.get("delivery_address") or job.get("dropoff_address") or "",
+        "phone": job.get("phone") or "",
+        "notes": job.get("notes") or "",
+        "tel_href": job.get("tel_href") or "",
+        "sms_href": job.get("sms_href") or "",
+        "pickup_map_url": job.get("pickup_map_url") or "",
+        "delivery_map_url": job.get("delivery_map_url") or "",
+        "job": job,
     }
 
 
@@ -352,7 +422,20 @@ def _sort_jobs_by_start_time(jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     return sorted(jobs, key=job_start_sort_key)
 
 
-def _build_staff_calendar(
+def _group_calendar_jobs(
+    jobs: List[Dict[str, Any]], start_iso: str, end_iso: str
+) -> Dict[str, List[Dict[str, Any]]]:
+    by_date: Dict[str, List[Dict[str, Any]]] = {}
+    for job in _dedupe_jobs_by_id(jobs):
+        iso = job.get("date_iso") or ""
+        if iso and start_iso <= iso <= end_iso:
+            by_date.setdefault(iso, []).append(job)
+    for iso in by_date:
+        by_date[iso] = _sort_jobs_by_start_time(by_date[iso])
+    return by_date
+
+
+def _build_staff_calendar_month(
     jobs: List[Dict[str, Any]],
     year: int,
     month: int,
@@ -360,13 +443,9 @@ def _build_staff_calendar(
     selected_day_iso: str = "",
 ) -> Dict[str, Any]:
     grid_start, grid_end, month_first, month_last = _calendar_grid_bounds(year, month)
-    by_date: Dict[str, List[Dict[str, Any]]] = {}
-    for job in _dedupe_jobs_by_id(jobs):
-        iso = job.get("date_iso") or ""
-        if month_first.isoformat() <= iso <= month_last.isoformat():
-            by_date.setdefault(iso, []).append(job)
-    for iso in by_date:
-        by_date[iso] = _sort_jobs_by_start_time(by_date[iso])
+    by_date = _group_calendar_jobs(
+        jobs, month_first.isoformat(), month_last.isoformat()
+    )
 
     cells: List[Dict[str, Any]] = []
     month_grid: List[List[Dict[str, Any]]] = []
@@ -385,7 +464,7 @@ def _build_staff_calendar(
             "has_jobs": bool(day_jobs),
             "job_count": len(day_jobs),
             "selected": iso == selected_day_iso,
-            "jobs": [_calendar_job_summary(job) for job in day_jobs],
+            "jobs": [_calendar_job_card(job) for job in day_jobs],
         }
         cells.append(cell)
         week_row.append(cell)
@@ -400,9 +479,10 @@ def _build_staff_calendar(
     is_current_month = year == today.year and month == today.month
 
     return {
+        "view": CAL_VIEW_MONTH,
         "year": year,
         "month": month,
-        "month_label": _month_heading(year, month),
+        "month_label": _month_heading(year, month).upper(),
         "weekday_labels": list(MONDAY_WEEKDAY_LABELS_SHORT),
         "cells": cells,
         "month_grid": month_grid,
@@ -414,6 +494,54 @@ def _build_staff_calendar(
         "next_year": next_year,
         "next_month": next_month,
         "is_current_month": is_current_month,
+    }
+
+
+def _build_staff_calendar_week(
+    jobs: List[Dict[str, Any]],
+    start_iso: str,
+    end_iso: str,
+    today: date,
+    week_offset: int,
+) -> Dict[str, Any]:
+    by_date = _group_calendar_jobs(jobs, start_iso, end_iso)
+    days: List[Dict[str, Any]] = []
+    try:
+        current = date.fromisoformat(start_iso)
+        end = date.fromisoformat(end_iso)
+    except ValueError:
+        current = today
+        end = today
+    while current <= end:
+        iso = current.isoformat()
+        day_jobs = by_date.get(iso, [])
+        days.append(
+            {
+                "date_iso": iso,
+                "day_num": current.day,
+                "weekday_label": current.strftime("%a").upper(),
+                "heading": "{0} {1}".format(current.strftime("%a").upper(), current.day),
+                "is_today": current == today,
+                "jobs": [_calendar_job_card(job) for job in day_jobs],
+            }
+        )
+        current += timedelta(days=1)
+    monday = date.fromisoformat(start_iso)
+    sunday = date.fromisoformat(end_iso)
+    this_monday, _ = week_range(today)
+    return {
+        "view": CAL_VIEW_WEEK,
+        "week_start": start_iso,
+        "week_end": end_iso,
+        "range_heading": _week_range_heading(monday, sunday),
+        "weekday_labels": list(MONDAY_WEEKDAY_LABELS_SHORT),
+        "days": days,
+        "week_offset": week_offset,
+        "prev_week_offset": week_offset - 1,
+        "next_week_offset": week_offset + 1,
+        "is_current_week": monday == this_monday and week_offset == 0,
+        "year": monday.year,
+        "month": monday.month,
     }
 
 
@@ -1065,6 +1193,7 @@ def build_staff_portal(
     calendar_month: Any = None,
     calendar_day: Any = None,
     view_staff_id: Any = None,
+    cal_view: Any = CAL_VIEW_MONTH,
 ) -> Dict[str, Any]:
     if today is None:
         today = perth_today()
@@ -1079,8 +1208,15 @@ def build_staff_portal(
     offset = normalize_week_offset(week_offset)
     cal_year, cal_month = normalize_calendar_month(calendar_year, calendar_month, today)
     selected_day = normalize_calendar_day(calendar_day, cal_year, cal_month)
+    active_cal_view = normalize_cal_view(cal_view)
     start_iso, end_iso = _range_dates(
-        active_range, today, offset, cal_year, cal_month
+        active_range,
+        today,
+        offset,
+        cal_year,
+        cal_month,
+        active_cal_view,
+        selected_day,
     )
 
     if is_all_staff:
@@ -1129,7 +1265,12 @@ def build_staff_portal(
             today_view = _build_today_individual_view(staff_jobs)
             jobs_label = today_view["heading"]
     elif active_range == RANGE_CALENDAR:
-        jobs_label = _month_heading(cal_year, cal_month)
+        if active_cal_view == CAL_VIEW_WEEK:
+            jobs_label = _week_range_heading(
+                date.fromisoformat(start_iso), date.fromisoformat(end_iso)
+            )
+        else:
+            jobs_label = _month_heading(cal_year, cal_month)
     elif active_range == RANGE_WEEK:
         if is_all_staff:
             jobs_label = "All Staff This Week"
@@ -1142,9 +1283,14 @@ def build_staff_portal(
 
     calendar_view = None
     if active_range == RANGE_CALENDAR:
-        calendar_view = _build_staff_calendar(
-            jobs, cal_year, cal_month, today, selected_day
-        )
+        if active_cal_view == CAL_VIEW_WEEK:
+            calendar_view = _build_staff_calendar_week(
+                jobs, start_iso, end_iso, today, offset
+            )
+        else:
+            calendar_view = _build_staff_calendar_month(
+                jobs, cal_year, cal_month, today, selected_day
+            )
 
     week_days: List[Dict[str, Any]] = []
     owner_weekly = None
@@ -1193,6 +1339,7 @@ def build_staff_portal(
         calendar_year=cal_year,
         calendar_month=cal_month,
         calendar_day=selected_day,
+        cal_view=active_cal_view,
     )
 
     star_points_view = None
@@ -1228,6 +1375,7 @@ def build_staff_portal(
         "calendar_year": cal_year,
         "calendar_month": cal_month,
         "calendar_day": selected_day,
+        "cal_view": active_cal_view,
         "calendar": calendar_view,
         "jobs": jobs,
         "job_count": count,
