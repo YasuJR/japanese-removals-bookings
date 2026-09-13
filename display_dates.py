@@ -1,9 +1,19 @@
 """Format move dates for booking tables (display only; DB stays ISO)."""
 
-from datetime import date, datetime
-from typing import Any, Dict
+from datetime import date, datetime, timedelta
+from typing import Any, Dict, Tuple
 
 _WEEKDAY_SHORT = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+MONDAY_WEEKDAY_LABELS_SHORT = _WEEKDAY_SHORT
+MONDAY_WEEKDAY_LABELS_LONG = (
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+)
 _MONTH_SHORT = (
     "Jan",
     "Feb",
@@ -32,6 +42,19 @@ def _parse_iso_date(date_string: Any):
         return datetime.strptime(text, "%Y-%m-%d").date()
     except ValueError:
         return None
+
+
+def monday_week_grid_bounds(first: date, last: date) -> Tuple[date, date]:
+    """Inclusive calendar grid range with Monday-first weeks."""
+    grid_start = first - timedelta(days=first.weekday())
+    grid_end = last + timedelta(days=(6 - last.weekday()))
+    return grid_start, grid_end
+
+
+def monday_week_bounds(anchor: date) -> Tuple[date, date]:
+    """Monday–Sunday week containing anchor."""
+    start = anchor - timedelta(days=anchor.weekday())
+    return start, start + timedelta(days=6)
 
 
 def normalize_move_date(value: Any) -> str:

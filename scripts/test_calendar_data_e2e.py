@@ -150,6 +150,89 @@ def test_hao_style_booking_on_correct_calendar_day():
     return True
 
 
+def test_month_grid_monday_start_when_month_begins_on_sunday():
+    ctx = calendar_data.build_calendar_context(year=2026, month=11, view="month")
+    assert ctx["weekday_labels"][0] == "Monday"
+    assert ctx["weekday_labels"][-1] == "Sunday"
+    first_week = ctx["month_grid"][0]
+    assert first_week[0]["date"] == "2026-10-26"
+    assert first_week[0]["day"] == 26
+    assert not first_week[0]["in_month"]
+    nov1 = next(cell for cell in first_week if cell["date"] == "2026-11-01")
+    assert first_week.index(nov1) == 6
+    return True
+
+
+def test_month_grid_monday_start_when_month_begins_on_monday():
+    ctx = calendar_data.build_calendar_context(year=2026, month=6, view="month")
+    first_week = ctx["month_grid"][0]
+    assert first_week[0]["date"] == "2026-06-01"
+    assert first_week[0]["in_month"]
+    assert first_week[0]["day"] == 1
+    return True
+
+
+def test_month_grid_trailing_days_end_on_sunday():
+    ctx = calendar_data.build_calendar_context(year=2026, month=8, view="month")
+    last_week = ctx["month_grid"][-1]
+    assert last_week[-1]["date"] == "2026-09-06"
+    assert last_week[-1]["day"] == 6
+    assert not last_week[-1]["in_month"]
+    aug31 = next(cell for cell in last_week if cell["date"] == "2026-08-31")
+    assert last_week.index(aug31) == 0
+    return True
+
+
+def test_week_view_runs_monday_through_sunday():
+    ctx = calendar_data.build_calendar_context(
+        year=2026, month=9, day=10, view="week", today=date(2026, 9, 10)
+    )
+    week_dates = [day["date"] for day in ctx["week_days"]]
+    assert week_dates == [
+        "2026-09-07",
+        "2026-09-08",
+        "2026-09-09",
+        "2026-09-10",
+        "2026-09-11",
+        "2026-09-12",
+        "2026-09-13",
+    ]
+    assert ctx["week_days"][0]["label"].startswith("Mon")
+    assert ctx["week_days"][-1]["label"].startswith("Sun")
+    return True
+
+
+def test_month_prev_next_and_today_navigation():
+    ctx = calendar_data.build_calendar_context(
+        year=2026, month=9, view="month", today=date(2026, 9, 13)
+    )
+    assert ctx["prev_year"] == 2026
+    assert ctx["prev_month"] == 8
+    assert ctx["next_year"] == 2026
+    assert ctx["next_month"] == 10
+    assert ctx["today_iso"] == "2026-09-13"
+    return True
+
+
+def test_calendar_page_renders_monday_first_headers():
+    client = app.test_client()
+    db.init_db()
+    username = "cal-monday-{0}".format(datetime.now().timestamp())
+    uid = db.create_staff_user(
+        username,
+        __import__("auth").hash_password("test-password"),
+        "Calendar Monday",
+        is_admin=1,
+    )
+    with client.session_transaction() as sess:
+        sess["user_id"] = uid
+    html = client.get("/calendar?view=month&year=2026&month=11").get_data(as_text=True)
+    mon_pos = html.index("calendar-weekday")
+    header_block = html[mon_pos : mon_pos + 400]
+    assert header_block.index("Mon") < header_block.index("Sun")
+    return True
+
+
 def test_calendar_page_renders_postgres_move_date():
     db.init_db()
     row = FakeRow(_hao_style_booking(booking_id=901))
@@ -184,6 +267,12 @@ def main() -> int:
         test_cancelled_booking_appears_with_cancelled_class,
         test_postgres_date_and_datetime_values_render,
         test_hao_style_booking_on_correct_calendar_day,
+        test_month_grid_monday_start_when_month_begins_on_sunday,
+        test_month_grid_monday_start_when_month_begins_on_monday,
+        test_month_grid_trailing_days_end_on_sunday,
+        test_week_view_runs_monday_through_sunday,
+        test_month_prev_next_and_today_navigation,
+        test_calendar_page_renders_monday_first_headers,
         test_calendar_page_renders_postgres_move_date,
     ]
     failed = 0

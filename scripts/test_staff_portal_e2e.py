@@ -1881,6 +1881,29 @@ def test_completed_jobs_use_saved_booking_times_when_actual_columns_empty():
     return True
 
 
+def test_staff_calendar_grid_starts_on_monday():
+    from staff_portal import build_staff_portal
+
+    portal = build_staff_portal(
+        "Yasu", "calendar", calendar_year=2026, calendar_month=11
+    )
+    cal = portal["calendar"]
+    assert cal is not None
+    assert cal["weekday_labels"] == [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri",
+        "Sat",
+        "Sun",
+    ]
+    assert cal["cells"][0]["date_iso"] == "2026-10-26"
+    assert cal["cells"][6]["date_iso"] == "2026-11-01"
+    assert cal["cells"][-1]["date_iso"] == "2026-12-06"
+    return True
+
+
 def test_calendar_shows_only_staff_jobs_and_day_detail():
     from datetime import date as date_cls
     from staff_portal import build_staff_portal
@@ -2544,6 +2567,7 @@ def main():
         test_future_actual_is_not_completed,
         test_history_groups_past_weeks_with_paid_hours,
         test_completed_jobs_use_saved_booking_times_when_actual_columns_empty,
+        test_staff_calendar_grid_starts_on_monday,
         test_calendar_shows_only_staff_jobs_and_day_detail,
         test_week_navigation_changes_week,
         test_owner_can_edit_and_clear_actual_times_from_staff_portal,

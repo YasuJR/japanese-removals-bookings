@@ -16,7 +16,12 @@ from booking_times import (
 )
 from crew import active_crew_names, crew_from_storage, display_crew
 import double_booking
-from display_dates import normalize_move_date
+from display_dates import (
+    MONDAY_WEEKDAY_LABELS_LONG,
+    monday_week_bounds,
+    monday_week_grid_bounds,
+    normalize_move_date,
+)
 
 STATUS_FILTERS = [
     ("all", "All"),
@@ -145,15 +150,11 @@ def _passes_filters(
 def _month_bounds(year: int, month: int) -> Tuple[date, date]:
     first = date(year, month, 1)
     last = date(year, month, monthrange(year, month)[1])
-    # Grid includes leading/trailing days for full weeks (Sunday start).
-    start = first - timedelta(days=(first.weekday() + 1) % 7)
-    end = last + timedelta(days=(6 - ((last.weekday() + 1) % 7)))
-    return start, end
+    return monday_week_grid_bounds(first, last)
 
 
 def _week_bounds(anchor: date) -> Tuple[date, date]:
-    start = anchor - timedelta(days=(anchor.weekday() + 1) % 7)
-    return start, start + timedelta(days=6)
+    return monday_week_bounds(anchor)
 
 
 def load_events(
@@ -345,7 +346,7 @@ def build_calendar_context(
         "events_by_date": events_by_date,
         "month_grid": month_grid,
         "week_days": week_days,
-        "weekday_labels": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+        "weekday_labels": list(MONDAY_WEEKDAY_LABELS_LONG),
         "time_slots": ["{0}:00".format(h) for h in range(6, 20)],
         "crew_options": active_crew_names(),
         "truck_options": trucks,

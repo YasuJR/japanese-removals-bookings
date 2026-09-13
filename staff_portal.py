@@ -23,7 +23,12 @@ from booking_times import (
 from crew import CREW_OPTIONS, active_crew_names, all_crew_names, crew_from_storage
 from daily_jobs_data import _crew_slash_display
 from dashboard_data import perth_today, week_range
-from display_dates import format_display_date, normalize_move_date
+from display_dates import (
+    MONDAY_WEEKDAY_LABELS_SHORT,
+    format_display_date,
+    monday_week_grid_bounds,
+    normalize_move_date,
+)
 import staff_job_times
 import star_points
 from weekly_schedule_data import (
@@ -308,8 +313,7 @@ def _month_heading(year: int, month: int) -> str:
 def _calendar_grid_bounds(year: int, month: int) -> Tuple[date, date, date, date]:
     first = date(year, month, 1)
     last = date(year, month, monthrange(year, month)[1])
-    grid_start = first - timedelta(days=(first.weekday() + 1) % 7)
-    grid_end = last + timedelta(days=(6 - ((last.weekday() + 1) % 7)))
+    grid_start, grid_end = monday_week_grid_bounds(first, last)
     return grid_start, grid_end, first, last
 
 
@@ -363,7 +367,7 @@ def _build_staff_calendar(
         "year": year,
         "month": month,
         "month_label": _month_heading(year, month),
-        "weekday_labels": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+        "weekday_labels": list(MONDAY_WEEKDAY_LABELS_SHORT),
         "cells": cells,
         "selected_date_iso": selected_day_iso,
         "selected_date_display": _date_display(selected_day_iso) if selected_day_iso else "",
