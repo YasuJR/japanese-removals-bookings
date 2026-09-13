@@ -18,6 +18,7 @@ from booking_times import (
     display_start_time,
     effective_start_hm,
     format_time_12h,
+    job_start_sort_key,
     normalize_time_input,
 )
 from crew import CREW_OPTIONS, active_crew_names, all_crew_names, crew_from_storage
@@ -317,6 +318,40 @@ def _calendar_grid_bounds(year: int, month: int) -> Tuple[date, date, date, date
     return grid_start, grid_end, first, last
 
 
+def _dedupe_jobs_by_id(jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen: set = set()
+    unique: List[Dict[str, Any]] = []
+    for job in jobs:
+        job_id = job.get("id")
+        if job_id in seen:
+            continue
+        if job_id is not None:
+            seen.add(job_id)
+        unique.append(job)
+    return unique
+
+
+def _calendar_job_summary(job: Dict[str, Any]) -> Dict[str, Any]:
+    status = str(job.get("status_display") or job.get("status") or "").strip()
+    if status and status == status.upper() and " " not in status:
+        status_label = status
+    elif status:
+        status_label = status.upper()
+    else:
+        status_label = ""
+    return {
+        "id": job.get("id"),
+        "start_display": job.get("start_time") or "—",
+        "customer_name": job.get("customer_name") or "—",
+        "crew_display": job.get("crew_display") or job.get("crew") or "—",
+        "status_display": status_label,
+    }
+
+
+def _sort_jobs_by_start_time(jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return sorted(jobs, key=job_start_sort_key)
+
+
 def _build_staff_calendar(
     jobs: List[Dict[str, Any]],
     year: int,
@@ -326,36 +361,37 @@ def _build_staff_calendar(
 ) -> Dict[str, Any]:
     grid_start, grid_end, month_first, month_last = _calendar_grid_bounds(year, month)
     by_date: Dict[str, List[Dict[str, Any]]] = {}
-    for job in jobs:
+    for job in _dedupe_jobs_by_id(jobs):
         iso = job.get("date_iso") or ""
-        if grid_start.isoformat() <= iso <= grid_end.isoformat():
+        if month_first.isoformat() <= iso <= month_last.isoformat():
             by_date.setdefault(iso, []).append(job)
-    for day_jobs in by_date.values():
-        day_jobs.sort(
-            key=lambda item: (
-                item.get("start_hm") or "",
-                item.get("customer_name") or "",
-            )
-        )
+    for iso in by_date:
+        by_date[iso] = _sort_jobs_by_start_time(by_date[iso])
 
     cells: List[Dict[str, Any]] = []
+    month_grid: List[List[Dict[str, Any]]] = []
+    week_row: List[Dict[str, Any]] = []
     current = grid_start
     today_iso = today.isoformat()
     while current <= grid_end:
         iso = current.isoformat()
         in_month = month_first <= current <= month_last
         day_jobs = by_date.get(iso, []) if in_month else []
-        cells.append(
-            {
-                "date_iso": iso,
-                "day_num": current.day,
-                "in_month": in_month,
-                "is_today": iso == today_iso,
-                "has_jobs": bool(day_jobs),
-                "job_count": len(day_jobs),
-                "selected": iso == selected_day_iso,
-            }
-        )
+        cell = {
+            "date_iso": iso,
+            "day_num": current.day,
+            "in_month": in_month,
+            "is_today": iso == today_iso,
+            "has_jobs": bool(day_jobs),
+            "job_count": len(day_jobs),
+            "selected": iso == selected_day_iso,
+            "jobs": [_calendar_job_summary(job) for job in day_jobs],
+        }
+        cells.append(cell)
+        week_row.append(cell)
+        if len(week_row) == 7:
+            month_grid.append(week_row)
+            week_row = []
         current += timedelta(days=1)
 
     selected_jobs = by_date.get(selected_day_iso, []) if selected_day_iso else []
@@ -369,6 +405,7 @@ def _build_staff_calendar(
         "month_label": _month_heading(year, month),
         "weekday_labels": list(MONDAY_WEEKDAY_LABELS_SHORT),
         "cells": cells,
+        "month_grid": month_grid,
         "selected_date_iso": selected_day_iso,
         "selected_date_display": _date_display(selected_day_iso) if selected_day_iso else "",
         "selected_jobs": selected_jobs,
@@ -721,7 +758,7 @@ def _build_owner_weekly_from_jobs(
     for job in jobs:
         iso = job.get("date_iso") or ""
         if iso:
-            by_date[iso].append(_owner_weekly_job_from_portal(job))
+            by_date[iso].append(job)
     try:
         start = date.fromisoformat(start_iso)
         end = date.fromisoformat(end_iso)
@@ -732,10 +769,10 @@ def _build_owner_weekly_from_jobs(
     total_jobs = 0
     while current <= end:
         iso = current.isoformat()
-        day_jobs = sorted(
-            by_date.get(iso, []),
-            key=lambda job: (job.get("time_range") or "", job.get("customer_name") or ""),
-        )
+        day_jobs = [
+            _owner_weekly_job_from_portal(job)
+            for job in _sort_jobs_by_start_time(by_date.get(iso, []))
+        ]
         total_jobs += len(day_jobs)
         days.append(
             {
@@ -1104,7 +1141,7 @@ def build_staff_portal(
         jobs_label = "{0} Job{1}".format(count, "" if count == 1 else "s")
 
     calendar_view = None
-    if active_range == RANGE_CALENDAR and not is_all_staff:
+    if active_range == RANGE_CALENDAR:
         calendar_view = _build_staff_calendar(
             jobs, cal_year, cal_month, today, selected_day
         )

@@ -1881,6 +1881,74 @@ def test_completed_jobs_use_saved_booking_times_when_actual_columns_empty():
     return True
 
 
+def test_all_staff_weekly_sorts_same_day_jobs_by_start_time():
+    from staff_portal import build_staff_portal
+
+    monday = _isolated_monday()
+    early = _unique("WeekSortEarly")
+    late = _unique("WeekSortLate")
+    _create_job(
+        late,
+        monday.isoformat(),
+        crew="Yasu,Ken",
+        start_time="13:00",
+        finish_time="16:30",
+    )
+    _create_job(
+        early,
+        monday.isoformat(),
+        crew="Yasu,Ken",
+        start_time="08:00",
+        finish_time="12:00",
+    )
+    portal = build_staff_portal(view_staff_id="all", range_key="week", today=monday)
+    day = next(
+        item
+        for item in portal["owner_weekly"]["days"]
+        if item["date_iso"] == monday.isoformat()
+    )
+    names = [job["customer_name"] for job in day["jobs"]]
+    assert names.index(early) < names.index(late)
+    assert "8:00 AM" in day["jobs"][0]["time_range"]
+    assert "1:00 PM" in day["jobs"][1]["time_range"]
+    return True
+
+
+def test_all_staff_calendar_shows_unique_jobs_in_month_grid():
+    from staff_portal import build_staff_portal
+
+    customer = _unique("AllCalJob")
+    move_day = "2026-09-10"
+    _create_job(
+        customer,
+        move_day,
+        crew="Yasu,Ken",
+        start_time="08:00",
+        finish_time="10:00",
+        status="Confirmed",
+    )
+    portal = build_staff_portal(
+        view_staff_id="all",
+        range_key="calendar",
+        calendar_year=2026,
+        calendar_month=9,
+    )
+    cal = portal["calendar"]
+    assert cal is not None
+    day = next(
+        cell
+        for week in cal["month_grid"]
+        for cell in week
+        if cell["date_iso"] == move_day
+    )
+    matches = [job for job in day["jobs"] if job["customer_name"] == customer]
+    assert len(matches) == 1
+    assert matches[0]["crew_display"] == "Yasu / Ken"
+    assert matches[0]["start_display"] == "8:00 AM"
+    assert matches[0]["status_display"] == "CONFIRMED"
+    return True
+
+
 def test_staff_calendar_grid_starts_on_monday():
     from staff_portal import build_staff_portal
 
@@ -2544,6 +2612,8 @@ def main():
         test_today_total_paid_hours_sums_recorded_jobs_only,
         test_this_week_tab_includes_later_week_jobs,
         test_all_staff_week_view_matches_owner_schedule,
+        test_all_staff_weekly_sorts_same_day_jobs_by_start_time,
+        test_all_staff_calendar_shows_unique_jobs_in_month_grid,
         test_staff_rename_keeps_booking_links,
         test_staff_portal_hides_financial_data_and_booking_admin_links,
         test_staff_portal_reflects_booking_updates,

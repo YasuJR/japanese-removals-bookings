@@ -1282,6 +1282,13 @@ a.staff-job-btn:active {
   text-align: center;
 }
 
+.staff-cal-month-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -0.15rem;
+  padding: 0 0.15rem 0.35rem;
+}
+
 .staff-cal-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -1289,6 +1296,73 @@ a.staff-job-btn:active {
   width: 100%;
   max-width: 100%;
   overflow: hidden;
+}
+
+.staff-cal-grid-month {
+  min-width: min(100%, 42rem);
+}
+
+.staff-cal-day-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 5.5rem;
+  padding: 0.25rem 0.2rem 0.35rem;
+  border-radius: 10px;
+  background: var(--cream);
+  border: 1px solid transparent;
+  overflow: hidden;
+}
+
+.staff-cal-day-head-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  align-self: flex-start;
+}
+
+.staff-cal-day-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+  width: 100%;
+}
+
+.staff-cal-job {
+  display: grid;
+  gap: 0.08rem;
+  padding: 0.35rem 0.35rem;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--navy);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.staff-cal-job-time {
+  font-weight: 800;
+  font-size: 0.68rem;
+}
+
+.staff-cal-job-name {
+  font-size: 0.76rem;
+  font-weight: 800;
+  word-break: break-word;
+}
+
+.staff-cal-job-crew,
+.staff-cal-job-status {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.staff-cal-job-status {
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .staff-cal-weekday {
@@ -1301,24 +1375,11 @@ a.staff-job-btn:active {
   padding: 0.2rem 0;
 }
 
-.staff-cal-day {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 2.75rem;
-  padding: 0.25rem 0.1rem 0.35rem;
-  border-radius: 10px;
-  text-decoration: none;
-  color: var(--navy);
-  background: var(--cream);
-  border: 1px solid transparent;
-  -webkit-tap-highlight-color: transparent;
-}
-
 .staff-cal-day-outside {
   opacity: 0.35;
   pointer-events: none;
+  justify-content: flex-start;
+  align-items: center;
 }
 
 .staff-cal-day-today {
@@ -1326,12 +1387,8 @@ a.staff-job-btn:active {
 }
 
 .staff-cal-day-selected {
-  background: var(--navy);
-  color: #fff;
-}
-
-.staff-cal-day-has-jobs .staff-cal-day-dot {
-  display: block;
+  background: rgba(26, 39, 68, 0.06);
+  border-color: var(--navy);
 }
 
 .staff-cal-day-num {
@@ -1362,6 +1419,16 @@ a.staff-job-btn:active {
   font-size: 1.05rem;
   font-weight: 800;
   color: var(--navy);
+}
+
+@media (max-width: 767px) {
+  .staff-cal-grid-month {
+    min-width: 44rem;
+  }
+
+  .staff-cal-day-cell {
+    min-height: 6.5rem;
+  }
 }
 
 @media (min-width: 420px) {

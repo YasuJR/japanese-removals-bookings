@@ -224,6 +224,58 @@ def validate_times(
     return start_norm, finish_norm, duration_storage, errors
 
 
+_12H_CLOCK = re.compile(
+    r"^(\d{1,2}):(\d{2})\s*([AaPp]\.?\s*[Mm]\.?)$"
+)
+
+
+def time_value_to_minutes(value: Any) -> Optional[int]:
+    """Minutes from midnight for HH:MM or 12-hour clock strings."""
+    hm = normalize_time_input(value)
+    if hm:
+        parsed = parse_hhmm(hm)
+        if parsed:
+            return parsed.hour * 60 + parsed.minute
+    text = str(value or "").strip()
+    match = _12H_CLOCK.match(text)
+    if not match:
+        return None
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    suffix = match.group(3).upper().replace(".", "").replace(" ", "")
+    if hour < 1 or hour > 12 or minute > 59:
+        return None
+    if suffix == "AM":
+        hour = 0 if hour == 12 else hour
+    else:
+        hour = hour if hour == 12 else hour + 12
+    return hour * 60 + minute
+
+
+def job_start_sort_key(job: Dict[str, Any]) -> Tuple[int, str]:
+    """Sort jobs by true start time; missing start times go last."""
+    missing = 24 * 60
+    minutes: Optional[int] = None
+    if job.get("start_minutes") is not None:
+        try:
+            minutes = int(job["start_minutes"])
+        except (TypeError, ValueError):
+            minutes = None
+    for field in ("start_hm", "start_time"):
+        if minutes is not None:
+            break
+        minutes = time_value_to_minutes(job.get(field))
+    if minutes is None:
+        time_range = str(job.get("time_range") or "").strip()
+        if "–" in time_range:
+            minutes = time_value_to_minutes(time_range.split("–", 1)[0].strip())
+        elif time_range:
+            minutes = time_value_to_minutes(time_range)
+    if minutes is None:
+        minutes = missing
+    return (minutes, str(job.get("customer_name") or "").lower())
+
+
 def event_datetimes(booking: Dict[str, Any]) -> Tuple[datetime, datetime]:
     """Perth-local start/end datetimes for calendar sync."""
     tz = ZoneInfo(config.TIMEZONE)
