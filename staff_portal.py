@@ -507,27 +507,27 @@ def _build_staff_calendar_week(
     by_date = _group_calendar_jobs(jobs, start_iso, end_iso)
     days: List[Dict[str, Any]] = []
     try:
-        current = date.fromisoformat(start_iso)
-        end = date.fromisoformat(end_iso)
+        monday = date.fromisoformat(start_iso)
     except ValueError:
-        current = today
-        end = today
-    while current <= end:
+        monday, _ = week_range(today)
+    weekday_names = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+    for offset in range(7):
+        current = monday + timedelta(days=offset)
         iso = current.isoformat()
         day_jobs = by_date.get(iso, [])
         days.append(
             {
                 "date_iso": iso,
                 "day_num": current.day,
-                "weekday_label": current.strftime("%a").upper(),
-                "heading": "{0} {1}".format(current.strftime("%a").upper(), current.day),
+                "weekday_label": weekday_names[offset],
+                "heading": "{0} {1}".format(weekday_names[offset], current.day),
                 "is_today": current == today,
                 "jobs": [_calendar_job_card(job) for job in day_jobs],
             }
         )
-        current += timedelta(days=1)
-    monday = date.fromisoformat(start_iso)
-    sunday = date.fromisoformat(end_iso)
+    sunday = monday + timedelta(days=6)
+    start_iso = monday.isoformat()
+    end_iso = sunday.isoformat()
     this_monday, _ = week_range(today)
     return {
         "view": CAL_VIEW_WEEK,

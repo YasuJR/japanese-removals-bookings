@@ -1964,10 +1964,62 @@ def test_staff_calendar_week_view_shows_monday_first_seven_days():
     assert cal is not None
     assert cal["view"] == "week"
     assert len(cal["days"]) == 7
-    assert cal["days"][0]["weekday_label"] == "MON"
-    assert cal["days"][6]["weekday_label"] == "SUN"
+    assert [day["weekday_label"] for day in cal["days"]] == [
+        "MON",
+        "TUE",
+        "WED",
+        "THU",
+        "FRI",
+        "SAT",
+        "SUN",
+    ]
     assert portal["start_date"] == monday.isoformat()
     assert portal["end_date"] == (monday + timedelta(days=6)).isoformat()
+    return True
+
+
+def test_staff_calendar_week_dom_has_seven_columns_and_no_jobs_placeholder():
+    html = _staff_client("Yasu").get(
+        "/staff?range=calendar&cal_view=week"
+    ).get_data(as_text=True)
+    import re
+
+    labels = re.findall(
+        r'class="staff-cal-week-col-label">([A-Z]+)</span>', html
+    )
+    assert labels == ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+    cols = re.findall(
+        r'<div class="staff-cal-week-col[^"]*"[^>]*data-date="[^"]+"',
+        html,
+    )
+    assert len(cols) == 7
+    assert "NO JOBS" in html
+    assert "staff-cal-week-board" in html
+    return True
+
+
+def test_staff_calendar_week_month_boundary_seven_days():
+    from datetime import date as date_cls
+    from staff_portal import CAL_VIEW_WEEK, build_staff_portal
+
+    anchor = date_cls(2026, 1, 30)
+    portal = build_staff_portal(
+        view_staff_id="all",
+        range_key="calendar",
+        today=anchor,
+        week_offset=0,
+        cal_view=CAL_VIEW_WEEK,
+        calendar_year=2026,
+        calendar_month=1,
+        calendar_day=anchor.isoformat(),
+    )
+    days = portal["calendar"]["days"]
+    assert len(days) == 7
+    assert days[0]["date_iso"] == "2026-01-26"
+    assert days[6]["date_iso"] == "2026-02-01"
+    assert days[4]["weekday_label"] == "FRI"
+    assert days[5]["weekday_label"] == "SAT"
+    assert days[6]["weekday_label"] == "SUN"
     return True
 
 
@@ -2693,6 +2745,8 @@ def main():
         test_all_staff_weekly_sorts_same_day_jobs_by_start_time,
         test_all_staff_calendar_shows_unique_jobs_in_month_grid,
         test_staff_calendar_week_view_shows_monday_first_seven_days,
+        test_staff_calendar_week_dom_has_seven_columns_and_no_jobs_placeholder,
+        test_staff_calendar_week_month_boundary_seven_days,
         test_staff_calendar_week_navigation_offsets,
         test_individual_staff_calendar_week_shows_only_assigned_jobs,
         test_staff_rename_keeps_booking_links,
