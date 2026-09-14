@@ -34,7 +34,7 @@
     </div>
   </header>
 
-  <main class="wrap staff-portal">
+  <main class="wrap staff-portal{% if portal.range == 'calendar' and portal.cal_view == 'week' %} staff-portal-calendar-week{% endif %}">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         <ul class="flash-list">

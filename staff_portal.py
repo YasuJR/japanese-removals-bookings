@@ -390,6 +390,20 @@ def _calendar_status_class(job: Dict[str, Any]) -> str:
     return "quote"
 
 
+def _week_time_range(job: Dict[str, Any]) -> str:
+    raw = str(job.get("scheduled_range_display") or "").strip()
+    if raw:
+        parts = re.split(r"\s*[–\-]\s*", raw, maxsplit=1)
+        if len(parts) == 2:
+
+            def _strip_ampm(text: str) -> str:
+                return re.sub(r"\s*(AM|PM)\b", "", text, flags=re.IGNORECASE).strip()
+
+            return "{0}–{1}".format(_strip_ampm(parts[0]), _strip_ampm(parts[1]))
+        return raw
+    return str(job.get("start_time") or "—")
+
+
 def _calendar_job_card(job: Dict[str, Any]) -> Dict[str, Any]:
     status = str(job.get("status_display") or job.get("status") or "").strip()
     if status and status == status.upper() and " " not in status:
@@ -401,6 +415,7 @@ def _calendar_job_card(job: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "id": job.get("id"),
         "time_range": job.get("scheduled_range_display") or job.get("start_time") or "—",
+        "time_range_week": _week_time_range(job),
         "start_display": job.get("start_time") or "—",
         "customer_name": job.get("customer_name") or "—",
         "crew_display": job.get("crew_display") or job.get("crew") or "—",

@@ -1995,6 +1995,15 @@ def test_staff_calendar_week_dom_has_seven_columns_and_no_jobs_placeholder():
     assert len(cols) == 7
     assert "NO JOBS" in html
     assert "staff-cal-week-board" in html
+    assert "staff-cal-week-layout" in html
+    assert "staff-portal-calendar-week" in html
+    assert "staff-cal-week-job-summary" in html
+    css = _staff_client("Yasu").get("/static/staff_portal.css").get_data(as_text=True)
+    assert "grid-template-columns: repeat(7, minmax(0, 1fr))" in css
+    assert "flex-direction: column" in css
+    assert "width: max-content" not in css.split(".staff-cal-week-board")[1].split(
+        "@media"
+    )[0]
     return True
 
 

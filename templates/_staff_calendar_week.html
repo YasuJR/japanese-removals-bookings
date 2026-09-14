@@ -1,4 +1,4 @@
-<section class="staff-cal-week-wrap" aria-label="{{ portal.calendar.range_heading }}">
+<section class="staff-cal-week-wrap staff-cal-week-layout" aria-label="{{ portal.calendar.range_heading }}">
   <div class="staff-cal-week-scroll">
     <div class="staff-cal-week-board">
       {% for day in portal.calendar.days %}
@@ -14,7 +14,7 @@
         <div class="staff-cal-week-col-body">
           {% if day.jobs %}
           {% for job in day.jobs %}
-          {% include "_staff_calendar_job.html" %}
+          {% include "_staff_calendar_job_week.html" %}
           {% endfor %}
           {% else %}
           <p class="staff-cal-week-empty">NO JOBS</p>
