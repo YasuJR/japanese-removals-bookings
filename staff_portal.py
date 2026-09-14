@@ -286,23 +286,44 @@ def bound_staff_identity(
     return resolve_staff_name(from_id, names)
 
 
-def _calendar_week_anchor(
-    today: date, week_offset: int, cal_year: int, cal_month: int, cal_day: Any
-) -> date:
-    if cal_day:
-        try:
-            if isinstance(cal_day, str) and len(cal_day) >= 10:
-                return date.fromisoformat(cal_day[:10])
-        except ValueError:
-            pass
-    if cal_year and cal_month and cal_day:
-        try:
-            last = monthrange(cal_year, cal_month)[1]
-            return date(cal_year, cal_month, min(int(cal_day), last))
-        except (ValueError, TypeError):
-            pass
+def staff_calendar_week_bounds(today: date, week_offset: int = 0) -> Tuple[str, str]:
+    """Monday–Sunday (inclusive) for Staff Portal calendar week navigation."""
     monday, _ = week_range(today)
-    return monday + timedelta(weeks=week_offset)
+    monday = monday + timedelta(weeks=week_offset)
+    sunday = monday + timedelta(days=6)
+    return monday.isoformat(), sunday.isoformat()
+
+
+def _calendar_week_job_ids(calendar: Dict[str, Any]) -> List[int]:
+    ids: List[int] = []
+    if not calendar or calendar.get("view") != CAL_VIEW_WEEK:
+        return ids
+    for day in calendar.get("days") or []:
+        for card in day.get("jobs") or []:
+            job_id = card.get("id")
+            if job_id is not None:
+                ids.append(int(job_id))
+    return ids
+
+
+def _calendar_month_job_ids_in_range(
+    calendar: Dict[str, Any], start_iso: str, end_iso: str
+) -> List[int]:
+    ids: List[int] = []
+    if not calendar or calendar.get("view") != CAL_VIEW_MONTH:
+        return ids
+    for week in calendar.get("month_grid") or []:
+        for cell in week:
+            if not cell.get("in_month"):
+                continue
+            iso = cell.get("date_iso") or ""
+            if not iso or iso < start_iso or iso > end_iso:
+                continue
+            for card in cell.get("jobs") or []:
+                job_id = card.get("id")
+                if job_id is not None:
+                    ids.append(int(job_id))
+    return ids
 
 
 def _range_dates(
@@ -319,19 +340,14 @@ def _range_dates(
         return iso, iso
     if range_key == RANGE_CALENDAR:
         if normalize_cal_view(cal_view) == CAL_VIEW_WEEK:
-            anchor = _calendar_week_anchor(today, week_offset, cal_year, cal_month, cal_day)
-            monday, sunday = week_range(anchor)
-            return monday.isoformat(), sunday.isoformat()
+            return staff_calendar_week_bounds(today, week_offset)
         year, month = cal_year, cal_month
         if not year or not month:
             year, month = today.year, today.month
         last_day = monthrange(year, month)[1]
         return date(year, month, 1).isoformat(), date(year, month, last_day).isoformat()
     if range_key == RANGE_WEEK:
-        monday, sunday = week_range(today)
-        monday = monday + timedelta(weeks=week_offset)
-        sunday = sunday + timedelta(weeks=week_offset)
-        return monday.isoformat(), sunday.isoformat()
+        return staff_calendar_week_bounds(today, week_offset)
     if range_key == RANGE_HISTORY:
         start = today - timedelta(days=HISTORY_LOOKBACK_DAYS)
         end = today - timedelta(days=1)
@@ -364,10 +380,16 @@ def _dedupe_jobs_by_id(jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     unique: List[Dict[str, Any]] = []
     for job in jobs:
         job_id = job.get("id")
-        if job_id in seen:
+        if job_id is None:
+            unique.append(job)
             continue
-        if job_id is not None:
-            seen.add(job_id)
+        try:
+            key = int(job_id)
+        except (TypeError, ValueError):
+            key = job_id
+        if key in seen:
+            continue
+        seen.add(key)
         unique.append(job)
     return unique
 
@@ -603,7 +625,9 @@ def _scheduled_range_display(booking: Dict[str, Any]) -> str:
         return "{0} – {1}".format(format_time_12h(start), format_time_12h(finish))
     if start:
         return format_time_12h(start)
-    return "—"
+    if finish:
+        return "{0} – {1}".format("TIME TBC", format_time_12h(finish))
+    return "TIME TBC"
 
 
 def _status_badge(booking: Dict[str, Any]) -> Tuple[str, bool]:
@@ -665,6 +689,7 @@ def _serialize_job(booking: Dict[str, Any], today: date) -> Dict[str, Any]:
     pickup = str(row.get("pickup_address") or "").strip()
     dropoff = str(row.get("delivery_address") or "").strip()
     phone = str(row.get("phone") or "").strip()
+    stored_start = normalize_time_input(row.get("start_time"))
     start_hm = effective_start_hm(row)
     pickup_label = _suburb_label(pickup) if pickup else ""
     dropoff_label = _suburb_label(dropoff) if dropoff else ""
@@ -686,8 +711,9 @@ def _serialize_job(booking: Dict[str, Any], today: date) -> Dict[str, Any]:
         "id": int(row["id"]),
         "date_iso": move_date,
         "date_display": _date_display(move_date) if move_date else "—",
-        "start_time": display_start_time(row),
+        "start_time": format_time_12h(stored_start) if stored_start else "TIME TBC",
         "start_hm": start_hm,
+        "has_start_time": bool(stored_start),
         "owner_start_hm": owner_start_hm,
         "owner_finish_hm": owner_finish_hm,
         "status": status_value,
@@ -1347,13 +1373,16 @@ def build_staff_portal(
             "paid_hours": paid_summary["paid_hours"],
         }
 
+    nav_day = selected_day
+    if active_range == RANGE_CALENDAR and active_cal_view == CAL_VIEW_WEEK:
+        nav_day = ""
     nav = portal_nav_params(
         staff_id=selected_staff_id,
         range_key=active_range,
         week_offset=offset,
         calendar_year=cal_year,
         calendar_month=cal_month,
-        calendar_day=selected_day,
+        calendar_day=nav_day,
         cal_view=active_cal_view,
     )
 

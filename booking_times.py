@@ -255,6 +255,8 @@ def time_value_to_minutes(value: Any) -> Optional[int]:
 def job_start_sort_key(job: Dict[str, Any]) -> Tuple[int, str]:
     """Sort jobs by true start time; missing start times go last."""
     missing = 24 * 60
+    if job.get("has_start_time") is False:
+        return (missing, str(job.get("customer_name") or "").lower())
     minutes: Optional[int] = None
     if job.get("start_minutes") is not None:
         try:

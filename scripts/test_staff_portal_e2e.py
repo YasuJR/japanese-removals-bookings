@@ -2007,6 +2007,176 @@ def test_staff_calendar_week_dom_has_seven_columns_and_no_jobs_placeholder():
     return True
 
 
+def _portal_week_job_ids(portal):
+    from staff_portal import _calendar_week_job_ids
+
+    return set(_calendar_week_job_ids(portal.get("calendar") or {}))
+
+
+def _portal_month_job_ids_in_week(portal, start_iso, end_iso):
+    from staff_portal import _calendar_month_job_ids_in_range
+
+    return set(
+        _calendar_month_job_ids_in_range(
+            portal.get("calendar") or {}, start_iso, end_iso
+        )
+    )
+
+
+def test_week_calendar_ignores_stale_day_query_for_date_range():
+    from staff_portal import CAL_VIEW_WEEK, build_staff_portal
+
+    monday = _isolated_monday()
+    this_week_day = monday + timedelta(days=2)
+    other_week_day = monday + timedelta(days=9)
+    this_customer = _unique("WeekThis")
+    other_customer = _unique("WeekOther")
+    _create_job(this_customer, this_week_day.isoformat(), start_time="08:00")
+    _create_job(other_customer, other_week_day.isoformat(), start_time="09:00")
+
+    portal = build_staff_portal(
+        view_staff_id="all",
+        range_key="calendar",
+        today=this_week_day,
+        week_offset=0,
+        cal_view=CAL_VIEW_WEEK,
+        calendar_year=other_week_day.year,
+        calendar_month=other_week_day.month,
+        calendar_day=other_week_day.isoformat(),
+    )
+    assert portal["start_date"] == monday.isoformat()
+    names = {
+        card["customer_name"]
+        for day in portal["calendar"]["days"]
+        for card in day["jobs"]
+    }
+    assert this_customer in names
+    assert other_customer not in names
+    return True
+
+
+def test_week_calendar_matches_month_for_same_week_all_staff():
+    from staff_portal import CAL_VIEW_MONTH, CAL_VIEW_WEEK, build_staff_portal
+
+    monday = _isolated_monday()
+    sunday = monday + timedelta(days=6)
+    anchor = monday + timedelta(days=3)
+    customers = []
+    for offset, start in enumerate(("07:00", "08:00", "08:00")):
+        name = _unique("WeekParity{0}".format(offset))
+        customers.append(name)
+        day = monday + timedelta(days=offset)
+        _create_job(
+            name,
+            day.isoformat(),
+            start_time=start,
+            status=["Confirmed", "Invoiced", "Completed"][offset],
+        )
+    _create_job(
+        _unique("WeekSunday"),
+        sunday.isoformat(),
+        start_time="10:00",
+        status="Confirmed",
+    )
+
+    week_portal = build_staff_portal(
+        view_staff_id="all",
+        range_key="calendar",
+        today=anchor,
+        week_offset=0,
+        cal_view=CAL_VIEW_WEEK,
+    )
+    month_portal = build_staff_portal(
+        view_staff_id="all",
+        range_key="calendar",
+        today=anchor,
+        cal_view=CAL_VIEW_MONTH,
+        calendar_year=anchor.year,
+        calendar_month=anchor.month,
+    )
+    week_ids = _portal_week_job_ids(week_portal)
+    month_ids = _portal_month_job_ids_in_week(
+        month_portal, monday.isoformat(), sunday.isoformat()
+    )
+    assert week_ids == month_ids
+    assert len(week_ids) >= len(customers) + 1
+    return True
+
+
+def test_week_calendar_same_time_different_booking_ids_both_show():
+    from staff_portal import CAL_VIEW_WEEK, build_staff_portal
+
+    monday = _isolated_monday()
+    a = _unique("WeekDupA")
+    b = _unique("WeekDupB")
+    _create_job(a, monday.isoformat(), start_time="08:00")
+    _create_job(b, monday.isoformat(), start_time="08:00")
+    portal = build_staff_portal(
+        "Yasu",
+        "calendar",
+        monday,
+        week_offset=0,
+        cal_view=CAL_VIEW_WEEK,
+    )
+    monday_jobs = portal["calendar"]["days"][0]["jobs"]
+    names = [job["customer_name"] for job in monday_jobs]
+    assert a in names and b in names
+    assert len([job for job in monday_jobs if job["customer_name"] in (a, b)]) == 2
+    return True
+
+
+def test_week_calendar_shows_job_without_start_time():
+    from staff_portal import CAL_VIEW_WEEK, build_staff_portal
+
+    monday = _isolated_monday()
+    customer = _unique("WeekNoStart")
+    booking_id = _create_job(
+        customer, monday.isoformat(), start_time="", finish_time=""
+    )
+    portal = build_staff_portal(
+        view_staff_id="all",
+        range_key="calendar",
+        today=monday,
+        cal_view=CAL_VIEW_WEEK,
+    )
+    cards = [
+        card
+        for day in portal["calendar"]["days"]
+        for card in day["jobs"]
+        if card["customer_name"] == customer
+    ]
+    assert len(cards) == 1
+    assert cards[0]["id"] == booking_id
+    assert "TIME TBC" in cards[0]["time_range"]
+    return True
+
+
+def test_week_calendar_individual_staff_legacy_slash_crew():
+    from staff_portal import CAL_VIEW_WEEK, build_staff_portal
+
+    monday = _isolated_monday()
+    customer = _unique("WeekSlashCrew")
+    _create_job(
+        customer,
+        monday.isoformat(),
+        crew="Yasu/Ken",
+        start_time="08:00",
+    )
+    portal = build_staff_portal(
+        "Yasu",
+        "calendar",
+        monday,
+        cal_view=CAL_VIEW_WEEK,
+    )
+    names = {
+        card["customer_name"]
+        for day in portal["calendar"]["days"]
+        for card in day["jobs"]
+    }
+    assert customer in names
+    return True
+
+
 def test_staff_calendar_week_month_boundary_seven_days():
     from datetime import date as date_cls
     from staff_portal import CAL_VIEW_WEEK, build_staff_portal
@@ -2754,6 +2924,11 @@ def main():
         test_all_staff_weekly_sorts_same_day_jobs_by_start_time,
         test_all_staff_calendar_shows_unique_jobs_in_month_grid,
         test_staff_calendar_week_view_shows_monday_first_seven_days,
+        test_week_calendar_ignores_stale_day_query_for_date_range,
+        test_week_calendar_matches_month_for_same_week_all_staff,
+        test_week_calendar_same_time_different_booking_ids_both_show,
+        test_week_calendar_shows_job_without_start_time,
+        test_week_calendar_individual_staff_legacy_slash_crew,
         test_staff_calendar_week_dom_has_seven_columns_and_no_jobs_placeholder,
         test_staff_calendar_week_month_boundary_seven_days,
         test_staff_calendar_week_navigation_offsets,

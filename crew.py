@@ -1,5 +1,6 @@
 """Crew assignment for bookings."""
 
+import re
 from typing import Any, Dict, List, Optional, Sequence
 
 import database as db
@@ -68,11 +69,14 @@ def crew_from_storage(value: Any) -> List[str]:
     text = str(value or "").strip()
     if not text:
         return []
-    return [
-        name
-        for name in (part.strip() for part in text.split(","))
-        if name
-    ]
+    names: List[str] = []
+    seen = set()
+    for part in re.split(r"\s*[,/]\s*|\s+/\s+", text):
+        name = part.strip()
+        if name and name not in seen:
+            seen.add(name)
+            names.append(name)
+    return names
 
 
 def display_crew(booking: Dict[str, Any]) -> str:

@@ -34,6 +34,7 @@
     </div>
   </header>
 
+  {% set portal_day = portal.calendar_day if portal.range == 'calendar' and portal.cal_view == 'month' else none %}
   <main class="wrap staff-portal{% if portal.range == 'calendar' and portal.cal_view == 'week' %} staff-portal-calendar-week{% endif %}">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -47,10 +48,10 @@
 
     <section class="panel staff-portal-controls">
       <nav class="staff-staff-switcher" aria-label="Staff schedule">
-        <a href="{{ url_for('staff_portal', staff_id='all', range=portal.range, week=portal.week_offset, year=portal.calendar_year, month=portal.calendar_month, day=portal.calendar_day, cal_view=portal.cal_view) }}"
+        <a href="{{ url_for('staff_portal', staff_id='all', range=portal.range, week=portal.week_offset, year=portal.calendar_year, month=portal.calendar_month, day=portal_day, cal_view=portal.cal_view) }}"
            class="staff-staff-tab{% if portal.is_all_staff %} active{% endif %}">All Staff</a>
         {% for member in portal.staff_roster %}
-        <a href="{{ url_for('staff_portal', staff_id=member.id, range=portal.range, week=portal.week_offset, year=portal.calendar_year, month=portal.calendar_month, day=portal.calendar_day, cal_view=portal.cal_view) }}"
+        <a href="{{ url_for('staff_portal', staff_id=member.id, range=portal.range, week=portal.week_offset, year=portal.calendar_year, month=portal.calendar_month, day=portal_day, cal_view=portal.cal_view) }}"
            class="staff-staff-tab{% if not portal.is_all_staff and portal.selected_staff_id == member.id %} active{% endif %}">{{ member.name }}</a>
         {% endfor %}
       </nav>
@@ -75,7 +76,7 @@
 
       <nav class="staff-portal-tabs" aria-label="Staff portal views">
         {% for key, label in portal.range_tabs %}
-        <a href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range=key, week=portal.week_offset, year=portal.calendar_year, month=portal.calendar_month, day=portal.calendar_day, cal_view=portal.cal_view) }}"
+        <a href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range=key, week=portal.week_offset, year=portal.calendar_year, month=portal.calendar_month, day=portal_day, cal_view=portal.cal_view) }}"
            class="staff-portal-tab{% if portal.range == key %} active{% endif %}">{{ label }}</a>
         {% endfor %}
       </nav>
