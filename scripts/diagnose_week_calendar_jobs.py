@@ -42,15 +42,24 @@ def _db_week_bookings(start_iso: str, end_iso: str, staff_name: str = "") -> lis
 def diagnose(today: date, week_offset: int = 0, staff_view: str = "all") -> int:
     db.init_db()
     start_iso, end_iso = staff_calendar_week_bounds(today, week_offset)
-    view = staff_view if staff_view != "all" else "all"
-    db_rows = _db_week_bookings(start_iso, end_iso, "" if view == "all" else view)
-    portal = build_staff_portal(
-        view_staff_id=view,
-        range_key="calendar",
-        today=today,
-        week_offset=week_offset,
-        cal_view=CAL_VIEW_WEEK,
-    )
+    if staff_view == "all":
+        db_rows = _db_week_bookings(start_iso, end_iso, "")
+        portal = build_staff_portal(
+            view_staff_id="all",
+            range_key="calendar",
+            today=today,
+            week_offset=week_offset,
+            cal_view=CAL_VIEW_WEEK,
+        )
+    else:
+        db_rows = _db_week_bookings(start_iso, end_iso, staff_view)
+        portal = build_staff_portal(
+            staff_view,
+            "calendar",
+            today,
+            week_offset=week_offset,
+            cal_view=CAL_VIEW_WEEK,
+        )
     shown_ids = set(_calendar_week_job_ids(portal.get("calendar") or {}))
     db_ids = {int(row["id"]) for row in db_rows}
     missing = sorted(db_ids - shown_ids)
