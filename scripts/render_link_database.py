@@ -37,6 +37,16 @@ def _load_api_key() -> str:
         stripped = line.strip()
         if stripped.startswith("key:"):
             return stripped.split(":", 1)[1].strip()
+    in_api = False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped == "api:":
+            in_api = True
+            continue
+        if in_api and stripped.startswith("key:"):
+            return stripped.split(":", 1)[1].strip()
+        if in_api and stripped and not line.startswith(" "):
+            in_api = False
     return ""
 
 

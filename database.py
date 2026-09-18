@@ -145,20 +145,36 @@ def _ensure_crew_columns(conn) -> None:
 
 
 def _ensure_booking_crew_hours_table(conn) -> None:
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS booking_crew_hours (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            booking_id INTEGER NOT NULL,
-            crew_id INTEGER NOT NULL,
-            start_time TEXT NOT NULL DEFAULT '',
-            finish_time TEXT NOT NULL DEFAULT '',
-            actual_start_time TEXT NOT NULL DEFAULT '',
-            actual_finish_time TEXT NOT NULL DEFAULT '',
-            UNIQUE (booking_id, crew_id)
+    if db_backend.is_postgres():
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS booking_crew_hours (
+                id SERIAL PRIMARY KEY,
+                booking_id INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+                crew_id INTEGER NOT NULL REFERENCES crew_members(id) ON DELETE CASCADE,
+                start_time TEXT NOT NULL DEFAULT '',
+                finish_time TEXT NOT NULL DEFAULT '',
+                actual_start_time TEXT NOT NULL DEFAULT '',
+                actual_finish_time TEXT NOT NULL DEFAULT '',
+                UNIQUE (booking_id, crew_id)
+            )
+            """
         )
-        """
-    )
+    else:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS booking_crew_hours (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                booking_id INTEGER NOT NULL,
+                crew_id INTEGER NOT NULL,
+                start_time TEXT NOT NULL DEFAULT '',
+                finish_time TEXT NOT NULL DEFAULT '',
+                actual_start_time TEXT NOT NULL DEFAULT '',
+                actual_finish_time TEXT NOT NULL DEFAULT '',
+                UNIQUE (booking_id, crew_id)
+            )
+            """
+        )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_booking_crew_hours_booking "
         "ON booking_crew_hours(booking_id)"
