@@ -37,8 +37,13 @@
   margin: 0 auto 2rem;
 }
 
+.staff-portal-page {
+  overflow-x: hidden;
+}
+
 @media (min-width: 768px) {
-  .staff-portal.staff-portal-calendar-week {
+  .staff-portal.staff-portal-calendar-week,
+  .staff-portal.staff-portal-calendar-month {
     max-width: min(72rem, 100%);
   }
 }
@@ -1375,9 +1380,12 @@ a.staff-job-btn:active {
 }
 
 .staff-cal-week-scroll {
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
   margin: 0;
-  padding: 0;
+  padding: 0 0 0.35rem;
   width: 100%;
   max-width: 100%;
 }
@@ -1390,6 +1398,11 @@ a.staff-job-btn:active {
 
 .staff-cal-month-grid {
   min-width: min(100%, 52rem);
+}
+
+.staff-cal-month-grid .calendar-weekdays,
+.staff-cal-month-grid .calendar-week {
+  min-width: calc(var(--staff-cal-col-min) * 7);
 }
 
 .staff-cal-week-board {
@@ -1731,29 +1744,33 @@ a.staff-job-btn:active {
 }
 
 @media (max-width: 767px) {
+  :root {
+    --staff-cal-col-min: 150px;
+  }
+
   .staff-cal-month-grid {
-    min-width: 44rem;
+    min-width: calc(var(--staff-cal-col-min) * 7);
   }
 
   .staff-cal-week-board {
-    display: flex;
-    flex-direction: column;
-    grid-template-columns: none;
-    width: 100%;
-    min-width: 0;
-    overflow: visible;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(var(--staff-cal-col-min), 1fr));
+    width: max-content;
+    min-width: calc(var(--staff-cal-col-min) * 7);
+    max-width: none;
   }
 
   .staff-cal-week-col {
-    width: 100%;
+    width: auto;
+    min-width: var(--staff-cal-col-min);
     max-width: none;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    padding: 0.75rem 0.55rem 0.85rem;
+    border-right: 1px solid var(--border);
+    border-bottom: none;
+    padding: 0.5rem 0.35rem 0.65rem;
   }
 
   .staff-cal-week-col:last-child {
-    border-bottom: none;
+    border-right: none;
   }
 
   .staff-cal-week-col-head {

@@ -8,6 +8,9 @@
   {% include '_head_icons.html' %}
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='staff_portal.css') }}">
+  {% if request.args.get('range', 'today') == 'calendar' %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='calendar.css') }}">
+  {% endif %}
 </head>
 <body class="staff-portal-page">
   <header class="site-header">
@@ -35,7 +38,7 @@
   </header>
 
   {% set portal_day = portal.calendar_day if portal.range == 'calendar' and portal.cal_view == 'month' else none %}
-  <main class="wrap staff-portal{% if portal.range == 'calendar' and portal.cal_view == 'week' %} staff-portal-calendar-week{% endif %}">
+  <main class="wrap staff-portal{% if portal.range == 'calendar' %}{% if portal.cal_view == 'week' %} staff-portal-calendar-week{% else %} staff-portal-calendar-month{% endif %}{% endif %}">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         <ul class="flash-list">
@@ -76,8 +79,13 @@
 
       <nav class="staff-portal-tabs" aria-label="Staff portal views">
         {% for key, label in portal.range_tabs %}
-        <a href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range=key, week=portal.week_offset, year=portal.calendar_year, month=portal.calendar_month, day=portal_day, cal_view=portal.cal_view) }}"
+        {% if key == 'calendar' %}
+        <a href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='calendar', cal_view='month', year=portal.calendar_year, month=portal.calendar_month) }}"
            class="staff-portal-tab{% if portal.range == key %} active{% endif %}">{{ label }}</a>
+        {% else %}
+        <a href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range=key, week=portal.week_offset) }}"
+           class="staff-portal-tab{% if portal.range == key %} active{% endif %}">{{ label }}</a>
+        {% endif %}
         {% endfor %}
       </nav>
 
@@ -153,7 +161,6 @@
       {% endif %}
 
     {% elif portal.range == "calendar" and portal.calendar %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='calendar.css') }}">
     <nav class="staff-cal-view-tabs" aria-label="Calendar view">
       <a class="staff-cal-view-tab{% if portal.cal_view == 'month' %} active{% endif %}"
          href="{{ url_for('staff_portal', staff_id=portal.selected_staff_id, range='calendar', cal_view='month', year=portal.calendar.year, month=portal.calendar.month) }}">MONTH</a>
@@ -196,6 +203,11 @@
     </section>
     {% endif %}
     {% endif %}
+
+    {% elif portal.range == "calendar" %}
+    <section class="panel staff-cal-unavailable">
+      <p class="empty">Calendar is temporarily unavailable. Please try again.</p>
+    </section>
 
     {% elif portal.range == "week" %}
     <section class="staff-week-nav" aria-label="Week navigation">

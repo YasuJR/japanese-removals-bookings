@@ -2078,10 +2078,35 @@ def test_staff_calendar_week_dom_has_seven_columns_and_no_jobs_placeholder():
     assert "staff-cal-week-job-summary" in html
     css = _staff_client("Yasu").get("/static/staff_portal.css").get_data(as_text=True)
     assert "grid-template-columns: repeat(7, minmax(0, 1fr))" in css
-    assert "flex-direction: column" in css
-    assert "width: max-content" not in css.split(".staff-cal-week-board")[1].split(
-        "@media"
+    mobile_block = css.split("@media (max-width: 767px)")[1]
+    assert "grid-template-columns: repeat(7, minmax(var(--staff-cal-col-min), 1fr))" in mobile_block
+    assert "width: max-content" in mobile_block
+    assert "flex-direction: column" not in mobile_block.split(".staff-cal-week-board")[1].split(
+        ".staff-cal-week-col-head"
     )[0]
+    return True
+
+
+def test_calendar_tab_shows_month_week_views_in_browser():
+    client = app.test_client()
+    html = client.get("/staff?range=calendar&staff_id=all&cal_view=month").get_data(
+        as_text=True
+    )
+    assert "staff-cal-view-tabs" in html
+    assert ">MONTH</a>" in html
+    assert ">WEEK</a>" in html
+    assert "calendar-weekdays" in html
+    assert "staff-cal-month-grid" in html
+    assert "calendar.css" in html
+    week_html = client.get(
+        "/staff?range=calendar&staff_id=all&cal_view=week"
+    ).get_data(as_text=True)
+    assert "staff-cal-week-board" in week_html
+    assert "Previous Week" in week_html
+    assert "staff-portal-calendar-week" in week_html
+    tab_html = client.get("/staff?range=today&staff_id=all").get_data(as_text=True)
+    assert 'range=calendar&amp;cal_view=month' in tab_html or "cal_view=month" in tab_html
+    assert "calendar-weekdays" not in tab_html
     return True
 
 
@@ -3065,6 +3090,7 @@ def main():
         test_week_calendar_shows_job_without_start_time,
         test_week_calendar_individual_staff_legacy_slash_crew,
         test_staff_calendar_week_dom_has_seven_columns_and_no_jobs_placeholder,
+        test_calendar_tab_shows_month_week_views_in_browser,
         test_staff_calendar_week_month_boundary_seven_days,
         test_staff_calendar_week_navigation_offsets,
         test_individual_staff_calendar_week_shows_only_assigned_jobs,
