@@ -135,6 +135,11 @@ def main() -> int:
         action="store_true",
         help="Trigger a deploy after updating DATABASE_URL",
     )
+    parser.add_argument(
+        "--clear-cache",
+        action="store_true",
+        help="With --deploy, clear Render build cache before deploy",
+    )
     args = parser.parse_args()
 
     api_key = _load_api_key()
@@ -171,8 +176,21 @@ def main() -> int:
     print("URL host:", db_url.split("@")[-1].split("/")[0])
 
     if args.deploy:
-        _request("POST", "/services/{0}/deploys".format(service_id), api_key, {})
-        print("Triggered deploy for {0}".format(SERVICE_NAME))
+        deploy_body = {}
+        if args.clear_cache:
+            deploy_body["clearCache"] = "clear"
+        _request(
+            "POST",
+            "/services/{0}/deploys".format(service_id),
+            api_key,
+            deploy_body,
+        )
+        print(
+            "Triggered deploy for {0}{1}".format(
+                SERVICE_NAME,
+                " (clear build cache)" if args.clear_cache else "",
+            )
+        )
     else:
         print("Run with --deploy to redeploy, or restart the service in Render Dashboard.")
 

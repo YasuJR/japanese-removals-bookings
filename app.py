@@ -594,16 +594,37 @@ def _flash_integration_messages(messages) -> None:
 def health_check():
     import db_backend
 
+    git_full = (os.environ.get("RENDER_GIT_COMMIT") or "").strip()
     payload = {
         "status": "ok",
         "production": config.PRODUCTION,
-        "git_commit": os.environ.get("RENDER_GIT_COMMIT", "")[:12],
+        "git_commit": git_full[:12],
+        "git_commit_full": git_full,
         "database": "postgres" if db_backend.is_postgres() else "sqlite",
         "database_url_set": bool(config.get_database_url()),
         "stripe_storage": "database"
         if config.PRODUCTION and db_backend.is_postgres()
         else "file",
     }
+    if db_backend.is_postgres() and config.get_database_url():
+        try:
+            conn = db_backend.get_connection()
+            try:
+                row = conn.execute(
+                    "SELECT to_regclass('public.booking_crew_hours') IS NOT NULL"
+                ).fetchone()
+                payload["booking_crew_hours_table"] = bool(row[0] if row else False)
+                if payload["booking_crew_hours_table"]:
+                    count_row = conn.execute(
+                        "SELECT COUNT(*) FROM booking_crew_hours"
+                    ).fetchone()
+                    payload["booking_crew_hours_rows"] = int(
+                        count_row[0] if count_row else 0
+                    )
+            finally:
+                conn.close()
+        except Exception as exc:
+            payload["database_schema_error"] = str(exc)[:200]
     try:
         payload["stripe"] = stripe_config.public_status()
     except Exception:
