@@ -252,30 +252,58 @@ def time_value_to_minutes(value: Any) -> Optional[int]:
     return hour * 60 + minute
 
 
-def job_start_sort_key(job: Dict[str, Any]) -> Tuple[int, str]:
-    """Sort jobs by true start time; missing start times go last."""
+def _minutes_from_time_range(value: Any) -> Optional[int]:
+    text = str(value or "").strip()
+    if not text or text.upper() == "TIME TBC":
+        return None
+    for sep in ("–", "-", "—"):
+        if sep in text:
+            text = text.split(sep, 1)[0].strip()
+            break
+    return time_value_to_minutes(text)
+
+
+def job_start_minutes(job: Dict[str, Any]) -> int:
+    """Minutes from midnight for sorting. Missing/TBC jobs sort last."""
     missing = 24 * 60
     if job.get("has_start_time") is False:
-        return (missing, str(job.get("customer_name") or "").lower())
-    minutes: Optional[int] = None
+        return missing
     if job.get("start_minutes") is not None:
         try:
-            minutes = int(job["start_minutes"])
+            parsed = int(job["start_minutes"])
+            if 0 <= parsed < missing:
+                return parsed
         except (TypeError, ValueError):
-            minutes = None
-    for field in ("start_hm", "start_time"):
+            pass
+    stored = normalize_time_input(
+        job.get("start_time")
+        or job.get("owner_start_hm")
+        or job.get("owner_start_time")
+    )
+    if stored:
+        minutes = time_value_to_minutes(stored)
         if minutes is not None:
-            break
+            return minutes
+    for field in ("start_hm", "start_display"):
         minutes = time_value_to_minutes(job.get(field))
-    if minutes is None:
-        time_range = str(job.get("time_range") or "").strip()
-        if "–" in time_range:
-            minutes = time_value_to_minutes(time_range.split("–", 1)[0].strip())
-        elif time_range:
-            minutes = time_value_to_minutes(time_range)
-    if minutes is None:
-        minutes = missing
-    return (minutes, str(job.get("customer_name") or "").lower())
+        if minutes is not None:
+            return minutes
+    minutes = _minutes_from_time_range(job.get("time_range"))
+    if minutes is not None:
+        return minutes
+    minutes = _minutes_from_time_range(job.get("scheduled_range_display"))
+    if minutes is not None:
+        return minutes
+    return missing
+
+
+def job_start_sort_key(job: Dict[str, Any]) -> Tuple[int, int]:
+    """Sort jobs by true start time; missing start times go last."""
+    try:
+        tie = int(job.get("id") or 0)
+    except (TypeError, ValueError):
+        tie = 0
+    return (job_start_minutes(job), tie)
 
 
 def event_datetimes(booking: Dict[str, Any]) -> Tuple[datetime, datetime]:

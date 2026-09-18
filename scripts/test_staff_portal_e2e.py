@@ -5,7 +5,7 @@ import os
 import re
 import sys
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
 
@@ -1881,6 +1881,84 @@ def test_completed_jobs_use_saved_booking_times_when_actual_columns_empty():
     return True
 
 
+def test_calendar_jobs_sorted_by_clock_not_display_string():
+    """1:00 PM must not sort before 9:30 AM when using 12-hour display strings."""
+    from booking_times import job_start_sort_key
+    from staff_portal import CAL_VIEW_MONTH, CAL_VIEW_WEEK, build_staff_portal
+
+    day_iso = _isolated_monday().isoformat()
+    specs = [
+        ("CalSortMidnight", "00:00", "03:00"),
+        ("CalSortMorning", "09:30", "11:30"),
+        ("CalSortNoon", "12:00", "14:00"),
+        ("CalSortAfternoon", "13:00", "15:00"),
+        ("CalSortLate", "15:00", "17:00"),
+    ]
+    expected_order = []
+    for prefix, start, finish in specs:
+        name = _unique(prefix)
+        _create_job(name, day_iso, start_time=start, finish_time=finish)
+        expected_order.append(name)
+
+    shuffled = [
+        {"id": 5, "start_time": "13:00", "has_start_time": True},
+        {"id": 2, "start_time": "09:30", "has_start_time": True},
+        {"id": 1, "start_time": "00:00", "has_start_time": True},
+        {"id": 4, "start_time": "15:00", "has_start_time": True},
+        {"id": 3, "start_time": "12:00", "has_start_time": True},
+    ]
+    assert [j["id"] for j in sorted(shuffled, key=job_start_sort_key)] == [
+        1,
+        2,
+        3,
+        5,
+        4,
+    ]
+
+    move_day = datetime.strptime(day_iso, "%Y-%m-%d").date()
+    for cal_view in (CAL_VIEW_MONTH, CAL_VIEW_WEEK):
+        portal = build_staff_portal(
+            view_staff_id="all",
+            range_key="calendar",
+            today=move_day,
+            calendar_year=move_day.year,
+            calendar_month=move_day.month,
+            calendar_day=day_iso,
+            cal_view=cal_view,
+        )
+        cal = portal["calendar"]
+        if cal_view == CAL_VIEW_WEEK:
+            day_jobs = next(
+                d["jobs"] for d in cal["days"] if d["date_iso"] == day_iso
+            )
+        else:
+            day_jobs = cal.get("selected_jobs") or []
+            if not day_jobs:
+                day_jobs = next(
+                    (
+                        d["jobs"]
+                        for d in cal.get("days") or []
+                        if d.get("date_iso") == day_iso
+                    ),
+                    [],
+                )
+        expected_set = set(expected_order)
+        ours = [j for j in day_jobs if j["customer_name"] in expected_set]
+        assert len(ours) == len(specs), (cal_view, [j["customer_name"] for j in ours])
+        names = [j["customer_name"] for j in ours]
+        assert names == expected_order, (cal_view, names)
+
+    from daily_jobs_data import build_daily_jobs
+
+    daily_names = [
+        j["customer_name"]
+        for j in build_daily_jobs(day_iso)["jobs"]
+        if j["customer_name"] in expected_order
+    ]
+    assert daily_names == expected_order
+    return True
+
+
 def test_all_staff_weekly_sorts_same_day_jobs_by_start_time():
     from staff_portal import build_staff_portal
 
@@ -2977,6 +3055,7 @@ def main():
         test_today_total_paid_hours_sums_recorded_jobs_only,
         test_this_week_tab_includes_later_week_jobs,
         test_all_staff_week_view_matches_owner_schedule,
+        test_calendar_jobs_sorted_by_clock_not_display_string,
         test_all_staff_weekly_sorts_same_day_jobs_by_start_time,
         test_all_staff_calendar_shows_unique_jobs_in_month_grid,
         test_staff_calendar_week_view_shows_monday_first_seven_days,

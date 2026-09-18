@@ -12,6 +12,9 @@ from booking_times import (
     display_start_time,
     effective_start_hm,
     format_time_12h,
+    job_start_minutes,
+    job_start_sort_key,
+    normalize_time_input,
     parse_duration_hours,
 )
 from crew import active_crew_names, crew_from_storage, display_crew
@@ -93,7 +96,14 @@ def calendar_event(
         "conflict_badge": badge,
         "has_conflict": badge == "conflict",
         "edit_url": "/bookings/{0}/edit".format(bid),
-        "start_minutes": _time_to_minutes(start_hm),
+        "start_minutes": job_start_minutes(
+            {
+                "id": b.get("id"),
+                "start_time": b.get("start_time"),
+                "start_hm": start_hm,
+                "has_start_time": bool(normalize_time_input(b.get("start_time"))),
+            }
+        ),
         "duration_hours": parse_duration_hours(b.get("duration_hours")) or 1.0,
     }
 
@@ -184,7 +194,12 @@ def load_events(
             payment_filter=payment_filter,
         ):
             events.append(ev)
-    events.sort(key=lambda e: (e["move_date"], e["start_minutes"], e["customer_name"]))
+    events.sort(
+        key=lambda e: (
+            e["move_date"],
+            *job_start_sort_key(e),
+        )
+    )
     return events
 
 

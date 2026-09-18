@@ -18,6 +18,7 @@ from booking_times import (
     display_start_time,
     effective_start_hm,
     format_time_12h,
+    job_start_minutes,
     job_start_sort_key,
     normalize_time_input,
 )
@@ -742,6 +743,15 @@ def _serialize_job(
         else ("TIME TBC" if not stored_start else format_time_12h(stored_start)),
         "start_hm": start_hm,
         "has_start_time": bool(stored_start),
+        "start_minutes": job_start_minutes(
+            {
+                "id": row.get("id"),
+                "start_time": row.get("start_time"),
+                "start_hm": stored_start or start_hm,
+                "has_start_time": bool(stored_start),
+                "scheduled_range_display": _scheduled_range_display(row),
+            }
+        ),
         "owner_start_hm": owner_start_hm,
         "owner_finish_hm": owner_finish_hm,
         "personal_start_hm": personal_start_hm or owner_start_hm,
@@ -1023,8 +1033,7 @@ def _history_weeks(
         week_jobs.sort(
             key=lambda job: (
                 job.get("date_iso") or "",
-                job.get("start_hm") or "",
-                job.get("customer_name") or "",
+                *job_start_sort_key(job),
             ),
             reverse=True,
         )
@@ -1087,12 +1096,7 @@ def _jobs_for_staff_name(
         for job in jobs
         if staff_name in (job.get("crew_names") or [])
     ]
-    matched.sort(
-        key=lambda job: (
-            job.get("start_hm") or "",
-            job.get("customer_name") or "",
-        )
-    )
+    matched.sort(key=job_start_sort_key)
     return matched
 
 
@@ -1153,12 +1157,8 @@ def _build_all_staff_week(
         iso = current.isoformat()
         staff_blocks: List[Dict[str, Any]] = []
         for member in roster:
-            member_jobs = sorted(
-                by_date.get(iso, {}).get(member["name"], []),
-                key=lambda job: (
-                    job.get("start_hm") or "",
-                    job.get("customer_name") or "",
-                ),
+            member_jobs = _sort_jobs_by_start_time(
+                by_date.get(iso, {}).get(member["name"], [])
             )
             paid_summary = _paid_hours_summary(member_jobs)
             week_paid_total += paid_summary["paid_hours"]
@@ -1231,21 +1231,14 @@ def _split_job_sections(
     future.sort(
         key=lambda job: (
             job.get("date_iso") or "",
-            job.get("start_hm") or "",
-            job.get("customer_name") or "",
+            *job_start_sort_key(job),
         )
     )
-    today_jobs.sort(
-        key=lambda job: (
-            job.get("start_hm") or "",
-            job.get("customer_name") or "",
-        )
-    )
+    today_jobs.sort(key=job_start_sort_key)
     past.sort(
         key=lambda job: (
             job.get("date_iso") or "",
-            job.get("start_hm") or "",
-            job.get("customer_name") or "",
+            *job_start_sort_key(job),
         ),
         reverse=True,
     )
@@ -1326,18 +1319,12 @@ def build_staff_portal(
         )
 
     if active_range == RANGE_TODAY:
-        jobs.sort(
-            key=lambda job: (
-                job.get("start_hm") or "",
-                job.get("customer_name") or "",
-            )
-        )
+        jobs.sort(key=job_start_sort_key)
     else:
         jobs.sort(
             key=lambda job: (
                 job.get("date_iso") or "",
-                job.get("start_hm") or "",
-                job.get("customer_name") or "",
+                *job_start_sort_key(job),
             )
         )
 
@@ -1543,8 +1530,7 @@ def build_staff_weekly_pdf_schedule(
     jobs.sort(
         key=lambda job: (
             job.get("date_iso") or "",
-            job.get("start_hm") or "",
-            job.get("customer_name") or "",
+            *job_start_sort_key(job),
         )
     )
 

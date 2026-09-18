@@ -12,6 +12,8 @@ from booking_times import (
     effective_finish_hm,
     effective_start_hm,
     format_time_12h,
+    job_start_minutes,
+    job_start_sort_key,
     normalize_time_input,
 )
 from crew import crew_from_storage
@@ -111,7 +113,14 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
         "paid_hours": paid_hours,
         "start_display": start_display,
         "finish_display": finish_display,
-        "start_minutes": _time_to_minutes(start_hm),
+        "start_minutes": job_start_minutes(
+            {
+                "id": row.get("id"),
+                "start_time": row.get("start_time"),
+                "start_hm": start_hm,
+                "has_start_time": bool(normalize_time_input(row.get("start_time"))),
+            }
+        ),
         "finish_minutes": _time_to_minutes(finish_hm),
     }
 
@@ -121,7 +130,7 @@ def build_daily_jobs(date_iso: str) -> Dict[str, Any]:
     date_iso = normalize_move_date(date_iso) or (date_iso or "").strip()
     rows = db.list_by_date(date_iso)
     jobs = [_serialize_job(dict(row)) for row in rows]
-    jobs.sort(key=lambda job: (job["start_minutes"], job["customer_name"].lower()))
+    jobs.sort(key=job_start_sort_key)
 
     for index, job in enumerate(jobs, start=1):
         job["job_number"] = index
