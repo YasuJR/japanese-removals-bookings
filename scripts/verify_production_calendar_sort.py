@@ -42,28 +42,31 @@ def _fetch_staff_calendar_day(day_iso: str) -> str:
 
 def _jobs_from_day_panel(html: str) -> list[dict]:
     """Parse selected-day job cards from staff calendar HTML."""
-    marker = "staff-cal-selected-day"
+    marker = 'id="staff-cal-day-jobs"'
     idx = html.find(marker)
-    panel = html[idx : idx + 200_000] if idx >= 0 else html
+    panel = html[idx : idx + 400_000] if idx >= 0 else html
     jobs: list[dict] = []
-    for block in re.findall(
-        r'<summary class="staff-cal-job-summary[^"]*">(.*?)</summary>',
+    for headline in re.findall(
+        r'class="staff-job-headline"[^>]*>([^<]+)</p>',
         panel,
-        re.S | re.I,
+        re.I,
     ):
-        time_m = re.search(r'class="cal-booking-time"[^>]*>([^<]+)', block)
-        name_m = re.search(r'class="cal-booking-customer"[^>]*>([^<]+)', block)
-        if not time_m or not name_m:
+        text = headline.strip()
+        if "—" in text:
+            start_part, customer = text.split("—", 1)
+        elif " – " in text:
+            start_part, customer = text.split(" – ", 1)
+        else:
             continue
-        time_text = time_m.group(1).strip()
-        start_part = re.split(r"[–\-—]", time_text, maxsplit=1)[0].strip()
+        start_part = start_part.strip()
+        customer = customer.strip()
         minutes = time_value_to_minutes(start_part)
-        if minutes is None and "TBC" in time_text.upper():
+        if minutes is None and "TBC" in start_part.upper():
             minutes = 24 * 60
         jobs.append(
             {
                 "id": len(jobs) + 1,
-                "customer_name": name_m.group(1).strip(),
+                "customer_name": customer,
                 "start_display": start_part,
                 "start_minutes": minutes if minutes is not None else 24 * 60,
             }
