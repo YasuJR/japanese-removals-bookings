@@ -2,10 +2,12 @@
   <input type="hidden" name="range" value="{{ portal.range }}">
   <input type="hidden" name="week" value="{{ portal.week_offset }}">
   <input type="hidden" name="staff_id" value="{{ portal.selected_staff_id }}">
+  {% if portal.cal_view %}<input type="hidden" name="cal_view" value="{{ portal.cal_view }}">{% endif %}
   {% if portal.calendar_year %}<input type="hidden" name="year" value="{{ portal.calendar_year }}">{% endif %}
   {% if portal.calendar_month %}<input type="hidden" name="month" value="{{ portal.calendar_month }}">{% endif %}
-  {% if portal.calendar_day %}<input type="hidden" name="day" value="{{ portal.calendar_day }}">{% endif %}
+  {% if portal.calendar_day and portal.cal_view == 'month' %}<input type="hidden" name="day" value="{{ portal.calendar_day }}">{% endif %}
 
+  {% if portal.is_all_staff %}
   <div class="staff-job-owner-grid">
     <label>
       Start time
@@ -58,4 +60,33 @@
     <button type="submit" class="staff-job-btn staff-job-owner-save">Save changes</button>
     <button type="submit" class="staff-job-btn staff-job-owner-clear" name="action" value="clear_actual">Clear actual time</button>
   </div>
+
+  {% else %}
+  <p class="staff-job-owner-personal-kicker">Edit {{ portal.staff }}&rsquo;s hours only</p>
+  <p class="staff-job-owner-personal-booking">Job time: {{ job.booking_scheduled_range_display }}</p>
+  <div class="staff-job-owner-grid">
+    <label>
+      Start time
+      <input type="time" name="start_time" value="{{ job.personal_start_hm or job.owner_start_hm }}">
+    </label>
+    <label>
+      Finish time
+      <input type="time" name="finish_time" value="{{ job.personal_finish_hm or job.owner_finish_hm }}">
+    </label>
+    <label>
+      Actual start
+      <input type="time" name="actual_start_time" value="{{ job.actual_start_hm }}">
+    </label>
+    <label>
+      Actual finish
+      <input type="time" name="actual_finish_time" value="{{ job.actual_finish_hm }}">
+    </label>
+  </div>
+
+  <div class="staff-job-owner-actions">
+    <button type="submit" class="staff-job-btn staff-job-owner-save">Save {{ portal.staff }}&rsquo;s times</button>
+    <button type="submit" class="staff-job-btn staff-job-owner-clear" name="action" value="reset_staff_times">Use Job Time</button>
+    <button type="submit" class="staff-job-btn staff-job-owner-clear" name="action" value="clear_actual">Clear actual time</button>
+  </div>
+  {% endif %}
 </form>

@@ -2094,12 +2094,15 @@ def _staff_portal_redirect():
     cal_year = (request.form.get("year") or request.args.get("year") or "").strip()
     cal_month = (request.form.get("month") or request.args.get("month") or "").strip()
     cal_day = (request.form.get("day") or request.args.get("day") or "").strip()
+    cal_view = (request.form.get("cal_view") or request.args.get("cal_view") or "").strip()
     if cal_year:
         params["year"] = cal_year
     if cal_month:
         params["month"] = cal_month
     if cal_day:
         params["day"] = cal_day
+    if cal_view:
+        params["cal_view"] = cal_view
     return redirect(url_for("staff_portal", **params))
 
 
@@ -2115,11 +2118,42 @@ def staff_portal_edit_booking(booking_id: int):
         abort(404)
     dest = _staff_portal_redirect()
     action = str(request.form.get("action") or "").strip().lower()
-    if action == "clear_actual":
+    staff_id_raw = str(request.form.get("staff_id") or "").strip()
+    individual_crew_id = None
+    if staff_id_raw and staff_id_raw.lower() != "all":
+        try:
+            individual_crew_id = int(staff_id_raw)
+        except (TypeError, ValueError):
+            individual_crew_id = None
+
+    if individual_crew_id is not None:
+        from crew import crew_from_storage
+
+        crew_names = crew_from_storage(dict(row).get("crew"))
+        roster = {int(m["id"]): m["name"] for m in db.list_crew_members(active_only=False)}
+        crew_name = roster.get(individual_crew_id, "")
+        if crew_name not in crew_names:
+            flash("That staff member is not assigned to this job.", "error")
+            return dest
+        if action == "reset_staff_times":
+            db.delete_booking_crew_hours(booking_id, individual_crew_id)
+            flash("Personal times reset to job time.", "success")
+            return dest
+        if action == "clear_actual":
+            staff_portal_owner.clear_staff_crew_actual_times(
+                booking_id, individual_crew_id
+            )
+            flash("Personal actual time cleared.", "success")
+            return dest
+        ok, errors = staff_portal_owner.save_staff_crew_job_edit(
+            booking_id, individual_crew_id, request.form, row
+        )
+    elif action == "clear_actual":
         db.save_booking_actual_times(booking_id, "", "", None)
         flash("Actual time cleared.", "success")
         return dest
-    ok, errors = staff_portal_owner.save_owner_job_edit(booking_id, request.form)
+    else:
+        ok, errors = staff_portal_owner.save_owner_job_edit(booking_id, request.form)
     if errors:
         for message in errors:
             flash(message, "error")

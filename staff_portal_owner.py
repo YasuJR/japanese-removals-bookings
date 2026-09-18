@@ -125,6 +125,79 @@ def parse_owner_job_edit_form(
     }, []
 
 
+def _parse_staff_crew_times_form(
+    form: Any,
+) -> Tuple[Optional[Dict[str, str]], List[str]]:
+    start = normalize_time_input(form.get("start_time") if hasattr(form, "get") else "")
+    finish = normalize_time_input(form.get("finish_time") if hasattr(form, "get") else "")
+    actual_start, actual_finish, _, actual_errors = (
+        staff_job_times.parse_actual_times_from_form(form)
+    )
+    if actual_errors:
+        return None, actual_errors
+    return {
+        "start_time": start,
+        "finish_time": finish,
+        "actual_start_time": actual_start or "",
+        "actual_finish_time": actual_finish or "",
+    }, []
+
+
+def save_staff_crew_job_edit(
+    booking_id: int, crew_id: int, form: Any, booking_row: Any
+) -> Tuple[bool, List[str]]:
+    """Save Staff Portal times for one crew member only; booking times unchanged."""
+    data, errors = _parse_staff_crew_times_form(form)
+    if errors or data is None:
+        return False, errors
+
+    booking_start = normalize_time_input(_row_value(booking_row, "start_time"))
+    booking_finish = normalize_time_input(_row_value(booking_row, "finish_time"))
+    booking_actual_start = staff_job_times.parse_actual_clock(
+        _row_value(booking_row, "actual_start_time")
+    )
+    booking_actual_finish = staff_job_times.parse_actual_clock(
+        _row_value(booking_row, "actual_finish_time")
+    )
+
+    same_scheduled = (
+        (data["start_time"] or booking_start) == booking_start
+        and (data["finish_time"] or booking_finish) == booking_finish
+    )
+    same_actual = (
+        (data["actual_start_time"] or booking_actual_start or "")
+        == (booking_actual_start or "")
+        and (data["actual_finish_time"] or booking_actual_finish or "")
+        == (booking_actual_finish or "")
+    )
+    if same_scheduled and same_actual:
+        db.delete_booking_crew_hours(booking_id, crew_id)
+    else:
+        db.upsert_booking_crew_hours(
+            booking_id,
+            crew_id,
+            start_time=data["start_time"],
+            finish_time=data["finish_time"],
+            actual_start_time=data["actual_start_time"],
+            actual_finish_time=data["actual_finish_time"],
+        )
+    return True, []
+
+
+def clear_staff_crew_actual_times(booking_id: int, crew_id: int) -> None:
+    row = db.get_booking_crew_hours(booking_id, crew_id)
+    if row is None:
+        return
+    db.upsert_booking_crew_hours(
+        booking_id,
+        crew_id,
+        start_time=str(row.get("start_time") or ""),
+        finish_time=str(row.get("finish_time") or ""),
+        actual_start_time="",
+        actual_finish_time="",
+    )
+
+
 def save_owner_job_edit(booking_id: int, form: Any) -> Tuple[bool, List[str]]:
     row = db.get_booking(booking_id)
     if row is None:

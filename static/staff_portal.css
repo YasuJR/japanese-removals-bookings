@@ -430,6 +430,19 @@
   color: var(--navy);
 }
 
+.staff-job-owner-personal-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.staff-job-owner-personal-booking {
+  margin: 0 0 0.65rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 .staff-job-owner-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

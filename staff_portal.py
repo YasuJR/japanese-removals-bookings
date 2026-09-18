@@ -639,12 +639,18 @@ def _status_badge(booking: Dict[str, Any]) -> Tuple[str, bool]:
     return "", False
 
 
-def _job_hours_payload(row: Dict[str, Any], today: date) -> Dict[str, Any]:
-    scheduled = staff_job_times.scheduled_hours(row)
-    actual = staff_job_times.actual_hours(row, today)
+def _job_hours_payload(
+    row: Dict[str, Any], today: date, hours_row: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    source = hours_row if hours_row is not None else row
+    scheduled = staff_job_times.scheduled_hours(source)
+    actual = staff_job_times.actual_hours(source, today)
     callout = staff_job_times.callout_hours(row)
     break_h = staff_job_times.break_hours(row)
-    paid = staff_job_times.paid_hours(row, today)
+    if actual is None:
+        paid = None
+    else:
+        paid = round(actual - break_h + (callout or 0.0), 2)
     move = staff_job_times.booking_move_date(row)
     is_future = move is not None and move > today
     if actual is None:
@@ -667,7 +673,7 @@ def _job_hours_payload(row: Dict[str, Any], today: date) -> Dict[str, Any]:
         "scheduled_hours": scheduled,
         "scheduled_hours_display": staff_job_times.format_hours_short(scheduled)
         or "—",
-        "scheduled_range_display": _scheduled_range_display(row),
+        "scheduled_range_display": _scheduled_range_display(source),
         "actual_hours": actual,
         "actual_hours_display": actual_display,
         "has_actual_hours": has_actual_hours,
@@ -680,9 +686,24 @@ def _job_hours_payload(row: Dict[str, Any], today: date) -> Dict[str, Any]:
     }
 
 
-def _serialize_job(booking: Dict[str, Any], today: date) -> Dict[str, Any]:
+def _serialize_job(
+    booking: Dict[str, Any],
+    today: date,
+    view_crew_id: Optional[int] = None,
+    crew_hours: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Operational fields only — no rates, invoices, costs, or profit."""
     row = dict(booking)
+    hours_row = (
+        staff_job_times.booking_for_crew_member(row, crew_hours)
+        if view_crew_id
+        else row
+    )
+    if view_crew_id and crew_hours is not None:
+        if not str(crew_hours.get("actual_start_time") or "").strip():
+            hours_row["actual_start_time"] = ""
+            hours_row["actual_finish_time"] = ""
+            hours_row["actual_duration"] = None
     move_date = normalize_move_date(row.get("move_date")) or str(
         row.get("move_date") or ""
     ).strip()[:10]
@@ -690,13 +711,18 @@ def _serialize_job(booking: Dict[str, Any], today: date) -> Dict[str, Any]:
     dropoff = str(row.get("delivery_address") or "").strip()
     phone = str(row.get("phone") or "").strip()
     stored_start = normalize_time_input(row.get("start_time"))
-    start_hm = effective_start_hm(row)
+    display_start = normalize_time_input(
+        hours_row.get("start_time") if view_crew_id else row.get("start_time")
+    )
+    start_hm = effective_start_hm(hours_row if view_crew_id else row)
     pickup_label = _suburb_label(pickup) if pickup else ""
     dropoff_label = _suburb_label(dropoff) if dropoff else ""
-    times = staff_job_times.job_time_state(row)
+    times = staff_job_times.job_time_state(hours_row)
     owner_start_hm = normalize_time_input(row.get("start_time"))
     owner_finish_hm = normalize_time_input(row.get("finish_time"))
-    hours = _job_hours_payload(row, today)
+    personal_start_hm = normalize_time_input(hours_row.get("start_time"))
+    personal_finish_hm = normalize_time_input(hours_row.get("finish_time"))
+    hours = _job_hours_payload(row, today, hours_row=hours_row)
     estimated_minutes = staff_job_times.duration_hours_to_minutes(
         row.get("duration_hours")
     )
@@ -711,11 +737,17 @@ def _serialize_job(booking: Dict[str, Any], today: date) -> Dict[str, Any]:
         "id": int(row["id"]),
         "date_iso": move_date,
         "date_display": _date_display(move_date) if move_date else "—",
-        "start_time": format_time_12h(stored_start) if stored_start else "TIME TBC",
+        "start_time": format_time_12h(display_start)
+        if display_start
+        else ("TIME TBC" if not stored_start else format_time_12h(stored_start)),
         "start_hm": start_hm,
         "has_start_time": bool(stored_start),
         "owner_start_hm": owner_start_hm,
         "owner_finish_hm": owner_finish_hm,
+        "personal_start_hm": personal_start_hm or owner_start_hm,
+        "personal_finish_hm": personal_finish_hm or owner_finish_hm,
+        "has_personal_time_override": bool(crew_hours),
+        "booking_scheduled_range_display": _scheduled_range_display(row),
         "status": status_value,
         "callout_hours_input": ""
         if callout_h is None
@@ -1260,6 +1292,13 @@ def build_staff_portal(
         selected_day,
     )
 
+    view_crew_id: Optional[int] = None
+    if not is_all_staff and selected_staff_id not in (None, "", STAFF_VIEW_ALL):
+        try:
+            view_crew_id = int(selected_staff_id)
+        except (TypeError, ValueError):
+            view_crew_id = None
+
     if is_all_staff:
         hide_cancelled = active_range != RANGE_WEEK
         bookings = _load_all_rows(start_iso, end_iso, hide_cancelled=hide_cancelled)
@@ -1268,9 +1307,23 @@ def build_staff_portal(
     else:
         bookings = []
 
+    crew_hours_map: Dict[int, Dict[str, Any]] = {}
+    if view_crew_id and bookings:
+        crew_hours_map = db.map_booking_crew_hours(
+            [int(b["id"]) for b in bookings], view_crew_id
+        )
+
     jobs: List[Dict[str, Any]] = []
     for booking in bookings:
-        jobs.append(_serialize_job(booking, today))
+        bid = int(booking["id"])
+        jobs.append(
+            _serialize_job(
+                booking,
+                today,
+                view_crew_id=view_crew_id,
+                crew_hours=crew_hours_map.get(bid),
+            )
+        )
 
     if active_range == RANGE_TODAY:
         jobs.sort(

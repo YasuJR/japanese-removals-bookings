@@ -131,6 +131,25 @@ def parse_actual_duration_minutes(value: Any) -> Optional[int]:
     return minutes
 
 
+def booking_for_crew_member(
+    booking: Dict[str, Any], crew_hours: Optional[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """Overlay per-crew scheduled/actual times without changing the booking row."""
+    merged = dict(booking)
+    if not crew_hours:
+        return merged
+    for key in (
+        "start_time",
+        "finish_time",
+        "actual_start_time",
+        "actual_finish_time",
+    ):
+        value = str(crew_hours.get(key) or "").strip()
+        if value:
+            merged[key] = value
+    return merged
+
+
 def booking_move_date(booking: Dict[str, Any]) -> Optional[date]:
     iso = normalize_move_date(
         booking.get("date_iso") or booking.get("move_date")

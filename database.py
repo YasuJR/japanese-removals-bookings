@@ -144,6 +144,27 @@ def _ensure_crew_columns(conn) -> None:
     )
 
 
+def _ensure_booking_crew_hours_table(conn) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS booking_crew_hours (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            booking_id INTEGER NOT NULL,
+            crew_id INTEGER NOT NULL,
+            start_time TEXT NOT NULL DEFAULT '',
+            finish_time TEXT NOT NULL DEFAULT '',
+            actual_start_time TEXT NOT NULL DEFAULT '',
+            actual_finish_time TEXT NOT NULL DEFAULT '',
+            UNIQUE (booking_id, crew_id)
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_booking_crew_hours_booking "
+        "ON booking_crew_hours(booking_id)"
+    )
+
+
 def _ensure_star_point_history_table(conn) -> None:
     if db_backend.is_postgres():
         conn.execute(
@@ -550,6 +571,7 @@ def init_db() -> None:
                 _ensure_staff_columns(conn)
                 _ensure_crew_columns(conn)
                 _ensure_star_point_history_table(conn)
+                _ensure_booking_crew_hours_table(conn)
                 _ensure_invoice_sequence(conn)
                 _seed_crew_and_trucks(conn)
                 _ensure_indexes(conn)
@@ -733,6 +755,7 @@ def init_db() -> None:
         _ensure_staff_columns(conn)
         _ensure_crew_columns(conn)
         _ensure_star_point_history_table(conn)
+        _ensure_booking_crew_hours_table(conn)
         _ensure_invoice_sequence(conn)
         _seed_crew_and_trucks(conn)
         _ensure_indexes(conn)
@@ -1866,6 +1889,85 @@ def list_extra_charges_for_bookings(
         item = dict(row)
         grouped[int(item["booking_id"])].append(item)
     return grouped
+
+
+def get_booking_crew_hours(booking_id: int, crew_id: int) -> Optional[Dict[str, Any]]:
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT booking_id, crew_id, start_time, finish_time,
+                   actual_start_time, actual_finish_time
+            FROM booking_crew_hours
+            WHERE booking_id = ? AND crew_id = ?
+            """,
+            (booking_id, crew_id),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def delete_booking_crew_hours(booking_id: int, crew_id: int) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM booking_crew_hours WHERE booking_id = ? AND crew_id = ?",
+            (booking_id, crew_id),
+        )
+        conn.commit()
+
+
+def upsert_booking_crew_hours(
+    booking_id: int,
+    crew_id: int,
+    *,
+    start_time: str = "",
+    finish_time: str = "",
+    actual_start_time: str = "",
+    actual_finish_time: str = "",
+) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO booking_crew_hours (
+                booking_id, crew_id, start_time, finish_time,
+                actual_start_time, actual_finish_time
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(booking_id, crew_id) DO UPDATE SET
+                start_time = excluded.start_time,
+                finish_time = excluded.finish_time,
+                actual_start_time = excluded.actual_start_time,
+                actual_finish_time = excluded.actual_finish_time
+            """,
+            (
+                booking_id,
+                crew_id,
+                str(start_time or "").strip(),
+                str(finish_time or "").strip(),
+                str(actual_start_time or "").strip(),
+                str(actual_finish_time or "").strip(),
+            ),
+        )
+        conn.commit()
+
+
+def map_booking_crew_hours(
+    booking_ids: List[int], crew_id: int
+) -> Dict[int, Dict[str, Any]]:
+    if not booking_ids or not crew_id:
+        return {}
+    placeholders = ",".join("?" for _ in booking_ids)
+    params: List[Any] = list(booking_ids) + [crew_id]
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT booking_id, crew_id, start_time, finish_time,
+                   actual_start_time, actual_finish_time
+            FROM booking_crew_hours
+            WHERE booking_id IN ({0}) AND crew_id = ?
+            """.format(
+                placeholders
+            ),
+            params,
+        ).fetchall()
+    return {int(row["booking_id"]): dict(row) for row in rows}
 
 
 def attach_extra_charges(rows: List[Dict[str, Any]]) -> None:

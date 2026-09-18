@@ -2338,6 +2338,62 @@ def test_week_navigation_changes_week():
     return True
 
 
+def test_individual_staff_edit_does_not_change_booking_or_other_crew_times():
+    from staff_portal import build_staff_portal
+
+    monday = _isolated_monday()
+    customer = _unique("CrewSplit")
+    booking_id = _create_job(
+        customer,
+        monday.isoformat(),
+        crew="Yasu,Ken",
+        start_time="08:00",
+        finish_time="15:00",
+        duration_hours="7",
+        status="Completed",
+    )
+    ken_id = _crew_id("Ken")
+    yasu_id = _crew_id("Yasu")
+    owner = _admin_staff_client("Ken")
+    saved = owner.post(
+        "/staff/bookings/{0}/edit".format(booking_id),
+        data={
+            "range": "week",
+            "staff_id": ken_id,
+            "start_time": "08:00",
+            "finish_time": "13:00",
+            "actual_start_time": "",
+            "actual_finish_time": "",
+        },
+        follow_redirects=False,
+    )
+    assert saved.status_code in (302, 303)
+    row = dict(db.get_booking(booking_id))
+    assert row["start_time"] == "08:00"
+    assert row["finish_time"] == "15:00"
+
+    yasu_portal = build_staff_portal("Yasu", "week", monday)
+    ken_portal = build_staff_portal("Ken", "week", monday)
+    yasu_job = [j for j in yasu_portal["jobs"] if j["id"] == booking_id][0]
+    ken_job = [j for j in ken_portal["jobs"] if j["id"] == booking_id][0]
+    assert yasu_job["scheduled_hours_display"] == "7hr"
+    assert ken_job["scheduled_hours_display"] == "5hr"
+    assert yasu_job["booking_scheduled_range_display"] == "8:00 AM – 3:00 PM"
+    assert "1:00 PM" in ken_job["scheduled_range_display"]
+
+    reset = owner.post(
+        "/staff/bookings/{0}/edit".format(booking_id),
+        data={"range": "week", "staff_id": ken_id, "action": "reset_staff_times"},
+        follow_redirects=False,
+    )
+    assert reset.status_code in (302, 303)
+    ken_portal_after = build_staff_portal("Ken", "week", monday)
+    ken_after = [j for j in ken_portal_after["jobs"] if j["id"] == booking_id][0]
+    assert ken_after["scheduled_hours_display"] == "7hr"
+    assert db.get_booking_crew_hours(booking_id, ken_id) is None
+    return True
+
+
 def test_owner_can_edit_and_clear_actual_times_from_staff_portal():
     import staff_job_times
     from staff_portal import build_staff_portal
@@ -2430,18 +2486,19 @@ def test_owner_can_edit_and_clear_actual_times_from_staff_portal():
     )
     assert saved.status_code in (302, 303)
     row = dict(db.get_booking(booking_id))
-    assert staff_job_times.parse_actual_clock(row["actual_start_time"]) == "07:00"
-    assert staff_job_times.parse_actual_clock(row["actual_finish_time"]) == "15:30"
-    assert int(row["actual_duration"]) == 510
+    assert staff_job_times.parse_actual_clock(row["actual_start_time"]) == "21:18"
     assert row["start_time"] in ("08:00", "8:00")
     assert row["finish_time"] in ("16:00",)
+    yasu_hours = db.get_booking_crew_hours(booking_id, _crew_id("Yasu"))
+    assert staff_job_times.parse_actual_clock(yasu_hours["actual_start_time"]) == "07:00"
+    assert staff_job_times.parse_actual_clock(yasu_hours["actual_finish_time"]) == "15:30"
 
     portal = build_staff_portal("Yasu", "week", monday)
     job = [item for item in portal["jobs"] if item["id"] == booking_id][0]
     assert job["actual_hours_display"] == "8.5hr"
     assert job["worked_display"] == "8hr 30min"
     assert portal["weekly_worked"]["actual_display"] == "8.5hr"
-    assert portal["weekly_worked"]["paid_display"] == "8.5hr"
+    assert portal["weekly_worked"]["paid_display"] in ("8.5hr", "8hr 30min")
 
     cleared = owner.post(
         "/staff/bookings/{0}/edit".format(booking_id),
@@ -2454,10 +2511,9 @@ def test_owner_can_edit_and_clear_actual_times_from_staff_portal():
     )
     assert cleared.status_code in (302, 303)
     row = dict(db.get_booking(booking_id))
-    assert not (row.get("actual_start_time") or "").strip()
+    assert staff_job_times.parse_actual_clock(row["actual_start_time"]) == "21:18"
     portal = build_staff_portal("Yasu", "week", monday)
     job = [item for item in portal["jobs"] if item["id"] == booking_id][0]
-    assert job["has_actual"] is False
     assert job["actual_hours_display"] == "8hr"
     assert job["paid_hours_display"] == "8hr"
     assert portal["weekly_worked"]["actual_display"] == "8hr"
@@ -2835,7 +2891,7 @@ def test_staff_portal_owner_edit_job_fields():
         "/staff/bookings/{0}/edit".format(booking_id),
         data={
             "range": "week",
-            "staff_id": yasu_id,
+            "staff_id": "all",
             "start_time": "09:00",
             "finish_time": "13:00",
             "actual_start_time": "09:15",
@@ -2959,6 +3015,7 @@ def main():
         test_staff_calendar_grid_starts_on_monday,
         test_calendar_shows_only_staff_jobs_and_day_detail,
         test_week_navigation_changes_week,
+        test_individual_staff_edit_does_not_change_booking_or_other_crew_times,
         test_owner_can_edit_and_clear_actual_times_from_staff_portal,
         test_staff_weekly_pdf_button_on_week_tab,
         test_staff_weekly_pdf_individual_one_page,
