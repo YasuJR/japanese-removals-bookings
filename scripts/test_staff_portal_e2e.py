@@ -2441,6 +2441,100 @@ def test_week_navigation_changes_week():
     return True
 
 
+def test_three_crew_scheduled_times_isolated_yasu_will_katsu():
+    from staff_portal import build_staff_portal
+
+    monday = _isolated_monday()
+    customer = _unique("TriCrewTime")
+    booking_id = _create_job(
+        customer,
+        monday.isoformat(),
+        crew="Yasu,Ken,Tom",
+        start_time="08:00",
+        finish_time="15:00",
+        duration_hours="7",
+        status="Confirmed",
+    )
+    yasu_id = _crew_id("Yasu")
+    will_id = _crew_id("Tom")
+    katsu_id = _crew_id("Ken")
+    owner = _admin_staff_client("Ken")
+
+    def _portal(staff_name):
+        return build_staff_portal(staff_name, "week", monday)
+
+    def _job_for(staff_name):
+        portal = _portal(staff_name)
+        matches = [j for j in portal["jobs"] if j["id"] == booking_id]
+        assert len(matches) == 1, (staff_name, [j["id"] for j in portal["jobs"]])
+        return matches[0]
+
+    saved = owner.post(
+        "/staff/bookings/{0}/edit".format(booking_id),
+        data={
+            "range": "week",
+            "staff_id": will_id,
+            "start_time": "08:00",
+            "finish_time": "13:00",
+            "actual_start_time": "",
+            "actual_finish_time": "",
+        },
+        follow_redirects=False,
+    )
+    assert saved.status_code in (302, 303)
+    row = dict(db.get_booking(booking_id))
+    assert row["start_time"] in ("08:00", "8:00")
+    assert row["finish_time"] in ("15:00",)
+
+    def _range(job):
+        return job["scheduled_range_display"]
+
+    all_portal = build_staff_portal(view_staff_id="all", range_key="week", today=monday)
+    all_job = [j for j in all_portal["jobs"] if j["id"] == booking_id][0]
+    assert _range(all_job) == "8:00 AM – 3:00 PM"
+
+    yasu_job = _job_for("Yasu")
+    will_job = _job_for("Tom")
+    katsu_job = _job_for("Ken")
+    assert _range(yasu_job) == "8:00 AM – 3:00 PM"
+    assert _range(will_job) == "8:00 AM – 1:00 PM"
+    assert _range(katsu_job) == "8:00 AM – 3:00 PM"
+
+    owner.post(
+        "/staff/bookings/{0}/edit".format(booking_id),
+        data={
+            "range": "week",
+            "staff_id": will_id,
+            "start_time": "09:00",
+            "finish_time": "12:00",
+        },
+        follow_redirects=False,
+    )
+    yasu_job = _job_for("Yasu")
+    will_job = _job_for("Tom")
+    assert _range(yasu_job) == "8:00 AM – 3:00 PM"
+    assert _range(will_job) == "9:00 AM – 12:00 PM"
+
+    owner.post(
+        "/staff/bookings/{0}/edit".format(booking_id),
+        data={
+            "range": "week",
+            "staff_id": yasu_id,
+            "start_time": "07:30",
+            "finish_time": "15:00",
+        },
+        follow_redirects=False,
+    )
+    yasu_job = _job_for("Yasu")
+    will_job = _job_for("Tom")
+    katsu_job = _job_for("Ken")
+    assert _range(yasu_job) == "7:30 AM – 3:00 PM"
+    assert _range(will_job) == "9:00 AM – 12:00 PM"
+    assert _range(katsu_job) == "8:00 AM – 3:00 PM"
+    assert dict(db.get_booking(booking_id))["finish_time"] in ("15:00",)
+    return True
+
+
 def test_individual_staff_edit_does_not_change_booking_or_other_crew_times():
     from staff_portal import build_staff_portal
 
@@ -3120,6 +3214,7 @@ def main():
         test_staff_calendar_grid_starts_on_monday,
         test_calendar_shows_only_staff_jobs_and_day_detail,
         test_week_navigation_changes_week,
+        test_three_crew_scheduled_times_isolated_yasu_will_katsu,
         test_individual_staff_edit_does_not_change_booking_or_other_crew_times,
         test_owner_can_edit_and_clear_actual_times_from_staff_portal,
         test_staff_weekly_pdf_button_on_week_tab,

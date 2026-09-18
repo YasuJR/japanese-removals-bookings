@@ -150,6 +150,90 @@ def booking_for_crew_member(
     return merged
 
 
+def _crew_hours_has_personal_schedule(crew_hours: Dict[str, Any]) -> bool:
+    return bool(
+        str(crew_hours.get("start_time") or "").strip()
+        or str(crew_hours.get("finish_time") or "").strip()
+    )
+
+
+def get_staff_job_times(
+    booking: Dict[str, Any],
+    *,
+    crew_id: Optional[int] = None,
+    crew_hours: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Effective times for one staff member or booking-level (All Staff).
+
+    Priority for individual staff (crew_id set):
+      1. booking_crew_hours row for that crew_id only
+      2. booking row for any field not overridden
+    Never reads another crew member's override.
+    """
+    base = dict(booking)
+    booking_start = normalize_time_input(base.get("start_time"))
+    booking_finish = normalize_time_input(base.get("finish_time"))
+    booking_actual_start = parse_actual_clock(base.get("actual_start_time"))
+    booking_actual_finish = parse_actual_clock(base.get("actual_finish_time"))
+
+    if crew_id is None:
+        effective = base
+        personal_start = ""
+        personal_finish = ""
+        personal_actual_start = ""
+        personal_actual_finish = ""
+        has_override = False
+    else:
+        has_override = crew_hours is not None
+        effective = booking_for_crew_member(base, crew_hours)
+        if crew_hours is not None:
+            personal_start = normalize_time_input(crew_hours.get("start_time"))
+            personal_finish = normalize_time_input(crew_hours.get("finish_time"))
+            personal_actual_start = parse_actual_clock(
+                crew_hours.get("actual_start_time")
+            )
+            personal_actual_finish = parse_actual_clock(
+                crew_hours.get("actual_finish_time")
+            )
+            if not personal_actual_start and not personal_actual_finish:
+                effective["actual_start_time"] = ""
+                effective["actual_finish_time"] = ""
+                effective["actual_duration"] = None
+        else:
+            personal_start = ""
+            personal_finish = ""
+            personal_actual_start = ""
+            personal_actual_finish = ""
+
+    effective_start = normalize_time_input(effective.get("start_time")) or booking_start
+    effective_finish = (
+        normalize_time_input(effective.get("finish_time")) or booking_finish
+    )
+    effective_actual_start = parse_actual_clock(effective.get("actual_start_time"))
+    effective_actual_finish = parse_actual_clock(effective.get("actual_finish_time"))
+
+    return {
+        "crew_id": crew_id,
+        "booking_start": booking_start,
+        "booking_finish": booking_finish,
+        "booking_actual_start": booking_actual_start,
+        "booking_actual_finish": booking_actual_finish,
+        "effective_start": effective_start,
+        "effective_finish": effective_finish,
+        "effective_actual_start": effective_actual_start,
+        "effective_actual_finish": effective_actual_finish,
+        "personal_start": personal_start,
+        "personal_finish": personal_finish,
+        "personal_actual_start": personal_actual_start,
+        "personal_actual_finish": personal_actual_finish,
+        "has_personal_override": bool(
+            has_override and crew_hours and _crew_hours_has_personal_schedule(crew_hours)
+        ),
+        "has_crew_hours_row": crew_hours is not None,
+        "effective_row": effective,
+    }
+
+
 def booking_move_date(booking: Dict[str, Any]) -> Optional[date]:
     iso = normalize_move_date(
         booking.get("date_iso") or booking.get("move_date")

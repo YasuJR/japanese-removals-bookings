@@ -123,15 +123,25 @@ def resolve_portal_staff(
     if view == STAFF_VIEW_ALL:
         return "", STAFF_VIEW_ALL, True
     if view is not None:
+        try:
+            view_id = int(view)
+        except (TypeError, ValueError):
+            view_id = 0
         staff = resolve_staff_id(view)
-        if staff:
-            return staff, int(view), False
+        if staff and view_id:
+            return staff, view_id, False
+        member = _crew_member_by_id(view_id)
+        if member and view_id:
+            return str(member.get("name") or "").strip(), view_id, False
 
     session_name = resolve_staff_name(session_staff_name)
     if session_name:
         for member in roster:
             if member["name"] == session_name:
                 return session_name, member["id"], False
+        member = _crew_member_by_name(session_name)
+        if member:
+            return session_name, int(member["id"]), False
         return session_name, session_staff_id, False
 
     if roster:
@@ -258,19 +268,35 @@ def resolve_staff_name(staff_name: Any, options: Optional[Sequence[str]] = None)
     return ""
 
 
+def _crew_member_by_id(crew_id: Any) -> Optional[Dict[str, Any]]:
+    try:
+        wanted = int(crew_id)
+    except (TypeError, ValueError):
+        return None
+    if wanted <= 0:
+        return None
+    for member in db.list_crew_members(active_only=False):
+        if int(member.get("id") or 0) == wanted:
+            return dict(member)
+    return None
+
+
+def _crew_member_by_name(name: str) -> Optional[Dict[str, Any]]:
+    text = str(name or "").strip()
+    if not text:
+        return None
+    for member in db.list_crew_members(active_only=False):
+        if str(member.get("name") or "").strip() == text:
+            return dict(member)
+    return None
+
+
 def resolve_staff_id(staff_id: Any) -> str:
     """Map a crew_members.id to that member's name. Empty when unknown."""
-    raw = str(staff_id or "").strip()
-    if not raw:
+    member = _crew_member_by_id(staff_id)
+    if not member:
         return ""
-    try:
-        wanted = int(raw)
-    except (TypeError, ValueError):
-        return ""
-    for member in _staff_roster():
-        if int(member.get("id") or 0) == wanted:
-            return str(member.get("name") or "").strip()
-    return ""
+    return str(member.get("name") or "").strip()
 
 
 def bound_staff_identity(
@@ -695,34 +721,29 @@ def _serialize_job(
 ) -> Dict[str, Any]:
     """Operational fields only — no rates, invoices, costs, or profit."""
     row = dict(booking)
-    hours_row = (
-        staff_job_times.booking_for_crew_member(row, crew_hours)
-        if view_crew_id
-        else row
+    staff_times = staff_job_times.get_staff_job_times(
+        row,
+        crew_id=view_crew_id,
+        crew_hours=crew_hours if view_crew_id else None,
     )
-    if view_crew_id and crew_hours is not None:
-        if not str(crew_hours.get("actual_start_time") or "").strip():
-            hours_row["actual_start_time"] = ""
-            hours_row["actual_finish_time"] = ""
-            hours_row["actual_duration"] = None
+    hours_row = staff_times["effective_row"]
     move_date = normalize_move_date(row.get("move_date")) or str(
         row.get("move_date") or ""
     ).strip()[:10]
     pickup = str(row.get("pickup_address") or "").strip()
     dropoff = str(row.get("delivery_address") or "").strip()
     phone = str(row.get("phone") or "").strip()
-    stored_start = normalize_time_input(row.get("start_time"))
-    display_start = normalize_time_input(
-        hours_row.get("start_time") if view_crew_id else row.get("start_time")
-    )
-    start_hm = effective_start_hm(hours_row if view_crew_id else row)
+    stored_start = staff_times["booking_start"]
+    display_start = staff_times["effective_start"]
+    display_finish = staff_times["effective_finish"]
+    start_hm = display_start or effective_start_hm(row)
     pickup_label = _suburb_label(pickup) if pickup else ""
     dropoff_label = _suburb_label(dropoff) if dropoff else ""
     times = staff_job_times.job_time_state(hours_row)
-    owner_start_hm = normalize_time_input(row.get("start_time"))
-    owner_finish_hm = normalize_time_input(row.get("finish_time"))
-    personal_start_hm = normalize_time_input(hours_row.get("start_time"))
-    personal_finish_hm = normalize_time_input(hours_row.get("finish_time"))
+    owner_start_hm = staff_times["booking_start"]
+    owner_finish_hm = staff_times["booking_finish"]
+    personal_start_hm = staff_times["personal_start"]
+    personal_finish_hm = staff_times["personal_finish"]
     hours = _job_hours_payload(row, today, hours_row=hours_row)
     estimated_minutes = staff_job_times.duration_hours_to_minutes(
         row.get("duration_hours")
@@ -746,17 +767,16 @@ def _serialize_job(
         "start_minutes": job_start_minutes(
             {
                 "id": row.get("id"),
-                "start_time": row.get("start_time"),
-                "start_hm": stored_start or start_hm,
-                "has_start_time": bool(stored_start),
-                "scheduled_range_display": _scheduled_range_display(row),
+                "start_time": display_start,
+                "start_hm": display_start or start_hm,
+                "has_start_time": bool(display_start),
             }
         ),
         "owner_start_hm": owner_start_hm,
         "owner_finish_hm": owner_finish_hm,
         "personal_start_hm": personal_start_hm or owner_start_hm,
         "personal_finish_hm": personal_finish_hm or owner_finish_hm,
-        "has_personal_time_override": bool(crew_hours),
+        "has_personal_time_override": staff_times["has_personal_override"],
         "booking_scheduled_range_display": _scheduled_range_display(row),
         "status": status_value,
         "callout_hours_input": ""
@@ -1101,19 +1121,44 @@ def _jobs_for_staff_name(
 
 
 def _build_today_by_staff(
-    jobs: List[Dict[str, Any]], roster: List[Dict[str, Any]]
+    jobs: List[Dict[str, Any]],
+    roster: List[Dict[str, Any]],
+    bookings_by_id: Dict[int, Dict[str, Any]],
+    today: date,
 ) -> List[Dict[str, Any]]:
+    """All Staff today: job cards use booking times; paid hours are per crew member."""
+    booking_ids = list(bookings_by_id.keys())
     blocks: List[Dict[str, Any]] = []
     for member in roster:
         member_jobs = _jobs_for_staff_name(jobs, member["name"])
-        paid_summary = _today_paid_summary(member_jobs)
+        crew_id = int(member.get("id") or 0)
+        crew_hours_map = (
+            db.map_booking_crew_hours(booking_ids, crew_id) if crew_id else {}
+        )
+        paid_total = 0.0
+        paid_count = 0
+        for job in member_jobs:
+            booking = bookings_by_id.get(int(job.get("id") or 0))
+            if not booking:
+                continue
+            staff_times = staff_job_times.get_staff_job_times(
+                booking,
+                crew_id=crew_id or None,
+                crew_hours=crew_hours_map.get(int(booking["id"])),
+            )
+            paid = staff_job_times.paid_hours(staff_times["effective_row"], today)
+            if paid is not None:
+                paid_total += float(paid)
+                paid_count += 1
+        paid_total = round(paid_total, 2)
         blocks.append(
             {
                 "staff_id": member["id"],
                 "staff": member["name"],
                 "jobs": member_jobs,
                 "job_count": len(member_jobs),
-                "paid_display": paid_summary["paid_display"],
+                "paid_display": staff_job_times.format_hours_short(paid_total)
+                or "0hr",
             }
         )
     return blocks
@@ -1334,9 +1379,12 @@ def build_staff_portal(
     today_view = None
     today_by_staff: List[Dict[str, Any]] = []
     owner_weekly = None
+    bookings_by_id = {int(b["id"]): dict(b) for b in bookings}
     if active_range == RANGE_TODAY:
         if is_all_staff:
-            today_by_staff = _build_today_by_staff(jobs, roster)
+            today_by_staff = _build_today_by_staff(
+                jobs, roster, bookings_by_id, today
+            )
             jobs_label = "{0} Job{1} today".format(
                 count, "" if count == 1 else "s"
             )
@@ -1524,9 +1572,27 @@ def build_staff_weekly_pdf_schedule(
         }
 
     bookings = _load_rows(staff, start_iso, end_iso) if staff else []
+    view_crew_id = None
+    try:
+        view_crew_id = int(selected_staff_id)
+    except (TypeError, ValueError):
+        view_crew_id = None
+    crew_hours_map: Dict[int, Dict[str, Any]] = {}
+    if view_crew_id and bookings:
+        crew_hours_map = db.map_booking_crew_hours(
+            [int(b["id"]) for b in bookings], view_crew_id
+        )
     jobs: List[Dict[str, Any]] = []
     for booking in bookings:
-        jobs.append(_serialize_job(booking, today))
+        bid = int(booking["id"])
+        jobs.append(
+            _serialize_job(
+                booking,
+                today,
+                view_crew_id=view_crew_id,
+                crew_hours=crew_hours_map.get(bid),
+            )
+        )
     jobs.sort(
         key=lambda job: (
             job.get("date_iso") or "",
