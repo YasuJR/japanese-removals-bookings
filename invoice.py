@@ -153,11 +153,44 @@ def invoice_customer_bill_to(booking: Any) -> Dict[str, str]:
     }
 
 
+def callout_line_parts(
+    booking: Dict[str, Any], totals: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
+    """Quantity × unit price for callout, or flat fee for legacy overrides."""
+    import callout_pricing
+
+    fee = float(totals.get("callout_fee") or 0)
+    if fee <= 0:
+        return None
+    rate = float(totals.get("hourly_rate") or 0)
+    minutes = callout_pricing.minutes_for_booking(booking)
+    hours = callout_pricing.hours_from_minutes(minutes) if minutes else None
+    if (
+        hours
+        and rate > 0
+        and minutes
+        and abs(callout_pricing.fee_amount(rate, minutes) - round(fee, 2)) <= 0.02
+    ):
+        return {
+            "description": callout_pricing.callout_line_description(minutes),
+            "quantity": hours,
+            "unit_amount": rate,
+            "amount": fee,
+        }
+    return {
+        "description": "Callout fee",
+        "quantity": 1.0,
+        "unit_amount": fee,
+        "amount": fee,
+    }
+
+
 def calculate_from_form_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """Invoice totals from parsed form pricing fields (no DB read)."""
     booking = {
         "hourly_rate": data.get("hourly_rate", 0),
         "callout_fee": data.get("callout_fee", 0),
+        "callout_minutes": data.get("callout_minutes"),
         "duration_hours": data.get("duration_hours"),
         "start_time": data.get("start_time", ""),
         "finish_time": data.get("finish_time", ""),

@@ -11,6 +11,7 @@ from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 import re
 
+import callout_pricing
 import database as db
 import job_status
 from booking_helpers import apple_maps_url, pickup_suburb, sms_href, tel_href
@@ -674,10 +675,9 @@ def _job_hours_payload(
     actual = staff_job_times.actual_hours(source, today)
     callout = staff_job_times.callout_hours(row)
     break_h = staff_job_times.break_hours(row)
-    if actual is None:
-        paid = None
-    else:
-        paid = round(actual - break_h + (callout or 0.0), 2)
+    paid = staff_job_times.paid_hours(
+        source, today, pricing_booking=row
+    )
     move = staff_job_times.booking_move_date(row)
     is_future = move is not None and move > today
     if actual is None:
@@ -688,11 +688,11 @@ def _job_hours_payload(
         actual_display = staff_job_times.format_hours_short(actual) or "0hr"
         paid_display = staff_job_times.format_hours_short(paid) or "0hr"
         has_actual_hours = True
-    callout_label = ""
-    if callout:
-        callout_label = "+ {0} call out".format(
-            staff_job_times.format_hours_short(callout)
-        )
+    import callout_pricing
+
+    callout_label = callout_pricing.staff_callout_hours_label(
+        row, format_hours_short=staff_job_times.format_hours_short
+    )
     break_label = ""
     if break_h:
         break_label = "-{0}".format(staff_job_times.format_hours_short(break_h))
@@ -779,9 +779,9 @@ def _serialize_job(
         "has_personal_time_override": staff_times["has_personal_override"],
         "booking_scheduled_range_display": _scheduled_range_display(row),
         "status": status_value,
-        "callout_hours_input": ""
-        if callout_h is None
-        else ("{0:.2f}".format(callout_h).rstrip("0").rstrip(".")),
+        "callout_minutes_input": callout_pricing.minutes_for_booking(row)
+        if callout_pricing.minutes_for_booking(row) is not None
+        else 0,
         "customer_name": str(row.get("customer_name") or "").strip() or "—",
         "num_movers": int(row.get("num_movers") or 0),
         "pickup_address": pickup,

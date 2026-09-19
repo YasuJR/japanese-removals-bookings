@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Tuple
 
 import job_status
 from booking_times import normalize_time_input, validate_times
+from callout_pricing import parse_callout_minutes_form, resolve_callout_fee
 from crew import crew_storage_value, merge_crew_for_edit, parse_crew_from_form
 from extra_charges import parse_extra_charges_from_form
 
@@ -54,6 +55,7 @@ def parse_booking_form(
 
     hourly_rate = None
     callout_fee = None
+    callout_minutes = None
     try:
         hourly_rate = float((form.get("hourly_rate") or "0").strip() or "0")
         if hourly_rate < 0:
@@ -61,12 +63,19 @@ def parse_booking_form(
     except (TypeError, ValueError):
         errors.append("Hourly rate must be a non-negative number.")
 
-    try:
-        callout_fee = float((form.get("callout_fee") or "0").strip() or "0")
-        if callout_fee < 0:
-            raise ValueError
-    except (TypeError, ValueError):
-        errors.append("Callout fee must be a non-negative number.")
+    callout_minutes, callout_minute_errors = parse_callout_minutes_form(form)
+    errors.extend(callout_minute_errors)
+    if callout_minutes is not None and hourly_rate is not None:
+        override_raw = (form.get("callout_fee_override") or "").strip()
+        if not override_raw:
+            override_raw = None
+        callout_fee = resolve_callout_fee(
+            hourly_rate,
+            callout_minutes,
+            override_fee=override_raw,
+        )
+    elif callout_minutes is None:
+        callout_fee = None
 
     gst_enabled = 1 if form.get("gst_enabled") == "on" else 0
     payment_status = (form.get("payment_status") or "Unpaid").strip() or "Unpaid"
@@ -106,6 +115,7 @@ def parse_booking_form(
         "crew_csv": crew_storage_value(crew_names),
         "hourly_rate": hourly_rate if hourly_rate is not None else 0.0,
         "callout_fee": callout_fee if callout_fee is not None else 0.0,
+        "callout_minutes": callout_minutes if callout_minutes is not None else 0,
         "gst_enabled": gst_enabled,
         "payment_status": payment_status,
         "invoice_status": invoice_status,

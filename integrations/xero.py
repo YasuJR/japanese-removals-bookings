@@ -412,12 +412,13 @@ def _build_line_items(booking: Dict[str, Any], totals: Dict[str, Any]) -> List[D
         }
     ]
 
-    if callout_fee > 0:
+    callout_line = invoice.callout_line_parts(booking, totals)
+    if callout_line:
         items.append(
             {
-                "Description": "Callout fee",
-                "Quantity": 1,
-                "UnitAmount": callout_fee,
+                "Description": callout_line["description"],
+                "Quantity": callout_line["quantity"],
+                "UnitAmount": callout_line["unit_amount"],
                 "AccountCode": INVOICE_ACCOUNT_CODE,
                 "TaxType": tax_type,
             }

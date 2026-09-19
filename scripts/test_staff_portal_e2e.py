@@ -1842,7 +1842,8 @@ def test_completed_jobs_use_saved_booking_times_when_actual_columns_empty():
     }
     done = by_id[completed]
     assert done["actual_hours_display"] == "3hr"
-    assert done["callout_hours_label"] == "+ 0.5hr call out"
+    assert "+ 0.5hr" in done["callout_hours_label"]
+    assert "30 min" in done["callout_hours_label"]
     assert done["paid_hours_display"] == "3.5hr"
     assert done["has_actual_hours"] is True
     assert by_id[invoiced]["actual_hours_display"] == "4hr"
@@ -3093,7 +3094,7 @@ def test_staff_portal_owner_edit_job_fields():
             "finish_time": "13:00",
             "actual_start_time": "09:15",
             "actual_finish_time": "12:45",
-            "callout_hours": "0.5",
+            "callout_minutes": "30",
             "status": "Completed",
             "crew": ["Yasu", "Ken"],
             "notes": "After owner edit",

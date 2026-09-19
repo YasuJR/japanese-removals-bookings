@@ -26,6 +26,7 @@ BOOKING_EXTRA_COLUMNS = [
     ("crew", "TEXT"),
     ("hourly_rate", "REAL"),
     ("callout_fee", "REAL"),
+    ("callout_minutes", "INTEGER"),
     ("gst_enabled", "INTEGER"),
     ("payment_status", "TEXT"),
     ("invoice_status", "TEXT"),
@@ -107,6 +108,33 @@ def _ensure_columns(conn) -> None:
             conn.execute(
                 "ALTER TABLE bookings ADD COLUMN {0} {1}".format(name, col_type)
             )
+    _backfill_callout_minutes(conn)
+
+
+def _backfill_callout_minutes(conn) -> None:
+    import callout_pricing
+
+    columns = db_backend.table_columns(conn, "bookings")
+    if "callout_minutes" not in columns:
+        return
+    rows = conn.execute(
+        """
+        SELECT id, hourly_rate, callout_fee, callout_minutes
+        FROM bookings
+        WHERE callout_minutes IS NULL
+        """
+    ).fetchall()
+    for row in rows:
+        data = dict(row) if hasattr(row, "keys") else row
+        inferred = callout_pricing.infer_minutes_from_legacy(
+            data.get("hourly_rate"), data.get("callout_fee")
+        )
+        if inferred is None:
+            continue
+        conn.execute(
+            "UPDATE bookings SET callout_minutes = ? WHERE id = ?",
+            (inferred, int(data["id"])),
+        )
 
 
 def _ensure_staff_columns(conn) -> None:
@@ -974,6 +1002,7 @@ def create_booking(
     crew: str = "",
     hourly_rate: float = 0.0,
     callout_fee: float = 0.0,
+    callout_minutes: Optional[int] = None,
     gst_enabled: int = 1,
     payment_status: str = "Unpaid",
     invoice_status: str = "",
@@ -988,10 +1017,10 @@ def create_booking(
                 pickup_address, delivery_address,
                 move_date, num_movers, notes,
                 start_time, finish_time, duration_hours, crew,
-                hourly_rate, callout_fee, gst_enabled,
+                hourly_rate, callout_fee, callout_minutes, gst_enabled,
                 payment_status, invoice_status, status,
                 gmail_message_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 customer_name.strip(),
@@ -1008,6 +1037,7 @@ def create_booking(
                 (crew or "").strip(),
                 hourly_rate,
                 callout_fee,
+                callout_minutes,
                 int(gst_enabled),
                 (payment_status or "Unpaid").strip(),
                 (invoice_status or "").strip(),
@@ -1035,6 +1065,7 @@ def update_booking(
     crew: str = "",
     hourly_rate: float = 0.0,
     callout_fee: float = 0.0,
+    callout_minutes: Optional[int] = None,
     gst_enabled: int = 1,
     payment_status: str = "Unpaid",
     invoice_status: str = "",
@@ -1058,6 +1089,7 @@ def update_booking(
                 crew = ?,
                 hourly_rate = ?,
                 callout_fee = ?,
+                callout_minutes = ?,
                 gst_enabled = ?,
                 payment_status = ?,
                 invoice_status = ?,
@@ -1079,6 +1111,7 @@ def update_booking(
                 (crew or "").strip(),
                 hourly_rate,
                 callout_fee,
+                callout_minutes,
                 int(gst_enabled),
                 (payment_status or "Unpaid").strip(),
                 (invoice_status or "").strip(),
@@ -1096,6 +1129,7 @@ def update_booking_invoice_fields(
     allowed = {
         "hourly_rate",
         "callout_fee",
+        "callout_minutes",
         "gst_enabled",
         "payment_status",
         "invoice_status",

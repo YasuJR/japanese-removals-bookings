@@ -8,9 +8,9 @@ MOVER_HOURLY_RATES: Dict[int, float] = {
     2: 180.0,
     3: 235.0,
 }
-MOVER_CALLOUT_FEES: Dict[int, float] = {
-    2: 90.0,
-    3: 117.50,
+MOVER_CALLOUT_MINUTES: Dict[int, int] = {
+    2: 30,
+    3: 30,
 }
 DEFAULT_CALLOUT_FEE = 90.0
 
@@ -24,13 +24,23 @@ def hourly_rate_for_movers(num_movers: int) -> Optional[float]:
     return MOVER_HOURLY_RATES.get(count)
 
 
-def callout_fee_for_movers(num_movers: int) -> Optional[float]:
-    """Return the standard callout fee for supported mover counts."""
+def callout_minutes_for_movers(num_movers: int) -> Optional[int]:
     try:
         count = int(num_movers)
     except (TypeError, ValueError):
         return None
-    return MOVER_CALLOUT_FEES.get(count)
+    return MOVER_CALLOUT_MINUTES.get(count)
+
+
+def callout_fee_for_movers(num_movers: int) -> Optional[float]:
+    """Return standard callout fee from mover count (30 min × hourly rate)."""
+    import callout_pricing
+
+    hourly = hourly_rate_for_movers(num_movers)
+    minutes = callout_minutes_for_movers(num_movers)
+    if hourly is None or minutes is None:
+        return None
+    return callout_pricing.fee_amount(hourly, minutes)
 
 
 def pricing_for_movers(num_movers: int) -> Optional[Tuple[float, float]]:
@@ -47,6 +57,7 @@ class MoverPricingState:
     def __init__(self) -> None:
         self.manual_hourly_override = False
         self.manual_callout_override = False
+        self.manual_callout_minutes_override = False
 
     def apply_hourly_for_movers(self, num_movers: int, current_rate: float) -> float:
         if self.manual_hourly_override:
@@ -54,6 +65,16 @@ class MoverPricingState:
         suggested = hourly_rate_for_movers(num_movers)
         if suggested is None:
             return current_rate
+        return suggested
+
+    def apply_callout_minutes_for_movers(
+        self, num_movers: int, current_minutes: int
+    ) -> int:
+        if self.manual_callout_minutes_override:
+            return current_minutes
+        suggested = callout_minutes_for_movers(num_movers)
+        if suggested is None:
+            return current_minutes
         return suggested
 
     def apply_callout_for_movers(self, num_movers: int, current_callout: float) -> float:
@@ -75,3 +96,6 @@ class MoverPricingState:
 
     def mark_manual_callout_override(self) -> None:
         self.manual_callout_override = True
+
+    def mark_manual_callout_minutes_override(self) -> None:
+        self.manual_callout_minutes_override = True

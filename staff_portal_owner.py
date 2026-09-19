@@ -56,18 +56,10 @@ def _row_value(row: Any, key: str, default: Any = "") -> Any:
         return default
 
 
-def _parse_callout_hours(form: Any) -> Tuple[Optional[float], List[str]]:
-    raw = form.get("callout_hours") if hasattr(form, "get") else ""
-    raw = str(raw or "").strip()
-    if not raw:
-        return 0.0, []
-    try:
-        value = float(raw)
-    except (TypeError, ValueError):
-        return None, ["Enter call-out hours as a number (e.g. 0.5)."]
-    if value < 0:
-        return None, ["Call-out hours cannot be negative."]
-    return round(value, 2), []
+def _parse_callout_minutes(form: Any) -> Tuple[Optional[int], List[str]]:
+    from callout_pricing import parse_callout_minutes_form
+
+    return parse_callout_minutes_form(form)
 
 
 def parse_owner_job_edit_form(
@@ -88,7 +80,7 @@ def parse_owner_job_edit_form(
         errors.append("Select at least one crew member.")
 
     notes = str(form.get("notes") if hasattr(form, "get") else "").strip()
-    callout_hours, callout_errors = _parse_callout_hours(form)
+    callout_minutes, callout_errors = _parse_callout_minutes(form)
     if callout_errors:
         errors.extend(callout_errors)
 
@@ -97,7 +89,7 @@ def parse_owner_job_edit_form(
     )
     errors.extend(actual_errors)
 
-    if errors or callout_hours is None or status is None:
+    if errors or callout_minutes is None or status is None:
         return None, errors
 
     duration = duration_hours_from_times(start, finish)
@@ -109,7 +101,13 @@ def parse_owner_job_edit_form(
         hourly_rate = float(_row_value(booking_row, "hourly_rate") or 0)
     except (TypeError, ValueError):
         hourly_rate = 0.0
-    callout_fee = round(callout_hours * hourly_rate, 2) if hourly_rate > 0 else 0.0
+    from callout_pricing import resolve_callout_fee
+
+    callout_fee = resolve_callout_fee(
+        hourly_rate,
+        callout_minutes,
+        override_fee=form.get("callout_fee_override") if hasattr(form, "get") else None,
+    )
 
     return {
         "start_time": start,
@@ -118,6 +116,7 @@ def parse_owner_job_edit_form(
         "crew_csv": crew_storage_value(crew_names),
         "status": status,
         "notes": notes,
+        "callout_minutes": callout_minutes,
         "callout_fee": callout_fee,
         "actual_start": actual_start,
         "actual_finish": actual_finish,
@@ -223,6 +222,7 @@ def save_owner_job_edit(booking_id: int, form: Any) -> Tuple[bool, List[str]]:
         crew=data["crew_csv"],
         hourly_rate=float(_row_value(row, "hourly_rate") or 0),
         callout_fee=data["callout_fee"],
+        callout_minutes=data.get("callout_minutes"),
         gst_enabled=int(_row_value(row, "gst_enabled") or 1),
         payment_status=str(_row_value(row, "payment_status") or "Unpaid"),
         invoice_status=str(_row_value(row, "invoice_status") or ""),

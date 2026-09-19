@@ -45,15 +45,9 @@
       <span class="pricing-value" id="live-labour-total">{{ (invoice_summary.hourly_rate * invoice_summary.hours)|format_aud }}</span>
     </div>
 
-    <div class="pricing-row">
-      <label class="pricing-label" for="pricing_callout_fee">Callout fee ($)</label>
-      <div class="pricing-input-group">
-        <button type="button" class="stepper-btn" data-step-target="callout_fee" data-step="-10" aria-label="Decrease callout fee">−</button>
-        <input type="number" name="callout_fee" id="pricing_callout_fee" class="pricing-input"
-               min="0" step="0.01"
-               value="{{ form.get('callout_fee', company_settings.default_callout_fee) }}">
-        <button type="button" class="stepper-btn" data-step-target="callout_fee" data-step="10" aria-label="Increase callout fee">+</button>
-      </div>
+    <div class="pricing-row pricing-row-full">
+      {% set pricing_callout_fee_id = 'pricing_callout_fee' %}
+      {% include '_callout_pricing_fields.html' %}
     </div>
 
     <div class="pricing-row pricing-row-full">

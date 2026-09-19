@@ -26,8 +26,12 @@
       <input type="time" name="actual_finish_time" value="{{ job.actual_finish_hm }}">
     </label>
     <label>
-      Call-out (hours)
-      <input type="number" name="callout_hours" min="0" step="0.25" inputmode="decimal" value="{{ job.callout_hours_input }}">
+      Call out time
+      <select name="callout_minutes">
+        {% for m in [0, 30, 45, 60, 90] %}
+        <option value="{{ m }}"{% if job.callout_minutes_input|int == m %} selected{% endif %}>{{ m }} min</option>
+        {% endfor %}
+      </select>
     </label>
     <label>
       Status

@@ -1,0 +1,31 @@
+{% set _callout_minutes = form.get('callout_minutes', 30)|int %}
+<div class="callout-pricing-fields form-grid">
+  <label class="pricing-label" for="callout_minutes">
+    Call out time
+    <select name="callout_minutes" id="callout_minutes" class="callout-minutes-select">
+      {% for m in [0, 30, 45, 60, 90] %}
+      <option value="{{ m }}"{% if _callout_minutes == m %} selected{% endif %}>{{ m }} min</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="pricing-label" for="{% if pricing_callout_fee_id %}{{ pricing_callout_fee_id }}{% else %}callout_fee{% endif %}">
+    Call out fee ($)
+    <input type="number"
+           name="callout_fee"
+           id="{% if pricing_callout_fee_id %}{{ pricing_callout_fee_id }}{% else %}callout_fee{% endif %}"
+           class="pricing-input callout-fee-auto"
+           min="0" step="0.01" inputmode="decimal"
+           value="{{ form.get('callout_fee', company_settings.default_callout_fee) }}"
+           readonly tabindex="-1">
+  </label>
+  {% if is_admin %}
+  <label class="pricing-label" for="callout_fee_override">
+    Override call out fee ($)
+    <input type="number" name="callout_fee_override" id="callout_fee_override"
+           class="pricing-input" min="0" step="0.01" inputmode="decimal"
+           placeholder="Calculated if empty"
+           value="{{ form.get('callout_fee_override', '') }}">
+  </label>
+  {% endif %}
+</div>
+<script src="{{ url_for('static', filename='callout_pricing.js') }}"></script>

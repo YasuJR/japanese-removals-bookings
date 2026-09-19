@@ -146,13 +146,14 @@ def _line_items(booking: Dict[str, Any], totals: Dict[str, Any]) -> List[Dict[st
             "amount": invoice.format_aud(totals["hourly_rate"] * totals["hours"]),
         }
     ]
-    if totals["callout_fee"] > 0:
+    callout_line = invoice.callout_line_parts(booking, totals)
+    if callout_line:
         items.append(
             {
-                "description_html": "Callout fee",
-                "quantity": "1.00",
-                "unit_price": invoice.format_aud(totals["callout_fee"]),
-                "amount": invoice.format_aud(totals["callout_fee"]),
+                "description_html": callout_line["description"],
+                "quantity": "{0:.2f}".format(float(callout_line["quantity"])),
+                "unit_price": invoice.format_aud(callout_line["unit_amount"]),
+                "amount": invoice.format_aud(callout_line["amount"]),
             }
         )
     for charge in totals.get("extra_charges") or []:

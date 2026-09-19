@@ -33,6 +33,7 @@ def _form_dict(**overrides):
         "finish_time": "09:00",
         "duration_hours": "1",
         "hourly_rate": "180",
+        "callout_minutes": "30",
         "callout_fee": "90",
         "gst_enabled": "on",
         "payment_status": "Unpaid",
@@ -108,10 +109,12 @@ def test_invoice_total_recalculates_for_three_movers():
             hourly_rate="235",
             duration_hours="2",
             finish_time="10:00",
+            callout_minutes="30",
             callout_fee="117.50",
         )
     )
     assert not errors
+    assert data["callout_minutes"] == 30
     totals = invoice.calculate_from_form_data(data)
     assert totals["hourly_rate"] == 235.0
     assert totals["callout_fee"] == 117.50
@@ -136,6 +139,7 @@ def test_preview_calculate_endpoint_returns_updated_total_for_three_movers():
         data=_form_dict(
             num_movers="3",
             hourly_rate="235",
+            callout_minutes="30",
             callout_fee="117.50",
             duration_hours="1",
         ),
@@ -165,6 +169,7 @@ def test_preview_calculate_endpoint_returns_updated_total_for_two_movers():
         data=_form_dict(
             num_movers="2",
             hourly_rate="180",
+            callout_minutes="30",
             callout_fee="90",
             duration_hours="1",
         ),
@@ -194,9 +199,11 @@ def test_new_booking_page_includes_mover_pricing_scripts():
     html = resp.get_data(as_text=True)
     assert 'name="num_movers"' in html
     assert 'name="callout_fee"' in html
+    assert 'name="callout_minutes"' in html
     assert 'id="hourly_rate"' in html
     assert "mover_pricing.js" in html
-    assert "117.5" in (ROOT / "static" / "mover_pricing.js").read_text()
+    assert "CALLOUT_MINUTES" in (ROOT / "static" / "mover_pricing.js").read_text()
+    assert "callout_pricing.js" in html
     assert "Net sales (ex GST)" not in html
     assert "Invoice overrides" not in html
     assert "GST inclusive pricing" not in html
@@ -223,7 +230,8 @@ def test_new_booking_page_simplified_layout():
     assert "Paste customer information" in html or "Analyse" in html
     assert "Extra charges" in html or "extra" in html.lower()
     assert "Hourly rate" in html
-    assert "Callout fee" in html
+    assert "Call out time" in html
+    assert "Call out fee" in html
     assert "Save booking" in html or "Confirm Booking" in html
     assert "invoice_bank_account_name" not in html
     assert "invoice_custom_text" not in html

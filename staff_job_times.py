@@ -466,18 +466,10 @@ def actual_hours(
 
 
 def callout_hours(booking: Dict[str, Any]) -> Optional[float]:
-    """Call-out hours from stored callout_fee / hourly_rate. No invoice change."""
-    try:
-        fee = float(booking.get("callout_fee") or 0)
-        rate = float(booking.get("hourly_rate") or 0)
-    except (TypeError, ValueError):
-        return None
-    if fee <= 0 or rate <= 0:
-        return None
-    hours = round(fee / rate, 2)
-    if hours <= 0:
-        return None
-    return hours
+    """Call-out hours from callout_minutes, with legacy fee/rate fallback."""
+    import callout_pricing
+
+    return callout_pricing.callout_hours(booking)
 
 
 def break_hours(booking: Dict[str, Any]) -> float:
@@ -488,14 +480,18 @@ def break_hours(booking: Dict[str, Any]) -> float:
 
 
 def paid_hours(
-    booking: Dict[str, Any], today: Optional[date] = None
+    booking: Dict[str, Any],
+    today: Optional[date] = None,
+    *,
+    pricing_booking: Optional[Dict[str, Any]] = None,
 ) -> Optional[float]:
     """Actual Hours - Unpaid Break + Call Out. None when actual is not recorded."""
     actual = actual_hours(booking, today)
     if actual is None:
         return None
-    callout = callout_hours(booking) or 0.0
-    break_deduction = break_hours(booking)
+    pricing = pricing_booking if pricing_booking is not None else booking
+    callout = callout_hours(pricing) or 0.0
+    break_deduction = break_hours(pricing)
     return round(actual - break_deduction + callout, 2)
 
 

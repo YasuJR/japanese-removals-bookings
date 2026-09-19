@@ -540,6 +540,7 @@ def update_booking_invoice(booking_id: int, form) -> Tuple[bool, List[str], str]
         crew=parsed["crew_csv"],
         hourly_rate=parsed["hourly_rate"],
         callout_fee=parsed["callout_fee"],
+        callout_minutes=parsed.get("callout_minutes"),
         gst_enabled=parsed["gst_enabled"],
         payment_status=parsed["payment_status"],
         invoice_status=parsed["invoice_status"],

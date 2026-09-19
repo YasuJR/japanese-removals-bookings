@@ -80,13 +80,17 @@ def crew_options() -> List[str]:
 
 
 def booking_form_defaults() -> Dict[str, Any]:
+    import callout_pricing
+
     s = get_settings()
     inv = default_invoice_fields()
+    minutes = callout_pricing.DEFAULT_CALLOUT_MINUTES
     return {
         "phone": s["default_phone"],
         "email": s["default_email"],
         "hourly_rate": inv["hourly_rate"],
-        "callout_fee": inv["callout_fee"],
+        "callout_fee": callout_pricing.fee_amount(inv["hourly_rate"], minutes),
+        "callout_minutes": minutes,
         "gst_enabled": inv["gst_enabled"],
         "crew": list(s["default_crew"]),
     }

@@ -58,6 +58,7 @@ from outstanding_invoices_data import (
 from executive_dashboard_data import build_executive_dashboard
 from profit_data import PROFIT_CSV_HEADERS, build_profit_dashboard, profit_csv_rows
 import booking_profit
+import callout_pricing
 from integrations import payment_reminder_automation, xero_payment_sync
 from booking_times import (
     DEFAULT_DURATION_HOURS,
@@ -376,6 +377,7 @@ def _booking_form_defaults() -> dict:
         "email": "",
         "hourly_rate": defaults["hourly_rate"],
         "callout_fee": defaults["callout_fee"],
+        "callout_minutes": defaults.get("callout_minutes", 30),
         "gst_enabled": defaults["gst_enabled"],
         "crew": defaults["crew"],
         "extra_charges": [],
@@ -408,6 +410,7 @@ def _save_booking_from_form(form):
         crew=data["crew_csv"],
         hourly_rate=data.get("hourly_rate", defaults["hourly_rate"]),
         callout_fee=data.get("callout_fee", defaults["callout_fee"]),
+        callout_minutes=data.get("callout_minutes"),
         gst_enabled=data.get("gst_enabled", defaults["gst_enabled"]),
         payment_status=defaults["payment_status"],
         invoice_status=defaults["invoice_status"],
@@ -435,6 +438,7 @@ def _create_booking_from_data(data):
         crew=data["crew_csv"],
         hourly_rate=data.get("hourly_rate", defaults["hourly_rate"]),
         callout_fee=data.get("callout_fee", defaults["callout_fee"]),
+        callout_minutes=data.get("callout_minutes"),
         gst_enabled=data.get("gst_enabled", defaults["gst_enabled"]),
         payment_status=defaults["payment_status"],
         invoice_status=defaults["invoice_status"],
@@ -483,6 +487,7 @@ def _update_booking_from_form(booking_id, form):
         crew=data["crew_csv"],
         hourly_rate=data["hourly_rate"],
         callout_fee=data["callout_fee"],
+        callout_minutes=data.get("callout_minutes"),
         gst_enabled=data["gst_enabled"],
         payment_status=data["payment_status"],
         invoice_status=data["invoice_status"],
@@ -2710,6 +2715,15 @@ def edit_booking(booking_id):
         flash("Could not update booking.", "error")
         return redirect(url_for("edit_booking", booking_id=booking_id))
 
+    booking_dict = services.booking_to_dict(row)
+    form_callout_minutes = callout_pricing.minutes_for_booking(booking_dict)
+    if form_callout_minutes is None:
+        form_callout_minutes = (
+            callout_pricing.DEFAULT_CALLOUT_MINUTES
+            if float(row["callout_fee"] or 0) > 0
+            else 0
+        )
+
     form = {
         "customer_name": row["customer_name"],
         "phone": row["phone"],
@@ -2739,6 +2753,7 @@ def edit_booking(booking_id):
         "callout_fee": row["callout_fee"]
         if row["callout_fee"] is not None
         else invoice.default_invoice_fields()["callout_fee"],
+        "callout_minutes": form_callout_minutes,
         "gst_enabled": row["gst_enabled"]
         if row["gst_enabled"] is not None
         else invoice.default_invoice_fields()["gst_enabled"],

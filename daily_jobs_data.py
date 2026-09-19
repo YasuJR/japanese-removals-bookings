@@ -39,18 +39,10 @@ def format_job_duration_label(hours: Optional[float]) -> str:
 
 
 def callout_hours_from_booking(booking: Dict[str, Any]) -> Optional[float]:
-    """Payroll call-out hours from stored fee and hourly rate. No invoice change."""
-    try:
-        fee = float(booking.get("callout_fee") or 0)
-        rate = float(booking.get("hourly_rate") or 0)
-    except (TypeError, ValueError):
-        return None
-    if fee <= 0 or rate <= 0:
-        return None
-    hours = round(fee / rate, 2)
-    if hours <= 0:
-        return None
-    return hours
+    """Payroll call-out hours from callout_minutes (legacy fee/rate fallback)."""
+    import callout_pricing
+
+    return callout_pricing.callout_hours(booking)
 
 
 def format_callout_hours_label(hours: Optional[float]) -> str:

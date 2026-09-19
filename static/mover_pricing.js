@@ -1,8 +1,8 @@
 (function () {
   var HOURLY_RATES = { 2: 180, 3: 235 };
-  var CALLOUT_FEES = { 2: 90, 3: 117.5 };
+  var CALLOUT_MINUTES = { 2: 30, 3: 30 };
   var manualHourlyOverride = false;
-  var manualCalloutOverride = false;
+  var manualCalloutMinutesOverride = false;
   var applying = false;
 
   function moversInput() {
@@ -17,11 +17,10 @@
     );
   }
 
-  function calloutInput() {
+  function calloutMinutesInput() {
     return (
-      document.getElementById("pricing_callout_fee") ||
-      document.getElementById("callout_fee") ||
-      document.querySelector('input[name="callout_fee"]')
+      document.getElementById("callout_minutes") ||
+      document.querySelector('select[name="callout_minutes"]')
     );
   }
 
@@ -40,14 +39,14 @@
       return false;
     }
     var hourlyEl = hourlyInput();
-    var calloutEl = calloutInput();
+    var minutesEl = calloutMinutesInput();
     var hourlyRate = Object.prototype.hasOwnProperty.call(HOURLY_RATES, count)
       ? HOURLY_RATES[count]
       : null;
-    var calloutFee = Object.prototype.hasOwnProperty.call(CALLOUT_FEES, count)
-      ? CALLOUT_FEES[count]
+    var calloutMinutes = Object.prototype.hasOwnProperty.call(CALLOUT_MINUTES, count)
+      ? CALLOUT_MINUTES[count]
       : null;
-    if (hourlyRate === null && calloutFee === null) {
+    if (hourlyRate === null && calloutMinutes === null) {
       return false;
     }
 
@@ -58,20 +57,23 @@
       dispatchFieldEvents(hourlyEl);
       changed = true;
     }
-    if (!manualCalloutOverride && calloutEl && calloutFee !== null) {
-      calloutEl.value = calloutFee.toFixed(2);
-      dispatchFieldEvents(calloutEl);
+    if (!manualCalloutMinutesOverride && minutesEl && calloutMinutes !== null) {
+      minutesEl.value = String(calloutMinutes);
+      dispatchFieldEvents(minutesEl);
       changed = true;
     }
     applying = false;
+    if (changed && window.calloutPricingSync) {
+      window.calloutPricingSync();
+    }
     return changed;
   }
 
   function bind() {
     var moversEl = moversInput();
     var hourlyEl = hourlyInput();
-    var calloutEl = calloutInput();
-    if (!moversEl || (!hourlyEl && !calloutEl)) {
+    var minutesEl = calloutMinutesInput();
+    if (!moversEl || (!hourlyEl && !minutesEl)) {
       return;
     }
 
@@ -86,10 +88,15 @@
       });
     }
 
-    if (calloutEl) {
-      calloutEl.addEventListener("input", function () {
+    if (minutesEl) {
+      minutesEl.addEventListener("input", function () {
         if (!applying) {
-          manualCalloutOverride = true;
+          manualCalloutMinutesOverride = true;
+        }
+      });
+      minutesEl.addEventListener("change", function () {
+        if (!applying) {
+          manualCalloutMinutesOverride = true;
         }
       });
     }
