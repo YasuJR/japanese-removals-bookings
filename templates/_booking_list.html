@@ -14,6 +14,15 @@
       <span>{{ b|booking_finish_time }}</span>
     </p>
     <h3 class="booking-card-name">{{ b.customer_name }}</h3>
+    {% if show_invoice_in_results %}
+    {% set invoice_label = b|display_invoice_number %}
+    {% if invoice_label and invoice_label != '—' %}
+    <p class="booking-card-invoice">
+      Invoice:
+      <a href="{{ url_for('invoice_preview', booking_id=b.id) }}">{{ invoice_label }}</a>
+    </p>
+    {% endif %}
+    {% endif %}
     <div class="booking-card-badges">
       {% with status=b|booking_job_status %}
       {% include '_status_badge.html' %}
@@ -60,6 +69,7 @@
         <th>Start</th>
         <th>Finish</th>
         <th>Customer</th>
+        {% if show_invoice_in_results %}<th>Invoice</th>{% endif %}
         <th>Status</th>
         <th>Payment</th>
         <th>Phone</th>
@@ -85,6 +95,14 @@
         <td class="nowrap">{{ b|booking_start_time }}</td>
         <td class="nowrap">{{ b|booking_finish_time }}</td>
         <td>{{ b.customer_name }}</td>
+        {% if show_invoice_in_results %}
+        <td class="nowrap">
+          {% set invoice_label = b|display_invoice_number %}
+          {% if invoice_label and invoice_label != '—' %}
+          <a href="{{ url_for('invoice_preview', booking_id=b.id) }}">{{ invoice_label }}</a>
+          {% else %}—{% endif %}
+        </td>
+        {% endif %}
         <td class="nowrap">
           {% with status=b|booking_job_status %}
           {% include '_status_badge.html' %}

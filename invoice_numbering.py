@@ -54,6 +54,41 @@ def format_invoice_number(raw: Optional[str]) -> str:
     return text
 
 
+def normalize_invoice_search_text(query: str) -> str:
+    """Lowercase and remove spaces for invoice number matching."""
+    return re.sub(r"\s+", "", (query or "").strip().lower())
+
+
+def invoice_search_sql_clauses(query: str) -> tuple:
+    """
+    SQL OR-clauses matching bookings.invoice_number for a search query.
+
+    Handles INV56, inv 56, plain 56 (numeric reference), case-insensitive.
+    """
+    compact = normalize_invoice_search_text(query)
+    if not compact:
+        return [], []
+
+    safe = compact.replace("%", "").replace("_", "")
+    clauses: list = []
+    params: list = []
+
+    normalized_col = "LOWER(REPLACE(COALESCE(invoice_number, ''), ' ', ''))"
+    clauses.append("{0} LIKE ?".format(normalized_col))
+    params.append("%{0}%".format(safe))
+
+    numeric = _numeric_suffix(compact)
+    if numeric is not None:
+        for variant in (
+            str(numeric),
+            "inv{0}".format(numeric),
+            "inv-{0}".format(numeric),
+        ):
+            clauses.append("{0} = ?".format(normalized_col))
+            params.append(variant)
+    return clauses, params
+
+
 def numeric_sequence_value(raw: Optional[str]) -> int:
     """Extract the numeric sequence from a stored invoice number, if any."""
     num = _numeric_suffix(raw)

@@ -1871,6 +1871,8 @@ def search_bookings(query: str) -> List[sqlite3.Row]:
     if not q:
         return list_all()
 
+    import invoice_numbering
+
     safe = q.replace("%", "").replace("_", "")
     pattern = "%" + safe.lower() + "%"
     clauses = [
@@ -1884,6 +1886,10 @@ def search_bookings(query: str) -> List[sqlite3.Row]:
         "LOWER(CAST(id AS TEXT)) LIKE ?",
     ]
     params = [pattern] * len(clauses)
+
+    inv_clauses, inv_params = invoice_numbering.invoice_search_sql_clauses(q)
+    clauses.extend(inv_clauses)
+    params.extend(inv_params)
 
     if q.isdigit():
         clauses.insert(0, "id = ?")
