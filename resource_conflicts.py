@@ -7,6 +7,7 @@ import double_booking
 import job_status
 from booking_times import display_finish_time, display_start_time
 from crew import crew_from_storage
+from trucks import same_truck_resource
 
 
 def _candidate_booking(
@@ -115,8 +116,7 @@ def find_truck_conflict_warnings(
         if not _times_overlap(candidate, other):
             continue
 
-        other_truck = (other.get("truck_assigned") or "").strip()
-        if not other_truck or other_truck.lower() != truck.lower():
+        if not same_truck_resource(candidate, other):
             continue
 
         slot = "{0} - {1}".format(

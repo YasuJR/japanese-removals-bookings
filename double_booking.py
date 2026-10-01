@@ -9,6 +9,7 @@ import automation
 import config
 import database as db
 import job_status
+from trucks import schedule_overlap_requires_override
 from booking_times import (
     DEFAULT_DURATION_HOURS,
     DEFAULT_START_TIME,
@@ -97,6 +98,8 @@ def find_conflicts(
             continue
         if not _times_overlap(candidate, other):
             continue
+        if not schedule_overlap_requires_override(candidate, other):
+            continue
         conflicts.append(
             {
                 "id": other_id,
@@ -129,6 +132,7 @@ def booking_payload_from_form(
         "duration_hours": data.get("duration_hours") or "",
         "status": data.get("status") or job_status.DEFAULT_STATUS,
         "customer_name": data.get("customer_name") or "",
+        "truck_assigned": (data.get("truck_assigned") or "").strip(),
     }
     return payload
 
