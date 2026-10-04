@@ -1,3 +1,4 @@
+{% from '_bilingual_macros.html' import sh, bl %}
 {% set is_new_job_costs = new_booking_mode|default(false) %}
 {% set job_cost_values = job_cost_form_values(
      form if form is defined else {},
@@ -9,7 +10,7 @@
          data-staff-rate="{{ STAFF_COST_RATE_PER_HOUR }}"
          data-staff-rate-three="{{ STAFF_COST_RATE_THREE_MOVERS }}"
          data-default-fuel="{{ DEFAULT_FUEL_COST }}">
-  <h3>Job Costs</h3>
+  <h3>{{ sh('Job Costs', '作業コスト') }}</h3>
   <p class="muted form-hint">
     Staff Cost defaults to ${{ '%.0f'|format(STAFF_COST_RATE_PER_HOUR) }}/hr for 2 movers,
     or ${{ '%.0f'|format(STAFF_COST_RATE_THREE_MOVERS) }}/hr
@@ -19,7 +20,7 @@
   </p>
   <div class="job-costs-grid">
     <label class="job-cost-field">
-      Staff Cost
+      {{ bl('Staff Cost', 'スタッフ人件費') }}
       <span class="money-input">
         <span class="money-prefix" aria-hidden="true">$</span>
         <input type="number" name="staff_cost" id="staff_cost" class="job-cost-input" min="0" step="0.01"
@@ -28,7 +29,7 @@
       </span>
     </label>
     <label class="job-cost-field">
-      Fuel Cost
+      {{ bl('Fuel Cost', '燃料費') }}
       <span class="money-input">
         <span class="money-prefix" aria-hidden="true">$</span>
         <input type="number" name="fuel_cost" id="fuel_cost" class="job-cost-input" min="0" step="0.01"
@@ -37,7 +38,7 @@
       </span>
     </label>
     <label class="job-cost-field">
-      Truck Cost
+      {{ bl('Truck Cost', 'トラック費用') }}
       <span class="money-input">
         <span class="money-prefix" aria-hidden="true">$</span>
         <input type="number" name="truck_cost" class="job-cost-input" min="0" step="0.01"
@@ -46,7 +47,7 @@
       </span>
     </label>
     <label class="job-cost-field">
-      Parking Cost
+      {{ bl('Parking Cost', '駐車料金') }}
       <span class="money-input">
         <span class="money-prefix" aria-hidden="true">$</span>
         <input type="number" name="parking_cost" class="job-cost-input" min="0" step="0.01"
@@ -55,7 +56,7 @@
       </span>
     </label>
     <label class="job-cost-field">
-      Other Cost
+      {{ bl('Other Cost', 'その他費用') }}
       <span class="money-input">
         <span class="money-prefix" aria-hidden="true">$</span>
         <input type="number" name="other_costs" class="job-cost-input" min="0" step="0.01"
@@ -64,7 +65,7 @@
       </span>
     </label>
     <div class="job-cost-field job-cost-total-field">
-      <span class="job-cost-total-label">Total Job Cost</span>
+      <span class="job-cost-total-label">{{ bl('Total Job Cost', '合計作業コスト') }}</span>
       <strong class="job-cost-total-display" id="job-cost-total-display">$0.00</strong>
     </div>
   </div>

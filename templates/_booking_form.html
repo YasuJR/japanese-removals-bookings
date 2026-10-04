@@ -1,28 +1,29 @@
+{% from '_bilingual_macros.html' import bl %}
 <div class="form-grid">
   <label>
-    Customer name *
+    {{ bl('Customer name *', 'お客様名') }}
     <input type="text" name="customer_name" required
            value="{{ form.get('customer_name', '') }}">
   </label>
   <label>
-    Phone number
+    {{ bl('Phone number', '電話番号') }}
     <input type="tel" name="phone"
            autocomplete="tel"
            value="{{ form.get('phone', '' if new_booking_mode else company_settings.default_phone) }}">
   </label>
   <label>
-    Email
+    {{ bl('Email', 'メールアドレス') }}
     <input type="email" name="email"
            autocomplete="email"
            value="{{ form.get('email', '' if new_booking_mode else company_settings.default_email) }}">
   </label>
   <label>
-    Move date *
+    {{ bl('Move date *', '日付') }}
     <input type="date" name="move_date" required
            value="{{ form.get('move_date', '') }}">
   </label>
   <label>
-    Job status
+    {{ bl('Job status', '作業ステータス') }}
     <select name="status">
       {% for option in job_status_options %}
       <option value="{{ option }}"
@@ -31,13 +32,13 @@
     </select>
   </label>
   <label>
-    Start time
+    {{ bl('Start time', '開始時間') }}
     <input type="time" name="start_time" id="start_time"
            value="{{ form.get('start_time', '08:00') }}">
   </label>
   {% if new_booking_mode %}
   <label>
-    Duration (hours)
+    {{ bl('Duration (hours)', '作業時間（時間）') }}
     <input type="number" name="duration_hours" id="duration_hours"
            min="0.5" max="24" step="0.25"
            placeholder="e.g. 3"
@@ -45,7 +46,7 @@
     <span class="field-hint">Finish time updates automatically below</span>
   </label>
   <div class="finish-live-box">
-    <span class="finish-live-label">Finish time</span>
+    <span class="finish-live-label">{{ bl('Finish time', '終了時間') }}</span>
     <p class="finish-live" id="finish_live_display" aria-live="polite">
       <strong id="finish_live_text">{% if form.get('finish_time') %}{{ form.get('finish_time')|format_hm_12h }}{% else %}—{% endif %}</strong>
     </p>
@@ -54,39 +55,39 @@
   </div>
   {% elif not pricing_panel_mode %}
   <label>
-    Duration (hours)
+    {{ bl('Duration (hours)', '作業時間（時間）') }}
     <input type="number" name="duration_hours" id="duration_hours"
            min="0.5" max="24" step="0.25"
            placeholder="e.g. 3"
            value="{{ form.get('duration_hours', '10') }}">
   </label>
   <label>
-    Finish time
+    {{ bl('Finish time', '終了時間') }}
     <input type="time" name="finish_time" id="finish_time"
            value="{{ form.get('finish_time', '') }}">
   </label>
   {% else %}
   <label>
-    Finish time
+    {{ bl('Finish time', '終了時間') }}
     <input type="time" name="finish_time" id="finish_time"
            value="{{ form.get('finish_time', '') }}">
   </label>
   {% endif %}
   {% if not new_booking_mode %}
   <label>
-    Actual start time
+    {{ bl('Actual start time', '実際の開始時間') }}
     <input type="time" name="actual_start_time" id="actual_start_time"
            value="{{ form.get('actual_start_time', '') }}">
     <span class="field-hint">Actual work start. Does not change scheduled or invoice times.</span>
   </label>
   <label>
-    Actual finish time
+    {{ bl('Actual finish time', '実際の終了時間') }}
     <input type="time" name="actual_finish_time" id="actual_finish_time"
            value="{{ form.get('actual_finish_time', '') }}">
     <span class="field-hint">Actual work finish. Separate from scheduled finish time.</span>
   </label>
   <div class="finish-live-box">
-    <span class="finish-live-label">Actual duration</span>
+    <span class="finish-live-label">{{ bl('Actual duration', '実際の作業時間') }}</span>
     <p class="finish-live" aria-live="polite">
       <strong>{{ form.get('actual_duration_label') or '—' }}</strong>
     </p>
@@ -94,12 +95,12 @@
   </div>
   {% endif %}
   <label>
-    Number of movers *
+    {{ bl('Number of movers *', '作業人数') }}
     <input type="number" name="num_movers" id="num_movers" min="1" max="20" required
            value="{{ form.get('num_movers', '2') }}">
   </label>
   <fieldset class="full-width crew-fieldset">
-    <legend>Crew</legend>
+    <legend>{{ bl('Crew', '担当スタッフ') }}</legend>
     <div class="crew-checkboxes">
       {% for name in crew_options %}
       <label class="crew-option">
@@ -111,7 +112,7 @@
     </div>
   </fieldset>
   <label>
-    Truck assigned
+    {{ bl('Truck assigned', '使用トラック') }}
     <select name="truck_assigned">
       <option value="">— Select truck —</option>
       {% for truck in truck_options %}
@@ -122,10 +123,11 @@
   </label>
   {% include '_crew_warnings.html' %}
   <label class="full-width">
-    Pickup address *
+    {{ bl('Pickup address *', '引越し元住所') }}
     <input type="text" name="pickup_address" required
            placeholder="Street, suburb, WA"
            value="{{ form.get('pickup_address', '') }}">
+    <span class="placeholder-ja-hint" lang="ja" aria-hidden="true">例：2/155 Stock Rd, Attadale WA</span>
   </label>
   {% if form.get('pickup_address') or form.get('delivery_address') %}
   <div class="full-width">
@@ -135,13 +137,14 @@
   </div>
   {% endif %}
   <label class="full-width">
-    Delivery address *
+    {{ bl('Delivery address *', '引越し先住所') }}
     <input type="text" name="delivery_address" required
            placeholder="Street, suburb, WA"
            value="{{ form.get('delivery_address', '') }}">
+    <span class="placeholder-ja-hint" lang="ja" aria-hidden="true">例：2/155 Stock Rd, Attadale WA</span>
   </label>
   <label class="full-width">
-    Notes
+    {{ bl('Notes', '備考') }}
     <textarea name="notes" rows="3"
               placeholder="Stairs, parking, fragile items, access codes…">{{ form.get('notes', '') }}</textarea>
   </label>

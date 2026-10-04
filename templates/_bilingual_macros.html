@@ -1,0 +1,22 @@
+{# English primary label + optional Japanese sublabel (display only). #}
+{% macro bl(en, ja) -%}
+<span class="field-label-stack"><span class="field-label-en">{{ en }}</span>{% if ja %}<span class="field-label-ja" lang="ja">{{ ja }}</span>{% endif %}</span>
+{%- endmacro %}
+
+{% macro sh(en, ja) -%}
+<span class="section-heading-stack"><span class="section-heading-en">{{ en }}</span>{% if ja %}<span class="section-heading-ja" lang="ja">{{ ja }}</span>{% endif %}</span>
+{%- endmacro %}
+
+{% macro paste_summary_ja(label) -%}
+{%- set m = {
+  'Name': '名前',
+  'Phone': '電話番号',
+  'Email': 'メールアドレス',
+  'From': '出発地',
+  'To': '到着地',
+  'Date': '日付',
+  'Start Time': '開始時間',
+  'Notes': 'メモ'
+} -%}
+{{ m.get(label, '') }}
+{%- endmacro %}

@@ -1,14 +1,15 @@
+{% from '_bilingual_macros.html' import sh, bl %}
 <section class="extra-charges-panel">
-  <h3>Extra charges</h3>
+  <h3>{{ sh('Extra charges', '追加料金') }}</h3>
   <p class="hint">Add optional fees such as stairs, piano, packing, or after-hours surcharges. Unit ($) can be negative for deductions, discounts, or credits. Amounts are GST inclusive when GST is enabled.</p>
 
   <div class="extra-charges-table-wrap">
     <table class="extra-charges-table" id="extra-charges-table">
       <thead>
         <tr>
-          <th>Description</th>
-          <th>Qty</th>
-          <th>Unit price ($)</th>
+          <th>{{ bl('Description', '内容') }}</th>
+          <th>{{ bl('Qty', '数量') }}</th>
+          <th>{{ bl('Unit price ($)', '単価') }}</th>
           <th></th>
         </tr>
       </thead>
@@ -25,7 +26,12 @@
       </tbody>
     </table>
   </div>
-  <button type="button" class="btn-secondary btn-sm" id="extra-charge-add">Add charge</button>
+  <button type="button" class="btn-secondary btn-sm" id="extra-charge-add">
+    <span class="btn-label-stack">
+      <span>Add charge</span>
+      <span class="field-label-ja" lang="ja">追加料金を追加</span>
+    </span>
+  </button>
 </section>
 
 <script>

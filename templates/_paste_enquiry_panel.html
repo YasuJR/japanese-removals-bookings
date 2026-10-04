@@ -1,21 +1,27 @@
+{% from '_bilingual_macros.html' import sh, bl, paste_summary_ja %}
 <div class="paste-enquiry-panel">
-  <h3>Paste Customer Information</h3>
+  <h3>{{ sh('Paste Customer Information', '顧客情報を貼り付け') }}</h3>
   <p class="hint muted">Paste an SMS, email, or enquiry message. Click Analyse to fill the booking form below.</p>
   <label class="paste-enquiry-label">
     <textarea name="paste_text" rows="6" class="paste-enquiry-text"
       placeholder="Hi Yasu, this is John Smith&#10;0412 345 678&#10;10 ABC St, Cannington&#10;moving to 25 XYZ Rd, Innaloo&#10;15/08/2026&#10;Start time 8:00 AM">{{ paste_text or '' }}</textarea>
   </label>
   <div class="paste-enquiry-actions">
-    <button type="submit" name="action" value="analyse_paste" class="btn-secondary" formnovalidate>Analyse</button>
+    <button type="submit" name="action" value="analyse_paste" class="btn-secondary" formnovalidate>
+      <span class="btn-label-stack">
+        <span>Analyse</span>
+        <span class="field-label-ja" lang="ja">内容を解析</span>
+      </span>
+    </button>
   </div>
 </div>
 
 {% if parsed_summary %}
 <div class="paste-enquiry-results" aria-live="polite">
-  <h4>Extracted details</h4>
+  <h4>{{ sh('Extracted details', '抽出された情報') }}</h4>
   <dl class="paste-enquiry-summary">
     {% for label, value in parsed_summary %}
-    <dt>{{ label }}</dt>
+    <dt>{{ bl(label, paste_summary_ja(label)) }}</dt>
     <dd>{{ value }}</dd>
     {% endfor %}
   </dl>

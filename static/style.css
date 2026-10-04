@@ -319,6 +319,67 @@ span.brand-mark {
   color: var(--muted);
 }
 
+/* Bilingual labels: English primary + compact Japanese sublabel */
+.field-label-stack,
+.section-heading-stack,
+.th-label-stack {
+  display: block;
+}
+
+.field-label-en,
+.section-heading-en,
+.th-label-en {
+  display: block;
+}
+
+.field-label-ja,
+.section-heading-ja,
+.th-label-ja {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.2;
+  margin-top: 0.05rem;
+}
+
+label > .field-label-stack {
+  margin-bottom: 0.18rem;
+}
+
+.crew-fieldset legend .field-label-ja {
+  font-size: 0.68rem;
+}
+
+.paste-enquiry-summary dt .field-label-ja {
+  font-size: 0.68rem;
+}
+
+.btn-label-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.02rem;
+  line-height: 1.15;
+}
+
+.btn-label-stack .field-label-ja {
+  font-size: 0.65rem;
+}
+
+.placeholder-ja-hint {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--muted);
+  margin-top: 0.12rem;
+  line-height: 1.25;
+}
+
+.extra-charges-table th {
+  vertical-align: bottom;
+}
+
 .readonly-field {
   background: var(--bg-soft, #f7f4ef);
   color: var(--navy);

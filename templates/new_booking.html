@@ -1,10 +1,11 @@
 {% extends "base.html" %}
+{% from '_bilingual_macros.html' import sh %}
 {% block title %}New booking{% endblock %}
 
 {% block content %}
 <form method="post" class="booking-form">
   <section class="panel">
-    <h2>New booking</h2>
+    <h2>{{ sh('New booking', '新規予約') }}</h2>
     <p class="hint">Paste customer details to analyse, review the fields, then confirm the booking.</p>
     {% include '_paste_enquiry_panel.html' %}
     {% include '_double_booking_banner.html' %}
@@ -18,7 +19,10 @@
 
   <div class="form-actions">
     <button type="submit" name="action" value="save" class="btn-primary">
-      {% if parsed_summary %}Confirm Booking{% else %}Save booking{% endif %}
+      <span class="btn-label-stack">
+        <span>{% if parsed_summary %}Confirm Booking{% else %}Save booking{% endif %}</span>
+        <span class="field-label-ja" lang="ja">{% if parsed_summary %}予約を確定{% else %}予約を保存{% endif %}</span>
+      </span>
     </button>
   </div>
 </form>
