@@ -550,24 +550,14 @@ a.staff-job-btn:active {
   pointer-events: none;
 }
 
-.staff-job-notes {
-  margin: 0.85rem 0 0;
-  padding: 0.7rem 0.75rem;
-  font-size: 0.95rem;
-  line-height: 1.45;
-  background: var(--cream);
-  border-radius: 8px;
-  border-left: 3px solid var(--navy-light);
+.staff-today-job-card .job-note-box,
+.staff-schedule-job .job-note-box,
+.staff-job-card .job-note-box {
+  margin-top: 0.65rem;
 }
 
-.staff-job-notes span {
-  display: block;
-  font-weight: 700;
-  color: var(--navy);
-  margin-bottom: 0.2rem;
-  text-transform: uppercase;
-  font-size: 0.78rem;
-  letter-spacing: 0.02em;
+.staff-cal-job-detail .job-note-box {
+  margin-top: 0.75rem;
 }
 
 .staff-job-scheduled {
@@ -2214,32 +2204,6 @@ a.staff-job-btn:active {
   color: var(--navy);
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-.staff-job-note {
-  margin: 0.55rem 0 0;
-  padding: 0.55rem 0.65rem;
-  border-radius: 8px;
-  background: #fff8e6;
-  border: 1px solid #f0dfa8;
-}
-
-.staff-job-note-kicker {
-  margin: 0 0 0.25rem;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  color: #8a6d1d;
-}
-
-.staff-job-note-body {
-  margin: 0;
-  font-size: 0.9rem;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--navy);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .staff-job-actions-compact {

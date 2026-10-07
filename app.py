@@ -43,7 +43,7 @@ from integrations import (
 )
 from integrations import executive_config, review_config, sms_config, xero_config, company_config, xero_branding, stripe_config, gmail_config, google_oauth
 from integrations import stripe as stripe_service
-from booking_helpers import apple_maps_url, mailto_href, sms_href, tel_href
+from booking_helpers import apple_maps_url, mailto_href, notes_display, sms_href, tel_href
 from driver_run_sheet_data import build_driver_run_sheet
 from staff_portal import STAFF_VIEW_ALL, build_staff_portal, build_staff_weekly_pdf_schedule, portal_nav_params
 import staff_auth
@@ -130,6 +130,7 @@ app.jinja_env.filters["booking_finish_time"] = lambda row: display_finish_time(
 app.jinja_env.filters["booking_crew"] = lambda row: display_crew(_row_to_dict(row))
 app.jinja_env.filters["apple_maps_url"] = apple_maps_url
 app.jinja_env.filters["tel_href"] = tel_href
+app.jinja_env.filters["notes_display"] = notes_display
 app.jinja_env.filters["sms_href"] = sms_href
 app.jinja_env.filters["mailto_href"] = mailto_href
 app.jinja_env.filters["format_hm_12h"] = format_time_12h

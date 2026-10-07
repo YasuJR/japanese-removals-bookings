@@ -5,7 +5,14 @@ import re
 from typing import Any, Dict, List
 from urllib.parse import quote
 
+from markupsafe import Markup, escape
+
 import config
+
+_URL_IN_NOTES = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
+_PHONE_IN_NOTES = re.compile(
+    r"(?<![\d.])(?:\+?61[\s\-]?|0)(?:4[\d\s\-]{7,11}|(?:\(?0?[2-578]\)?)[\d\s\-]{7,11})(?![\d])"
+)
 
 
 def apple_maps_url(address: Any) -> str:
@@ -56,6 +63,51 @@ def _clean_phone_for_sms(phone: Any) -> str:
 def tel_href(phone: Any) -> str:
     dial = _clean_phone_for_tel(phone)
     return "tel:{0}".format(dial) if dial else ""
+
+
+def _linkify_phones_in_notes_text(segment: str) -> Markup:
+    """Escape note text and wrap AU phone-like tokens in tel: links when valid."""
+    if not segment:
+        return Markup("")
+    parts: List[Markup] = []
+    cursor = 0
+    for match in _PHONE_IN_NOTES.finditer(segment):
+        parts.append(escape(segment[cursor : match.start()]))
+        phone = match.group(0)
+        href = tel_href(phone)
+        digits = _phone_digits(phone)
+        if href and len(digits) >= 9:
+            parts.append(
+                Markup(
+                    '<a href="{0}" class="job-note-link">{1}</a>'
+                ).format(escape(href), escape(phone))
+            )
+        else:
+            parts.append(escape(phone))
+        cursor = match.end()
+    parts.append(escape(segment[cursor:]))
+    return Markup("").join(parts)
+
+
+def notes_display(value: Any) -> Markup:
+    """Render booking notes: escaped, line breaks preserved, optional tel/http links."""
+    raw = str(value or "")
+    if not raw:
+        return Markup("")
+    chunks: List[Markup] = []
+    cursor = 0
+    for match in _URL_IN_NOTES.finditer(raw):
+        chunks.append(_linkify_phones_in_notes_text(raw[cursor : match.start()]))
+        url = match.group(0)
+        chunks.append(
+            Markup(
+                '<a href="{0}" class="job-note-link" rel="noopener noreferrer" '
+                'target="_blank">{1}</a>'
+            ).format(escape(url), escape(url))
+        )
+        cursor = match.end()
+    chunks.append(_linkify_phones_in_notes_text(raw[cursor:]))
+    return Markup("").join(chunks)
 
 
 def sms_href(phone: Any) -> str:

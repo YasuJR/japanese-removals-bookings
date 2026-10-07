@@ -944,6 +944,50 @@ label > .field-label-stack {
   white-space: pre-wrap;
 }
 
+/* Shared job note callout (Staff Portal + booking details) */
+.job-note-box {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.8rem;
+  border-radius: 8px;
+  background: #f7f1e3;
+  border: 1px solid #e8dcc4;
+  border-left: 3px solid var(--navy-light, #4a5d7a);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.booking-details-section .job-note-box {
+  margin-top: 1rem;
+  grid-column: 1 / -1;
+}
+
+.job-note-box-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--navy, #1a2744);
+  line-height: 1.2;
+}
+
+.job-note-box-body {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--navy, #1a2744);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.job-note-box-body a.job-note-link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .booking-details-extras {
   align-items: start;
 }

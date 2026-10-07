@@ -1,0 +1,15 @@
+{% if note_text is defined %}
+  {% set _note = note_text %}
+{% elif job is defined and job.notes %}
+  {% set _note = job.notes %}
+{% elif booking is defined and booking.notes %}
+  {% set _note = booking.notes %}
+{% else %}
+  {% set _note = '' %}
+{% endif %}
+{% if _note and _note.strip() %}
+<section class="job-note-box" aria-label="Job note">
+  <p class="job-note-box-kicker">⚠ JOB NOTE</p>
+  <div class="job-note-box-body">{{ _note|notes_display }}</div>
+</section>
+{% endif %}

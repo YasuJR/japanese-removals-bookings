@@ -33,17 +33,14 @@
         <dt>Phone</dt>
         <dd>{{ job.phone or "—" }}</dd>
       </div>
-      {% if job.notes %}
-      <div>
-        <dt>Notes</dt>
-        <dd>{{ job.notes }}</dd>
-      </div>
-      {% endif %}
       <div>
         <dt>Status</dt>
         <dd>{{ job.status_display or "—" }}</dd>
       </div>
     </dl>
+    {% with note_text=job.notes %}
+    {% include '_job_note_display.html' %}
+    {% endwith %}
     {% with job=job.job, compact_actions=true %}
     {% include "_staff_job_actions.html" %}
     {% endwith %}

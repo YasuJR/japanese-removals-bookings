@@ -109,7 +109,5 @@
     {% endif %}
   </div>
 
-  {% if job.notes %}
-  <p class="staff-job-notes"><span>Notes</span> {{ job.notes }}</p>
-  {% endif %}
+  {% include "_staff_job_note.html" %}
 </article>

@@ -45,8 +45,11 @@
       <div><dt>Crew</dt><dd>{{ booking|booking_crew }}</dd></div>
       <div><dt>Truck assigned</dt><dd>{{ booking.truck_assigned or 'Not assigned' }}</dd></div>
       <div><dt>Job status</dt><dd>{{ booking|booking_job_status }}</dd></div>
-      <div class="booking-details-notes"><dt>Notes</dt><dd>{{ booking.notes or '—' }}</dd></div>
+      {% if not booking.notes %}
+      <div class="booking-details-notes"><dt>Notes</dt><dd>—</dd></div>
+      {% endif %}
     </dl>
+    {% include '_job_note_display.html' %}
   </section>
 
   <section class="booking-details-section">
