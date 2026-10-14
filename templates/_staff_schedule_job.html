@@ -59,6 +59,12 @@
       <dd>{{ job.callout_hours_label }}</dd>
     </div>
     {% endif %}
+    {% if job.extra_pay_hours_label %}
+    <div>
+      <dt>Extra Pay</dt>
+      <dd>{{ job.extra_pay_hours_label }}</dd>
+    </div>
+    {% endif %}
     <div>
       <dt>Paid</dt>
       <dd>{{ job.paid_hours_display }}</dd>

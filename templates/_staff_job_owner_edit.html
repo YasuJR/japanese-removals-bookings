@@ -87,6 +87,21 @@
     </label>
   </div>
 
+  <div class="staff-job-owner-extrapay{% if job.has_extra_pay %} staff-job-owner-extrapay-on{% endif %}">
+    <p class="staff-job-owner-extrapay-kicker">Extra Pay</p>
+    {% if job.has_extra_pay %}
+    <p class="staff-job-owner-extrapay-status">Extra Pay: +0.5hr ✓</p>
+    <input type="hidden" name="extra_pay" value="1">
+    <button type="submit" class="staff-job-btn staff-job-owner-clear" name="action" value="clear_extra_pay">Remove Extra Pay</button>
+    {% else %}
+    <label class="staff-job-owner-extrapay-check">
+      <input type="checkbox" name="extra_pay" value="1">
+      +0.5hr
+    </label>
+    <button type="submit" class="staff-job-btn staff-job-owner-save" name="action" value="add_extra_pay">Add Extra 0.5hr Pay</button>
+    {% endif %}
+  </div>
+
   <div class="staff-job-owner-actions">
     <button type="submit" class="staff-job-btn staff-job-owner-save">Save {{ portal.staff }}&rsquo;s times</button>
     <button type="submit" class="staff-job-btn staff-job-owner-clear" name="action" value="reset_staff_times">Use Job Time</button>

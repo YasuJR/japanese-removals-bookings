@@ -2162,7 +2162,9 @@ def staff_portal_edit_booking(booking_id: int):
             flash("That staff member is not assigned to this job.", "error")
             return dest
         if action == "reset_staff_times":
-            db.delete_booking_crew_hours(booking_id, individual_crew_id)
+            staff_portal_owner.reset_staff_crew_times_to_job(
+                booking_id, individual_crew_id
+            )
             flash("Personal times reset to job time.", "success")
             return dest
         if action == "clear_actual":
@@ -2170,6 +2172,18 @@ def staff_portal_edit_booking(booking_id: int):
                 booking_id, individual_crew_id
             )
             flash("Personal actual time cleared.", "success")
+            return dest
+        if action == "add_extra_pay":
+            staff_portal_owner.set_staff_extra_pay(
+                booking_id, individual_crew_id, True
+            )
+            flash("Extra Pay +0.5hr added.", "success")
+            return dest
+        if action == "clear_extra_pay":
+            staff_portal_owner.set_staff_extra_pay(
+                booking_id, individual_crew_id, False
+            )
+            flash("Extra Pay removed.", "success")
             return dest
         ok, errors = staff_portal_owner.save_staff_crew_job_edit(
             booking_id, individual_crew_id, request.form, row

@@ -33,6 +33,9 @@
     {% if job.callout_hours_label %}
     <p class="staff-hours-callout">Call Out: {{ job.callout_hours_label }}</p>
     {% endif %}
+    {% if job.extra_pay_hours_label %}
+    <p class="staff-hours-extrapay">Extra Pay: {{ job.extra_pay_hours_label }}</p>
+    {% endif %}
     <p class="staff-hours-paid">
       <span>Paid Hours</span>
       <strong>{{ job.paid_hours_display }}</strong>

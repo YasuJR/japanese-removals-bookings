@@ -675,6 +675,7 @@ def _job_hours_payload(
     actual = staff_job_times.actual_hours(source, today)
     callout = staff_job_times.callout_hours(row)
     break_h = staff_job_times.break_hours(row)
+    extra_h = staff_job_times.extra_paid_hours(source)
     paid = staff_job_times.paid_hours(
         source, today, pricing_booking=row
     )
@@ -696,6 +697,10 @@ def _job_hours_payload(
     break_label = ""
     if break_h:
         break_label = "-{0}".format(staff_job_times.format_hours_short(break_h))
+    extra_label = ""
+    extra_minutes = staff_job_times.extra_paid_minutes(source)
+    if extra_h:
+        extra_label = "+{0}".format(staff_job_times.format_hours_short(extra_h))
     return {
         "scheduled_hours": scheduled,
         "scheduled_hours_display": staff_job_times.format_hours_short(scheduled)
@@ -708,6 +713,10 @@ def _job_hours_payload(
         "callout_hours_label": callout_label,
         "break_hours": break_h if break_h else None,
         "break_hours_label": break_label,
+        "extra_pay_hours": extra_h,
+        "extra_pay_hours_label": extra_label,
+        "extra_paid_minutes": extra_minutes,
+        "has_extra_pay": bool(extra_h),
         "paid_hours": paid,
         "paid_hours_display": paid_display,
     }

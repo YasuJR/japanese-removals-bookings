@@ -475,6 +475,7 @@ def postgres_ddl() -> List[str]:
             finish_time TEXT NOT NULL DEFAULT '',
             actual_start_time TEXT NOT NULL DEFAULT '',
             actual_finish_time TEXT NOT NULL DEFAULT '',
+            extra_paid_minutes INTEGER NOT NULL DEFAULT 0,
             UNIQUE (booking_id, crew_id)
         )
         """,

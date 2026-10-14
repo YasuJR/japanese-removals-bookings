@@ -126,7 +126,7 @@ def parse_owner_job_edit_form(
 
 def _parse_staff_crew_times_form(
     form: Any,
-) -> Tuple[Optional[Dict[str, str]], List[str]]:
+) -> Tuple[Optional[Dict[str, Any]], List[str]]:
     start = normalize_time_input(form.get("start_time") if hasattr(form, "get") else "")
     finish = normalize_time_input(form.get("finish_time") if hasattr(form, "get") else "")
     actual_start, actual_finish, _, actual_errors = (
@@ -134,12 +134,56 @@ def _parse_staff_crew_times_form(
     )
     if actual_errors:
         return None, actual_errors
+    extra_raw = str(form.get("extra_pay") if hasattr(form, "get") else "").strip()
+    extra_on = extra_raw.lower() in (
+        "1",
+        "on",
+        "true",
+        "yes",
+        str(staff_job_times.DEFAULT_EXTRA_PAID_MINUTES),
+    )
     return {
         "start_time": start,
         "finish_time": finish,
         "actual_start_time": actual_start or "",
         "actual_finish_time": actual_finish or "",
+        "extra_paid_minutes": (
+            staff_job_times.DEFAULT_EXTRA_PAID_MINUTES if extra_on else 0
+        ),
     }, []
+
+
+def _upsert_or_delete_crew_hours(
+    booking_id: int,
+    crew_id: int,
+    *,
+    start_time: str = "",
+    finish_time: str = "",
+    actual_start_time: str = "",
+    actual_finish_time: str = "",
+    extra_paid_minutes: int = 0,
+) -> None:
+    extra = staff_job_times.extra_paid_minutes(
+        {"extra_paid_minutes": extra_paid_minutes}
+    )
+    has_times = bool(
+        str(start_time or "").strip()
+        or str(finish_time or "").strip()
+        or str(actual_start_time or "").strip()
+        or str(actual_finish_time or "").strip()
+    )
+    if not has_times and extra <= 0:
+        db.delete_booking_crew_hours(booking_id, crew_id)
+        return
+    db.upsert_booking_crew_hours(
+        booking_id,
+        crew_id,
+        start_time=start_time,
+        finish_time=finish_time,
+        actual_start_time=actual_start_time,
+        actual_finish_time=actual_finish_time,
+        extra_paid_minutes=extra,
+    )
 
 
 def save_staff_crew_job_edit(
@@ -169,18 +213,57 @@ def save_staff_crew_job_edit(
         and (data["actual_finish_time"] or booking_actual_finish or "")
         == (booking_actual_finish or "")
     )
+    extra_minutes = int(data.get("extra_paid_minutes") or 0)
     if same_scheduled and same_actual:
-        db.delete_booking_crew_hours(booking_id, crew_id)
+        start_store = ""
+        finish_store = ""
+        actual_start_store = ""
+        actual_finish_store = ""
     else:
-        db.upsert_booking_crew_hours(
-            booking_id,
-            crew_id,
-            start_time=data["start_time"],
-            finish_time=data["finish_time"],
-            actual_start_time=data["actual_start_time"],
-            actual_finish_time=data["actual_finish_time"],
-        )
+        start_store = data["start_time"]
+        finish_store = data["finish_time"]
+        actual_start_store = data["actual_start_time"]
+        actual_finish_store = data["actual_finish_time"]
+    _upsert_or_delete_crew_hours(
+        booking_id,
+        crew_id,
+        start_time=start_store,
+        finish_time=finish_store,
+        actual_start_time=actual_start_store,
+        actual_finish_time=actual_finish_store,
+        extra_paid_minutes=extra_minutes,
+    )
     return True, []
+
+
+def set_staff_extra_pay(booking_id: int, crew_id: int, enabled: bool) -> None:
+    """Toggle Extra Pay +0.5hr for one staff member. Booking times unchanged."""
+    row = db.get_booking_crew_hours(booking_id, crew_id) or {}
+    extra = staff_job_times.DEFAULT_EXTRA_PAID_MINUTES if enabled else 0
+    _upsert_or_delete_crew_hours(
+        booking_id,
+        crew_id,
+        start_time=str(row.get("start_time") or ""),
+        finish_time=str(row.get("finish_time") or ""),
+        actual_start_time=str(row.get("actual_start_time") or ""),
+        actual_finish_time=str(row.get("actual_finish_time") or ""),
+        extra_paid_minutes=extra,
+    )
+
+
+def reset_staff_crew_times_to_job(booking_id: int, crew_id: int) -> None:
+    """Clear personal start/finish/actual; keep Extra Pay if set."""
+    row = db.get_booking_crew_hours(booking_id, crew_id)
+    extra = staff_job_times.extra_paid_minutes(row)
+    _upsert_or_delete_crew_hours(
+        booking_id,
+        crew_id,
+        start_time="",
+        finish_time="",
+        actual_start_time="",
+        actual_finish_time="",
+        extra_paid_minutes=extra,
+    )
 
 
 def clear_staff_crew_actual_times(booking_id: int, crew_id: int) -> None:
@@ -194,6 +277,7 @@ def clear_staff_crew_actual_times(booking_id: int, crew_id: int) -> None:
         finish_time=str(row.get("finish_time") or ""),
         actual_start_time="",
         actual_finish_time="",
+        extra_paid_minutes=staff_job_times.extra_paid_minutes(row),
     )
 
 

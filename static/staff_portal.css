@@ -448,6 +448,52 @@
   color: var(--muted);
 }
 
+.staff-job-owner-extrapay {
+  margin: 0.85rem 0 0;
+  padding: 0.75rem 0.8rem;
+  border-radius: 10px;
+  border: 2px dashed rgba(26, 39, 68, 0.28);
+  background: #f6f8fb;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.staff-job-owner-extrapay-on {
+  border-style: solid;
+  border-color: var(--navy);
+  background: #eef3ff;
+}
+
+.staff-job-owner-extrapay-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.staff-job-owner-extrapay-status {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.staff-job-owner-extrapay-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.staff-job-owner-extrapay-check input {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
 .staff-job-owner-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1012,11 +1058,18 @@ a.staff-job-btn:active {
   color: rgba(255, 255, 255, 0.8);
 }
 
-.staff-hours-callout {
+.staff-hours-callout,
+.staff-hours-break,
+.staff-hours-extrapay {
   margin: 0;
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--muted);
+}
+
+.staff-hours-extrapay {
+  color: var(--navy);
+  font-weight: 800;
 }
 
 .staff-hours-paid {

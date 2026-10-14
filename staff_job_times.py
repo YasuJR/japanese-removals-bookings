@@ -17,6 +17,8 @@ import job_status
 from booking_times import format_time_12h, normalize_time_input
 from display_dates import normalize_move_date
 
+DEFAULT_EXTRA_PAID_MINUTES = 30
+
 _CLOCK_12H = re.compile(
     r"(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp]\.?[Mm]\.?)"
 )
@@ -131,11 +133,33 @@ def parse_actual_duration_minutes(value: Any) -> Optional[int]:
     return minutes
 
 
+def extra_paid_minutes(source: Optional[Dict[str, Any]]) -> int:
+    """Staff-only extra paid minutes from booking_crew_hours. Never from bookings."""
+    if not source:
+        return 0
+    raw = source.get("extra_paid_minutes")
+    if raw is None or str(raw).strip() == "":
+        return 0
+    try:
+        minutes = int(raw)
+    except (TypeError, ValueError):
+        return 0
+    return minutes if minutes > 0 else 0
+
+
+def extra_paid_hours(source: Optional[Dict[str, Any]]) -> Optional[float]:
+    minutes = extra_paid_minutes(source)
+    if minutes <= 0:
+        return None
+    return round(minutes / 60.0, 2)
+
+
 def booking_for_crew_member(
     booking: Dict[str, Any], crew_hours: Optional[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """Overlay per-crew scheduled/actual times without changing the booking row."""
     merged = dict(booking)
+    merged.pop("extra_paid_minutes", None)
     if not crew_hours:
         return merged
     for key in (
@@ -147,6 +171,9 @@ def booking_for_crew_member(
         value = str(crew_hours.get(key) or "").strip()
         if value:
             merged[key] = value
+    extra_minutes = extra_paid_minutes(crew_hours)
+    if extra_minutes > 0:
+        merged["extra_paid_minutes"] = extra_minutes
     return merged
 
 
@@ -195,7 +222,13 @@ def get_staff_job_times(
             personal_actual_finish = parse_actual_clock(
                 crew_hours.get("actual_finish_time")
             )
-            if not personal_actual_start and not personal_actual_finish:
+            # Empty actuals mean "cleared" only when this staff also overrode
+            # start/finish. Extra Pay-only rows keep the booking actual times.
+            if (
+                not personal_actual_start
+                and not personal_actual_finish
+                and _crew_hours_has_personal_schedule(crew_hours)
+            ):
                 effective["actual_start_time"] = ""
                 effective["actual_finish_time"] = ""
                 effective["actual_duration"] = None
@@ -485,14 +518,19 @@ def paid_hours(
     *,
     pricing_booking: Optional[Dict[str, Any]] = None,
 ) -> Optional[float]:
-    """Actual Hours - Unpaid Break + Call Out. None when actual is not recorded."""
+    """Actual Hours - Unpaid Break + Call Out + Extra Pay.
+
+    Extra Pay is staff-only (booking_crew_hours.extra_paid_minutes) and is
+    never written to the booking or invoice. None when actual is not recorded.
+    """
     actual = actual_hours(booking, today)
     if actual is None:
         return None
     pricing = pricing_booking if pricing_booking is not None else booking
     callout = callout_hours(pricing) or 0.0
     break_deduction = break_hours(pricing)
-    return round(actual - break_deduction + callout, 2)
+    extra = extra_paid_hours(booking) or 0.0
+    return round(actual - break_deduction + callout + extra, 2)
 
 
 def hours_or_zero(value: Optional[float]) -> float:

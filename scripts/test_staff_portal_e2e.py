@@ -1324,6 +1324,22 @@ def test_weekly_worked_format_examples():
     ) == 3.25
     assert staff_job_times.actual_hours(
         {
+            "actual_start_time": "09:00",
+            "actual_finish_time": "11:15",
+            "extra_paid_minutes": 30,
+        }
+    ) == 2.25
+    assert staff_job_times.paid_hours(
+        {
+            "actual_start_time": "09:00",
+            "actual_finish_time": "11:15",
+            "callout_fee": 92.5,
+            "hourly_rate": 185,
+            "extra_paid_minutes": 30,
+        }
+    ) == 3.25
+    assert staff_job_times.actual_hours(
+        {
             "status": "Confirmed",
             "start_time": "13:15",
             "finish_time": "17:30",
@@ -1605,6 +1621,188 @@ def test_paid_hours_regression_cases():
     assert "Daily Paid: 7.75hr" in text
     assert "Weekly Paid Hours: 11.75hr" in text
     assert staff_job_times.paid_hours(dict(db.get_booking(case_b)), wednesday) == 4.75
+    return True
+
+
+def test_extra_pay_is_staff_only_and_adds_to_paid_hours():
+    """Extra Pay +0.5hr is per staff, Paid Hours only, never invoice/booking."""
+    import invoice
+    import staff_job_times
+    from staff_portal import build_staff_portal, build_staff_weekly_pdf_schedule
+    from integrations import weekly_schedule_pdf
+
+    names = [row["name"] for row in db.list_crew_members(active_only=False)]
+    if "Keiichi" not in names:
+        db.create_crew_member("Keiichi", role="Driver", active=1)
+
+    monday = _isolated_monday()
+    customer = _unique("ExtraPayJob")
+    booking_id = _create_job(
+        customer,
+        monday.isoformat(),
+        crew="Keiichi,Yasu",
+        start_time="09:00",
+        finish_time="11:15",
+        duration_hours="2.25",
+        callout_fee=92.5,
+        hourly_rate=185,
+        status="Completed",
+    )
+    db.save_booking_actual_times(booking_id, "09:00", "11:15", 135)
+    before_row = dict(db.get_booking(booking_id))
+    before_invoice = invoice.calculate_invoice_totals(before_row)
+    keiichi_id = _crew_id("Keiichi")
+    yasu_id = _crew_id("Yasu")
+
+    owner = _admin_staff_client("Keiichi")
+    with app.test_request_context("/staff?range=week"):
+        from flask import render_template
+        import staff_portal_owner as owner_mod
+        from crew import active_crew_names
+
+        before_html = render_template(
+            "staff_portal.html",
+            portal=build_staff_portal("Keiichi", "week", monday),
+            staff_portal_open=True,
+            staff_logged_in=True,
+            can_manage_staff_portal=True,
+            crew_options=active_crew_names(),
+            staff_portal_status_options=owner_mod.STAFF_PORTAL_STATUS_OPTIONS,
+        )
+    assert "Extra Pay" in before_html
+    assert "Add Extra 0.5hr Pay" in before_html
+
+    added = owner.post(
+        "/staff/bookings/{0}/edit".format(booking_id),
+        data={
+            "range": "week",
+            "staff_id": keiichi_id,
+            "action": "add_extra_pay",
+        },
+        follow_redirects=False,
+    )
+    assert added.status_code in (302, 303)
+
+    after_row = dict(db.get_booking(booking_id))
+    assert after_row["start_time"] == before_row["start_time"]
+    assert after_row["finish_time"] == before_row["finish_time"]
+    assert after_row["hourly_rate"] == before_row["hourly_rate"]
+    assert float(after_row["callout_fee"] or 0) == float(before_row["callout_fee"] or 0)
+    assert after_row["actual_start_time"] == before_row["actual_start_time"]
+    assert after_row["actual_finish_time"] == before_row["actual_finish_time"]
+    assert "extra_paid_minutes" not in after_row or after_row.get(
+        "extra_paid_minutes"
+    ) in (None, "", 0)
+    after_invoice = invoice.calculate_invoice_totals(after_row)
+    assert after_invoice["total"] == before_invoice["total"]
+    assert after_invoice["hours"] == before_invoice["hours"]
+    assert after_invoice["callout_fee"] == before_invoice["callout_fee"]
+
+    crew_row = db.get_booking_crew_hours(booking_id, keiichi_id)
+    assert crew_row is not None
+    assert int(crew_row["extra_paid_minutes"]) == 30
+    assert db.get_booking_crew_hours(booking_id, yasu_id) is None
+
+    keiichi = [
+        job
+        for job in build_staff_portal("Keiichi", "week", monday)["jobs"]
+        if job["id"] == booking_id
+    ][0]
+    yasu = [
+        job
+        for job in build_staff_portal("Yasu", "week", monday)["jobs"]
+        if job["id"] == booking_id
+    ][0]
+    all_job = [
+        job
+        for job in build_staff_portal(
+            view_staff_id="all", range_key="week", today=monday
+        )["jobs"]
+        if job["id"] == booking_id
+    ][0]
+    assert keiichi["actual_hours_display"] == "2.25hr"
+    assert keiichi["extra_pay_hours_label"] == "+0.5hr"
+    assert keiichi["has_extra_pay"] is True
+    assert keiichi["paid_hours_display"] == "3.25hr"
+    assert yasu["actual_hours_display"] == "2.25hr"
+    assert not yasu.get("extra_pay_hours_label")
+    assert yasu["paid_hours_display"] == "2.75hr"
+    assert not all_job.get("extra_pay_hours_label")
+    assert all_job["paid_hours_display"] == "2.75hr"
+
+    keiichi_week = build_staff_portal("Keiichi", "week", monday)
+    yasu_week = build_staff_portal("Yasu", "week", monday)
+    assert keiichi_week["weekly_worked"]["paid_display"] == "3.25hr"
+    assert yasu_week["weekly_worked"]["actual_display"] == "2.25hr"
+    assert yasu_week["weekly_worked"]["paid_display"] == "2.75hr"
+
+    history = build_staff_portal("Keiichi", "history", monday + timedelta(days=14))
+    hist_jobs = [
+        job
+        for week in history.get("history_weeks") or []
+        for job in week.get("jobs") or []
+        if job["id"] == booking_id
+    ]
+    assert hist_jobs
+    assert hist_jobs[0]["paid_hours_display"] == "3.25hr"
+    assert hist_jobs[0]["extra_pay_hours_label"] == "+0.5hr"
+
+    pdf = build_staff_weekly_pdf_schedule(keiichi_id, 0, monday)
+    pdf_bytes = weekly_schedule_pdf.render_staff_weekly_schedule_pdf(pdf)
+    text = _pdf_plain_text(pdf_bytes)
+    assert "3.25hr" in text
+
+    with app.test_request_context("/staff?range=week"):
+        from flask import render_template
+        import staff_portal_owner as owner_mod
+        from crew import active_crew_names
+
+        owner_html = render_template(
+            "staff_portal.html",
+            portal=build_staff_portal("Keiichi", "week", monday),
+            staff_portal_open=True,
+            staff_logged_in=True,
+            can_manage_staff_portal=True,
+            crew_options=active_crew_names(),
+            staff_portal_status_options=owner_mod.STAFF_PORTAL_STATUS_OPTIONS,
+        )
+        yasu_html = render_template(
+            "staff_portal.html",
+            portal=build_staff_portal("Yasu", "week", monday),
+            staff_portal_open=True,
+            staff_logged_in=True,
+            can_manage_staff_portal=True,
+            crew_options=active_crew_names(),
+            staff_portal_status_options=owner_mod.STAFF_PORTAL_STATUS_OPTIONS,
+        )
+    assert "Extra Pay: +0.5hr" in owner_html
+    assert customer in yasu_html
+    assert "Extra Pay: +0.5hr" not in yasu_html
+
+    removed = owner.post(
+        "/staff/bookings/{0}/edit".format(booking_id),
+        data={
+            "range": "week",
+            "staff_id": keiichi_id,
+            "action": "clear_extra_pay",
+        },
+        follow_redirects=False,
+    )
+    assert removed.status_code in (302, 303)
+    assert db.get_booking_crew_hours(booking_id, keiichi_id) is None
+    keiichi_after = [
+        job
+        for job in build_staff_portal("Keiichi", "week", monday)["jobs"]
+        if job["id"] == booking_id
+    ][0]
+    yasu_after = [
+        job
+        for job in build_staff_portal("Yasu", "week", monday)["jobs"]
+        if job["id"] == booking_id
+    ][0]
+    assert keiichi_after["paid_hours_display"] == "2.75hr"
+    assert not keiichi_after.get("extra_pay_hours_label")
+    assert yasu_after["paid_hours_display"] == "2.75hr"
     return True
 
 
@@ -3225,6 +3423,7 @@ def main():
         test_paid_hours_invoice_confirmed_when_status_still_confirmed,
         test_paid_hours_break_deduction_cases,
         test_paid_hours_regression_cases,
+        test_extra_pay_is_staff_only_and_adds_to_paid_hours,
         test_star_points_adjust_bounds_and_isolation,
         test_star_points_persist_after_reload_and_rename,
         test_star_points_admin_only_and_viewer_sees_display,

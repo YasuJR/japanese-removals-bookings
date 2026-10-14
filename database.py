@@ -184,6 +184,7 @@ def _ensure_booking_crew_hours_table(conn) -> None:
                 finish_time TEXT NOT NULL DEFAULT '',
                 actual_start_time TEXT NOT NULL DEFAULT '',
                 actual_finish_time TEXT NOT NULL DEFAULT '',
+                extra_paid_minutes INTEGER NOT NULL DEFAULT 0,
                 UNIQUE (booking_id, crew_id)
             )
             """
@@ -199,6 +200,7 @@ def _ensure_booking_crew_hours_table(conn) -> None:
                 finish_time TEXT NOT NULL DEFAULT '',
                 actual_start_time TEXT NOT NULL DEFAULT '',
                 actual_finish_time TEXT NOT NULL DEFAULT '',
+                extra_paid_minutes INTEGER NOT NULL DEFAULT 0,
                 UNIQUE (booking_id, crew_id)
             )
             """
@@ -207,6 +209,16 @@ def _ensure_booking_crew_hours_table(conn) -> None:
         "CREATE INDEX IF NOT EXISTS idx_booking_crew_hours_booking "
         "ON booking_crew_hours(booking_id)"
     )
+    _ensure_booking_crew_hours_columns(conn)
+
+
+def _ensure_booking_crew_hours_columns(conn) -> None:
+    existing = db_backend.table_columns(conn, "booking_crew_hours")
+    if "extra_paid_minutes" not in existing:
+        conn.execute(
+            "ALTER TABLE booking_crew_hours "
+            "ADD COLUMN extra_paid_minutes INTEGER NOT NULL DEFAULT 0"
+        )
 
 
 def _ensure_star_point_history_table(conn) -> None:
@@ -1952,7 +1964,7 @@ def get_booking_crew_hours(booking_id: int, crew_id: int) -> Optional[Dict[str, 
         row = conn.execute(
             """
             SELECT booking_id, crew_id, start_time, finish_time,
-                   actual_start_time, actual_finish_time
+                   actual_start_time, actual_finish_time, extra_paid_minutes
             FROM booking_crew_hours
             WHERE booking_id = ? AND crew_id = ?
             """,
@@ -1978,19 +1990,27 @@ def upsert_booking_crew_hours(
     finish_time: str = "",
     actual_start_time: str = "",
     actual_finish_time: str = "",
+    extra_paid_minutes: int = 0,
 ) -> None:
+    try:
+        extra_minutes = int(extra_paid_minutes or 0)
+    except (TypeError, ValueError):
+        extra_minutes = 0
+    if extra_minutes < 0:
+        extra_minutes = 0
     with get_connection() as conn:
         conn.execute(
             """
             INSERT INTO booking_crew_hours (
                 booking_id, crew_id, start_time, finish_time,
-                actual_start_time, actual_finish_time
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                actual_start_time, actual_finish_time, extra_paid_minutes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(booking_id, crew_id) DO UPDATE SET
                 start_time = excluded.start_time,
                 finish_time = excluded.finish_time,
                 actual_start_time = excluded.actual_start_time,
-                actual_finish_time = excluded.actual_finish_time
+                actual_finish_time = excluded.actual_finish_time,
+                extra_paid_minutes = excluded.extra_paid_minutes
             """,
             (
                 booking_id,
@@ -1999,6 +2019,7 @@ def upsert_booking_crew_hours(
                 str(finish_time or "").strip(),
                 str(actual_start_time or "").strip(),
                 str(actual_finish_time or "").strip(),
+                extra_minutes,
             ),
         )
         conn.commit()
@@ -2015,7 +2036,7 @@ def map_booking_crew_hours(
         rows = conn.execute(
             """
             SELECT booking_id, crew_id, start_time, finish_time,
-                   actual_start_time, actual_finish_time
+                   actual_start_time, actual_finish_time, extra_paid_minutes
             FROM booking_crew_hours
             WHERE booking_id IN ({0}) AND crew_id = ?
             """.format(
