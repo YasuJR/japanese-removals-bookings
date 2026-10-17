@@ -1,5 +1,7 @@
 # Japanese Removals — Booking System
 
+> **Developers / Claude Code:** start with [CLAUDE.md](CLAUDE.md) — architecture, business rules, tests, deploy. This README covers only first-time local setup.
+
 A simple, local booking manager for **Japanese Removals** (Perth, WA).
 
 ## What it does
