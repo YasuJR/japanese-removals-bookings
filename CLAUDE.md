@@ -31,7 +31,7 @@ curl -s https://japanese-removals-bookings.onrender.com/health | python3 -m json
 | DB | Local: SQLite `bookings.db` (gitignored). Production: Render PostgreSQL `japanese-removals-db` |
 | Prod web | Render service `japanese-removals-bookings`, `gunicorn wsgi:app --workers 2 --timeout 120`, health check `/health` |
 | Prod URL | https://japanese-removals-bookings.onrender.com |
-| Cron | Render cron `xero-payment-sync` every 15 min → `scripts/run_xero_payment_sync.py` (only cron in `render.yaml`) |
+| Cron | `render.yaml` defines cron `xero-payment-sync` (every 15 min → `scripts/run_xero_payment_sync.py`), but **as of 2026-10-17 it does not exist on Render**. Only the web service is deployed, and the dashboard shows "Last Xero Sync: 24 Aug 2026". See §17 |
 | Repo | https://github.com/YasuJR/japanese-removals-bookings (branch `main`) |
 | Timezone | `Australia/Perth` everywhere (`config.TIMEZONE`, `perth_today()`) |
 
@@ -345,7 +345,9 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 
 ## 14. Git / GitHub push
 
-- Remote `origin` = `https://github.com/YasuJR/japanese-removals-bookings.git`. Auth is the macOS keychain plus `gh` (logged in as `YasuJR`).
+- Remote `origin` = `https://github.com/YasuJR/japanese-removals-bookings.git`. Auth: `gh` is logged in as `YasuJR`.
+  - If plain `git push` fails with `could not read Username … Device not configured` (the keychain is not reachable from the Claude Code shell), push with:
+    `git -c credential.helper= -c credential.helper='!gh auth git-credential' push origin main`
 - Work directly on `main` (the historical workflow), or on a branch with a PR via `gh pr create` if Yasu prefers review.
 - Commit style: imperative one-line summary ending with a period (e.g. `Fix double booking override to require same truck, not just time overlap.`), a short body explaining why, and the Claude `Co-Authored-By` trailer.
 - Before pushing: run the relevant tests above, `git status` (don't commit `test_results` noise unless intended), then `git push origin main`.
@@ -357,7 +359,11 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
    - To force a deploy: `TRIGGER_RENDER_DEPLOY=1 python scripts/deploy_production_and_verify.py`, which calls `render_link_database.py --deploy --clear-cache`. This needs `RENDER_API_KEY` or `render login`.
 3. Optional prod checks: `verify_production_*.py` for the area you changed.
 4. **Rollback:** Render Dashboard → Deploys → "Rollback to this deploy". This does **not** revert the DB (`docs/ROLLBACK.md`).
-- Render CLI: a vendored binary is in `.bin/` (gitignored), or `render` if installed.
+- Render CLI: a vendored binary is at `.bin/cli_v2.17.0` (gitignored); `render` is not on PATH.
+  - Scripts read the API key from `RENDER_API_KEY` or `~/.render/cli.yaml`. That CLI token **expires** (check `expires_at`); expired means Render API calls return 401.
+  - Refresh with `.bin/cli_v2.17.0 login`, a browser device-code flow that Yasu approves. Run it in the background and give Yasu the printed URL and code.
+- Production office credentials for verify scripts come from the Render env vars `STAFF_USERNAME` / `STAFF_PASSWORD` via the API. Never print them.
+- Xero credentials in prod live in the DB (`integration_settings`), not in env vars. `verify_production_xero_payment_sync.py` reporting "env vars missing" is expected.
 - Production DB access: Render Dashboard → `japanese-removals-db` → connection string / Shell. Back up with `pg_dump "$DATABASE_URL" -Fc -f backup-YYYYMMDD.dump` before risky data changes.
 
 ---
@@ -393,6 +399,7 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 - Staff Portal "All Staff" owner edit recomputes `callout_fee` (losing overrides) and forces GST 0 → 1 (`staff_portal_owner.save_owner_job_edit`).
 - An invoiced job whose status is still Confirmed shows a "CONFIRMED" badge and counts as upcoming in the portal, even though its hours are counted.
 - In `edit_booking`, a rejected double-booking edit still persists the field changes (see §8).
+- **Xero payment sync cron is not deployed.** The Render service list (2026-10-17) only shows the web service `japanese-removals-bookings`. The blueprint cron `xero-payment-sync` was never created, so bank-transfer payments in Xero are not auto-marked Paid; there is a manual sync button on `/dashboard`. Creating it (Render Dashboard → New → Cron Job, or Blueprint sync) costs money, so it is Yasu's decision.
 - Cron scripts for Gmail, SMS, review and payment reminders exist (`scripts/run_*.py`) but are **not** scheduled in `render.yaml`.
 - `CRON_SECRET` is defined but unused.
 
