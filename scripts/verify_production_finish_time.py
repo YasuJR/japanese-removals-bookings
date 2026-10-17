@@ -69,7 +69,10 @@ def _load_staff_credentials_from_render() -> tuple[str, str]:
     api_key = _load_render_api_key()
     if not api_key:
         return "", ""
-    services = _unwrap(_render_api("/services?limit=100", api_key))
+    try:
+        services = _unwrap(_render_api("/services?limit=100", api_key))
+    except urllib.error.HTTPError:
+        return "", ""
     service = next((s for s in services if s.get("name") == SERVICE_NAME), None)
     if not service:
         return "", ""
@@ -87,7 +90,10 @@ def _latest_deploy_status() -> dict:
     api_key = _load_render_api_key()
     if not api_key:
         return {"status": "unknown", "detail": "No Render API key"}
-    services = _unwrap(_render_api("/services?limit=100", api_key))
+    try:
+        services = _unwrap(_render_api("/services?limit=100", api_key))
+    except urllib.error.HTTPError as exc:
+        return {"status": "unknown", "detail": "Render API {0}".format(exc.code)}
     service = next((s for s in services if s.get("name") == SERVICE_NAME), None)
     if not service:
         return {"status": "unknown", "detail": "Service not found"}
@@ -281,12 +287,25 @@ def _first_existing_booking_id(client: ProductionClient) -> int | None:
 
 def main() -> int:
     results: list[dict] = []
-    username, password = _load_staff_credentials_from_render()
+    username = (
+        os.environ.get("PRODUCTION_TEST_USERNAME")
+        or os.environ.get("STAFF_USERNAME")
+        or ""
+    ).strip()
+    password = (
+        os.environ.get("PRODUCTION_TEST_PASSWORD")
+        or os.environ.get("STAFF_PASSWORD")
+        or ""
+    ).strip()
     if not username or not password:
-        username = (os.environ.get("STAFF_USERNAME") or "").strip()
-        password = (os.environ.get("STAFF_PASSWORD") or "").strip()
+        render_user, render_pass = _load_staff_credentials_from_render()
+        username = username or render_user
+        password = password or render_pass
     if not username or not password:
-        print("FAIL: Set STAFF_USERNAME/STAFF_PASSWORD or Render API key")
+        print(
+            "FAIL: Set PRODUCTION_TEST_USERNAME/PRODUCTION_TEST_PASSWORD "
+            "or STAFF_USERNAME/STAFF_PASSWORD."
+        )
         return 1
 
     deploy = _latest_deploy_status()
