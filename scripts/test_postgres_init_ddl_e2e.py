@@ -17,9 +17,16 @@ import db_backend
 def test_booking_crew_hours_postgres_ddl_has_no_sqlite_autoincrement():
     recorded: list[str] = []
 
+    class _Cursor:
+        def fetchall(self):
+            return [{"column_name": "extra_paid_minutes"}]
+
     class _Conn:
+        _is_postgres = True
+
         def execute(self, sql: str, params=()):
             recorded.append(sql)
+            return _Cursor()
 
     with mock.patch.object(db_backend, "is_postgres", return_value=True):
         db._ensure_booking_crew_hours_table(_Conn())
