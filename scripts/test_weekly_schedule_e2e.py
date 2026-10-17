@@ -19,8 +19,11 @@ import weekly_schedule_data
 from app import app
 from integrations import weekly_schedule_pdf
 
-SCREENSHOT_DIR = Path("/opt/cursor/artifacts/screenshots")
-PDF_DIR = Path("/opt/cursor/artifacts")
+ARTIFACT_DIR = Path(
+    os.environ.get("TEST_ARTIFACT_DIR") or ROOT / "test_results" / "artifacts"
+)
+SCREENSHOT_DIR = ARTIFACT_DIR / "screenshots"
+PDF_DIR = ARTIFACT_DIR
 _test_user_counter = 0
 
 

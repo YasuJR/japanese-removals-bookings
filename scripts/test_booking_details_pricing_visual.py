@@ -16,7 +16,10 @@ from dashboard_data import perth_today
 
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-local-tests-only")
 
-SCREENSHOT_DIR = Path("/opt/cursor/artifacts/screenshots")
+SCREENSHOT_DIR = (
+    Path(os.environ.get("TEST_ARTIFACT_DIR") or ROOT / "test_results" / "artifacts")
+    / "screenshots"
+)
 AMOUNT_LABELS = {
     "Hourly rate",
     "Callout fee",

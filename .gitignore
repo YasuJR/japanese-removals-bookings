@@ -7,3 +7,4 @@ bookings.db
 credentials/*.json
 !credentials/.gitkeep
 .bin/
+test_results/artifacts/
