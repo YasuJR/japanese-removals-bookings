@@ -124,7 +124,7 @@ When adding a route: put it in `app.py` near its area, use the right decorator, 
   - The staff identity is in a separate signed cookie `jr_staff_portal` (path `/staff`, 14 days), **not** in the Flask session.
 - **Owner controls** (`staff_portal_owner.can_manage_staff_portal` = office user with `is_admin`): ✎ Edit on job cards, rename crew (also rewrites `bookings.crew` CSVs), Star Points admin.
 - **Owner edit semantics** (`/staff/bookings/<id>/edit`):
-  - `staff_id=<crew id>` → writes **only** `booking_crew_hours` for that person (`save_staff_crew_job_edit`). If the values equal the booking's, the row is deleted. `action=reset_staff_times` deletes it ("Use Job Time"). `action=clear_actual` blanks that person's actuals.
+  - `staff_id=<crew id>` → writes **only** `booking_crew_hours` for that person (`save_staff_crew_job_edit`; plus `add_extra_pay` / `clear_extra_pay`). If everything equals the booking's and there is no Extra Pay, the row is deleted. `action=reset_staff_times` ("Use Job Time") clears personal times but keeps Extra Pay. `action=clear_actual` blanks that person's actuals.
   - `staff_id=all` → `save_owner_job_edit` updates the booking itself (times, actuals, call-out, status, crew, notes). Known quirks: it recomputes `callout_fee` from minutes (drops any manual override), and `gst_enabled=int(x or 1)` turns GST 0 into 1.
 
 ---
@@ -133,14 +133,18 @@ When adding a route: put it in `app.py` near its area, use the right decorator, 
 
 ```
 booking_crew_hours(id, booking_id, crew_id, start_time, finish_time,
-                   actual_start_time, actual_finish_time, UNIQUE(booking_id, crew_id))
+                   actual_start_time, actual_finish_time,
+                   extra_paid_minutes INTEGER NOT NULL DEFAULT 0,   -- Extra Pay (ac82c0b)
+                   UNIQUE(booking_id, crew_id))
 ```
 - Postgres has FKs with `ON DELETE CASCADE`. SQLite has no FKs, so orphans are possible. Index on `booking_id`.
 - DB API: `get_booking_crew_hours`, `upsert_booking_crew_hours` (ON CONFLICT replace), `delete_booking_crew_hours`, `map_booking_crew_hours(ids, crew_id)`.
 - **Always read times through `staff_job_times.get_staff_job_times(booking, crew_id=, crew_hours=)`.**
   - `crew_id=None` (All Staff) → the booking row as-is.
   - With a crew id → the person's non-empty fields are overlaid on a copy of the booking.
-  - **Invariant:** if the person has a row but both of its actual times are empty, booking-level actuals are **cleared** for them. They never inherit another crew member's or the booking's actuals.
+  - **Invariant:** if the person's row has a personal start/finish but no actual times, booking-level actuals are **cleared** for them. A row that only carries Extra Pay (no personal start/finish) keeps the booking actuals (`_crew_hours_has_personal_schedule`). Nobody ever inherits another crew member's row.
+  - `extra_paid_minutes` is **only** read from the crew row (`booking_for_crew_member` pops any booking-level value).
+  - "Use Job Time" (`reset_staff_crew_times_to_job`) and "clear actual" keep Extra Pay. A row is deleted only when everything, Extra Pay included, matches the job (`_upsert_or_delete_crew_hours`).
 - **Invariants:**
   - A per-crew edit must never write to `bookings`.
   - A booking-level edit must never touch `booking_crew_hours`.
@@ -152,9 +156,13 @@ booking_crew_hours(id, booking_id, crew_id, start_time, finish_time,
 
 ### Staff Portal paid hours (`staff_job_times.paid_hours`)
 ```
-paid = round(actual_hours − break_hours + callout_hours, 2)     # None if actual_hours is None
+paid = round(actual_hours − break_hours + callout_hours + extra_pay_hours, 2)   # None if actual_hours is None
 ```
-Actual comes from the per-crew `effective_row`. Break and call-out come from the booking.
+Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out come from the booking.
+
+- **Extra Pay** (ac82c0b) is a per-staff "+0.5hr" (`DEFAULT_EXTRA_PAID_MINUTES = 30`), stored in `booking_crew_hours.extra_paid_minutes`.
+  - The owner toggles it in the individual-staff Edit panel (`action=add_extra_pay` / `clear_extra_pay` → `staff_portal_owner.set_staff_extra_pay`).
+  - It is staff pay only. It **never** touches the invoice, booking times, or All Staff job hours.
 
 **`actual_hours` precedence** (`staff_job_times.actual_hours`):
 1. Cancelled → `None`.
@@ -313,14 +321,23 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 | Postgres boot | `test_postgres_init_ddl_e2e.py`, `test_postgres_invoice_sequence_init.py` |
 | Misc | `test_booking_cancel_e2e.py`, `test_mover_pricing_e2e.py`, `test_payment_sets_completed_e2e.py`, `test_navigation_e2e.py`, `test_search_invoice_number_e2e.py`, `test_job_note_display_e2e.py` |
 
-**Known test-baseline issues (as of 2026-10-17):**
+**Known test-baseline issues (as of 2026-10-17, verified identical on clean worktrees of `origin/main` = production code):**
+- **Stale since 32b3313 (callout_minutes):** these tests post `callout_fee` without `callout_minutes`. The server now derives the fee from minutes, and missing minutes count as 0, so the expected totals are off:
+  - `test_invoice_edit_e2e.py` (5/8), `test_invoice_duration_from_times_e2e.py` (10/12), `test_edit_booking_save_unifies_invoice_e2e.py` (4/5), `test_invoice_negative_adjustments_e2e.py` (8/9), `test_booking_details_e2e.py` (9/11), `test_edit_finish_time_e2e.py` (1–3/4).
+  - Fix by adding `callout_minutes` to their form fixtures (pending Yasu's OK). Real forms always send `callout_minutes`.
+- `test_daily_jobs_e2e.py` passes 8/8 on a fresh DB but fails 2 tests against the cluttered local `bookings.db`.
+- Tip: for a clean baseline, run tests in a throwaway worktree (`git worktree add /tmp/x HEAD`). It gets its own fresh `bookings.db`; call the main repo's `.venv/bin/python scripts/...` from inside it.
 - `test_phase14_double_booking_e2e.py` Test D fails locally. Leftover bookings from earlier runs sit on the same relative date (today+63, no truck), so they conflict. It is a test-isolation problem, not a code bug, and fails on clean `main` too.
 - `test_staff_portal_e2e.py` was flaky once (63/65, then 65/65 on rerun).
 - `test_weekly_schedule_e2e.py` and `test_booking_details_pricing_visual.py` need Playwright for screenshots. Artifacts go to `test_results/artifacts/` (override with `TEST_ARTIFACT_DIR`).
 
 **Tests that hit production or real APIs (run only when asked):**
 - `verify_production_*.py`, `test_production_readiness.py --production`, `deploy_production_and_verify.py`, `diagnose_production_environment.py`, `smoke_live_booking.py`.
-- `test_production_booking_cancel.py` **creates a booking in production**.
+- **Write to production data — do not run without explicit permission:**
+  - `test_production_booking_cancel.py` creates and cancels a booking.
+  - `verify_production_finish_time.py` creates and edits a booking.
+  - `verify_production_star_points.py` **resets a real crew member's Star Points to 0** and then increments them.
+- Read-only and safe: `verify_production_daily_jobs.py`, `verify_production_crew_times.py`, `verify_production_calendar_sort.py`, `verify_production_staff_calendar.py`, `verify_production_xero_payment_sync.py`, `verify_production_paste.py` (Analyse only, no save), `deploy_production_and_verify.py`.
 - Xero / Stripe / Google scripts: `test_xero_*`, `test_phase7/8_*`, `verify_stripe_integration.py`, `verify_google_calendar.py`, `resync_xero_invoices.py`, and similar.
 - Results land in `test_results/<phase>/*.json`; these are committed, and re-runs dirty them.
 
@@ -358,7 +375,7 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 | e9d87fd | Staff week calendar missed jobs (stale `day` param) → bounds come only from the week offset |
 | 090fcce / b73416d | Week columns clipped or horizontal scroll → layout fit |
 | 50ee72d / d7c04ed | One crew member's time edit changed everyone's → `booking_crew_hours` plus `get_staff_job_times` |
-| a9c29b4 | Paid hours ignored breaks → Paid = Actual − Break + Call out |
+| a9c29b4 | Paid hours ignored breaks → Paid = Actual − Break + Call out (+ Extra Pay since ac82c0b) |
 | ef0a456 | Invoiced-but-Confirmed jobs had 0 paid hours → invoice-issued fallback |
 | 18c37ae / 5b46f43 | Weekly worked showed 0hr → use start/finish or duration |
 | d1cbc00 / 279b4e7 | Finish time overwritten by a stale duration, `HH:MM:SS` not parsed → Finish is the source of truth |
@@ -381,7 +398,8 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 
 ## 18. Tooling notes
 
-- This project was developed with Cursor until 2026-10. The ~112 old commits with a `Co-authored-by: Cursor` trailer are history only. There are no Cursor config files, rules or MCP dependencies in the repo.
+- This project was developed with Cursor until 2026-10. The ~113 old commits with a `Co-authored-by: Cursor` trailer are history only. There are no Cursor config files, rules or MCP dependencies in the repo.
+- **Watch for Cursor background agents still pushing to `main`.** ac82c0b (2026-10-14, author `Cursor Agent`) was pushed straight to `main` and auto-deployed. Always `git fetch` and check `git log main..origin/main` before starting work. If Yasu wants Claude Code only, disconnect the Cursor GitHub integration (github.com → Settings → Applications → Cursor, and Cursor Dashboard → Background Agents / Integrations).
 - Use Claude Code for everything: Bash / git / `gh` / Render API scripts.
 - Browser checks: use Playwright (as the visual test scripts do) or Claude in Chrome against `http://127.0.0.1:5001`.
 - Keep this file updated. When you fix a notable bug or change a rule (pay, invoice, conflict, schema), update the relevant section and §16 in the same commit.
