@@ -1683,11 +1683,13 @@ def list_by_move_dates_grouped(
     """
     from collections import defaultdict
 
+    from display_dates import normalize_move_date
+
     dates = sorted(
         {
-            (item.get("move_date") or "").strip()[:10]
+            normalize_move_date(item.get("move_date"))
             for item in bookings
-            if (item.get("move_date") or "").strip()
+            if normalize_move_date(item.get("move_date"))
         }
     )
     if not dates:
@@ -1697,7 +1699,7 @@ def list_by_move_dates_grouped(
     grouped: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for row in rows:
         item = dict(row)
-        key = (item.get("move_date") or "").strip()[:10]
+        key = normalize_move_date(item.get("move_date"))
         if key:
             grouped[key].append(item)
     return dict(grouped)
