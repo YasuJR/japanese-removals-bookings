@@ -19,6 +19,7 @@ curl -s https://japanese-removals-bookings.onrender.com/health | python3 -m json
 - Compare `/health.git_commit` with `git rev-parse origin/main` — tells you whether production is up to date.
 - **Never** `export DATABASE_URL=...` in your shell while running tests — every test script would write to that Postgres (production!).
 - Commit / push / deploy only when Yasu asks. Pushing `main` = deploying to production (Render auto-deploys).
+- Check **§19 TODO** for open tasks.
 
 ---
 
@@ -410,3 +411,14 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 - Use Claude Code for everything: Bash / git / `gh` / Render API scripts.
 - Browser checks: use Playwright (as the visual test scripts do) or Claude in Chrome against `http://127.0.0.1:5001`.
 - Keep this file updated. When you fix a notable bug or change a rule (pay, invoice, conflict, schema), update the relevant section and §16 in the same commit.
+
+## 19. TODO (open tasks)
+
+Remove an item from this list in the same commit that finishes it.
+
+- [ ] **Xero payment sync cron.** `render.yaml` defines cron `xero-payment-sync` (every 15 min, `python scripts/run_xero_payment_sync.py`), but it was never created on Render (checked 2026-10-17). The last automatic sync was 24 Aug 2026.
+  - To do: create it (Render Dashboard → New → Cron Job, or Blueprint sync). It needs the same env vars as the web service: `DATABASE_URL`, the Xero settings, and `SECRET_KEY`. Xero OAuth credentials are stored in the DB.
+  - Then confirm the first run marks Xero-paid bookings as Paid.
+  - Costs money on Render, so get Yasu's OK first. Until then, use the manual sync button on `/dashboard`. See §1 and §17.
+- [ ] **Stale call-out tests.** Six tests post `callout_fee` without `callout_minutes` (pre-32b3313 style), so they fail on production code: `test_invoice_edit_e2e.py`, `test_invoice_duration_from_times_e2e.py`, `test_edit_booking_save_unifies_invoice_e2e.py`, `test_invoice_negative_adjustments_e2e.py`, `test_booking_details_e2e.py`, `test_edit_finish_time_e2e.py`.
+  - To do: add `callout_minutes` to their form fixtures, update the expected totals (fee = rate × minutes / 60), and confirm they pass in a clean worktree. Details in §13.
