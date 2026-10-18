@@ -241,10 +241,13 @@ Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out 
 - **Office calendar:** `calendar_data.build_calendar_context` gives month / week / day views with status, crew, truck and payment filters. `static/calendar.js` makes day cells navigate to `/calendar/daily/<iso>`.
 - **Office weekly schedule:** `weekly_schedule_data.build_weekly_schedule` calls `build_daily_jobs` for each of the 7 days. The PDF is `integrations/weekly_schedule_pdf.render_weekly_schedule_pdf`.
 - **Staff calendar:** `_build_staff_calendar_month` / `_build_staff_calendar_week`. Week bounds come **only from the week offset**, not from a stale `day` param (fixed in e9d87fd). Jobs are deduped by id. The 7 columns must fit without horizontal scroll (090fcce, b73416d).
-- **Staff PDF** `/staff/weekly/schedule.pdf`:
-  - All Staff → owner layout, `weekly-schedule-<monday>.pdf`.
-  - Individual → `render_staff_weekly_schedule_pdf`, with Daily Paid and Weekly Paid Hours, `staff-weekly-<id>-<monday>.pdf`.
-  - Layout: one A4 landscape page, `KeepInFrame(shrink)`.
+- **Staff PDF** `/staff/weekly/schedule.pdf` (generated only when this route is hit, never on `/staff` page views):
+  - **Data:** `staff_portal.build_staff_weekly_pdf_schedule` calls `build_staff_portal(range=week)` and converts its `owner_weekly` / `week_days`. So the PDF shares the screen's query, staff filter, cancelled rule (All Staff shows Cancelled, Individual hides it), per-staff overrides, `job_start_sort_key` order and Paid Hours. **Never give the PDF its own query or maths again.**
+  - All Staff → booking times, 1 card per booking, `weekly-schedule-<monday>.pdf`. Individual → that person's `booking_crew_hours` times, Extra Pay, Daily Paid and a header with Work Days / Scheduled / Actual / Call Out / Weekly Paid Hours, `staff-weekly-<id>-<monday>.pdf`.
+  - Each card: time + duration, status, customer, (Movers ·) Crew (everyone), P / D / Ph, Note, Actual · Break · Call Out · Extra Pay, Paid.
+  - **Layout** (`integrations/weekly_schedule_pdf.render_staff_weekly_schedule_pdf`): Mon→Sun columns on A4 landscape, zero-padding Frame. It tries font scales `STAFF_SCALES` (7.4pt → 5.6pt floor) and uses the largest that fits on one page. If nothing fits at the floor, the grid continues on page 2 with the day headers repeated (`splitInRow`); jobs are never cut.
+  - Long unspaced tokens are broken to the column width (`_break_long_words`), and Japanese runs use the CID font `HeiseiKakuGo-W5` (DejaVu, used on Render, has no CJK glyphs).
+  - The office `/calendar/weekly/<date>/schedule.pdf` still uses the older `render_weekly_schedule_pdf` + `build_weekly_schedule` (daily_jobs data).
 - Other PDFs: invoice (`invoice_pdf.py`), job sheet (`job_sheet.py`), driver run sheet (`driver_run_sheet_pdf.py`).
 
 ---
@@ -313,12 +316,13 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 
 | Area | Script |
 |---|---|
-| Staff Portal, paid hours, booking_crew_hours, Star Points, calendar | `test_staff_portal_e2e.py` (65 tests, the most important one) |
+| Staff Portal, paid hours, booking_crew_hours, Star Points, calendar | `test_staff_portal_e2e.py` (66 tests, the most important one) |
 | Call out minutes / fee / paid hours | `test_callout_minutes_e2e.py` |
 | Finish time = source of truth | `test_finish_time_source_of_truth_e2e.py`, `test_edit_finish_time_e2e.py`, `test_invoice_duration_from_times_e2e.py` |
 | Invoice | `test_edit_booking_save_unifies_invoice_e2e.py`, `test_invoice_numbering_e2e.py`, `test_invoice_edit_e2e.py`, `test_invoice_negative_adjustments_e2e.py`, `test_invoice_pdf_layout_e2e.py` |
 | Double booking | `test_truck_double_booking_e2e.py`, `test_phase14_double_booking_e2e.py` |
 | Calendar / weekly | `test_calendar_data_e2e.py`, `test_weekly_schedule_e2e.py`, `test_daily_jobs_e2e.py` |
+| Staff weekly PDF | `test_staff_weekly_pdf_e2e.py` (screen ↔ PDF job/paid match, sort, Sunday, overrides, break, 45-min call out, Extra Pay, no duplicates, long text/Japanese inside columns, year crossing, busy week) |
 | Postgres boot | `test_postgres_init_ddl_e2e.py`, `test_postgres_invoice_sequence_init.py` |
 | Misc | `test_booking_cancel_e2e.py`, `test_mover_pricing_e2e.py`, `test_payment_sets_completed_e2e.py`, `test_navigation_e2e.py`, `test_search_invoice_number_e2e.py`, `test_job_note_display_e2e.py` |
 
@@ -329,7 +333,8 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 - `test_daily_jobs_e2e.py` passes 8/8 on a fresh DB but fails 2 tests against the cluttered local `bookings.db`.
 - Tip: for a clean baseline, run tests in a throwaway worktree (`git worktree add /tmp/x HEAD`). It gets its own fresh `bookings.db`; call the main repo's `.venv/bin/python scripts/...` from inside it.
 - `test_phase14_double_booking_e2e.py` Test D fails locally. Leftover bookings from earlier runs sit on the same relative date (today+63, no truck), so they conflict. It is a test-isolation problem, not a code bug, and fails on clean `main` too.
-- `test_staff_portal_e2e.py` was flaky once (63/65, then 65/65 on rerun).
+- `test_staff_portal_e2e.py` (66 tests): on a clean DB, 2 tests fail on HEAD both before and after the 2026-10-18 PDF change. `test_this_week_tab_includes_later_week_jobs` fails on Sundays (its "later this week" date falls back to today), and `test_week_calendar_matches_month_for_same_week_all_staff` is date-dependent. It was flaky once before (63/65, then 65/65).
+- `test_truck_double_booking_e2e.py` Case D fails only on the cluttered local DB (5/5 clean).
 - `test_weekly_schedule_e2e.py` and `test_booking_details_pricing_visual.py` need Playwright for screenshots. Artifacts go to `test_results/artifacts/` (override with `TEST_ARTIFACT_DIR`).
 
 **Tests that hit production or real APIs (run only when asked):**
@@ -393,6 +398,7 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 | c7fbbab / 970a790 | Invoice sent to the company's own phone/email → rejected as recipient |
 | 43565b3 / f84beb6 | Paste-enquiry parser leaked fields into notes; HTML5 validation blocked Analyse |
 | 30b2f97 | Missing Jinja filter `margin_badge` in prod → register filters in `app.py` |
+| (2026-10-18) | Staff weekly PDF drifted from the screen. The All Staff PDF used the office pipeline (`build_weekly_schedule` → `db.list_by_date` exact-string match per day, default 08:00 for TBC, no break deduction). The Individual PDF dropped Phone / Actual / Break / Call Out / Extra Pay / Paid. One Paragraph per day overflowed into the next column on long tokens, Japanese rendered as tofu, and `KeepInFrame(shrink)` made busy weeks unreadable → the PDF is now built from `build_staff_portal(range=week)` with a new card renderer |
 
 ## 17. Known quirks / open issues
 

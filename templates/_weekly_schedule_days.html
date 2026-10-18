@@ -24,6 +24,10 @@
           <p class="weekly-job-row"><span class="weekly-job-field">Delivery:</span> {{ job.delivery_address or '—' }}</p>
           <p class="weekly-job-row"><span class="weekly-job-field">Phone:</span> {{ job.phone or '—' }}</p>
           <p class="weekly-job-row"><span class="weekly-job-field">Status:</span> {{ job.status|upper }}</p>
+          {% if job.paid_hours_display is defined %}
+          <p class="weekly-job-row weekly-job-hours"><span class="weekly-job-field">Actual:</span> {{ job.actual_hours_display }}{% if job.break_hours_label %} · <span class="weekly-job-field">Break:</span> {{ job.break_hours_label }}{% endif %}{% if job.callout_hours_label %} · <span class="weekly-job-field">Call Out:</span> {{ job.callout_hours_label }}{% endif %}</p>
+          <p class="weekly-job-row weekly-job-hours"><span class="weekly-job-field">Paid:</span> <strong>{{ job.paid_hours_display }}</strong></p>
+          {% endif %}
         {% if link_jobs|default(true) %}
         </a>
         {% else %}

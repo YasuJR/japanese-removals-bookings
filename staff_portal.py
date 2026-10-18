@@ -34,11 +34,7 @@ from display_dates import (
 )
 import staff_job_times
 import star_points
-from weekly_schedule_data import (
-    _day_heading,
-    _week_range_heading,
-    build_weekly_schedule,
-)
+from weekly_schedule_data import _day_heading, _week_range_heading
 
 RANGE_TODAY = "today"
 RANGE_CALENDAR = "calendar"
@@ -772,7 +768,7 @@ def _serialize_job(
         if display_start
         else ("TIME TBC" if not stored_start else format_time_12h(stored_start)),
         "start_hm": start_hm,
-        "has_start_time": bool(stored_start),
+        "has_start_time": bool(display_start),
         "start_minutes": job_start_minutes(
             {
                 "id": row.get("id"),
@@ -988,6 +984,13 @@ def _owner_weekly_job_from_portal(job: Dict[str, Any]) -> Dict[str, Any]:
         "delivery_address": job.get("delivery_address") or job.get("dropoff_address") or "—",
         "phone": job.get("phone") or "—",
         "status": job.get("status") or job.get("status_display") or "",
+        "notes": job.get("notes") or "",
+        "actual_hours_display": job.get("actual_hours_display") or "—",
+        "break_hours_label": job.get("break_hours_label") or "",
+        "callout_hours_label": job.get("callout_hours_label") or "",
+        "extra_pay_hours_label": job.get("extra_pay_hours_label") or "",
+        "paid_hours": job.get("paid_hours"),
+        "paid_hours_display": job.get("paid_hours_display") or "—",
     }
 
 
@@ -1314,6 +1317,7 @@ def build_staff_portal(
     calendar_day: Any = None,
     view_staff_id: Any = None,
     cal_view: Any = CAL_VIEW_MONTH,
+    include_star_points: bool = True,
 ) -> Dict[str, Any]:
     if today is None:
         today = perth_today()
@@ -1372,6 +1376,7 @@ def build_staff_portal(
             )
         )
 
+    jobs = _dedupe_jobs_by_id(jobs)
     if active_range == RANGE_TODAY:
         jobs.sort(key=job_start_sort_key)
     else:
@@ -1485,7 +1490,11 @@ def build_staff_portal(
 
     star_points_view = None
     star_points_history: List[Dict[str, Any]] = []
-    if not is_all_staff and selected_staff_id not in (None, "", STAFF_VIEW_ALL):
+    if (
+        include_star_points
+        and not is_all_staff
+        and selected_staff_id not in (None, "", STAFF_VIEW_ALL)
+    ):
         try:
             crew_id = int(selected_staff_id)
         except (TypeError, ValueError):
@@ -1535,27 +1544,45 @@ def build_staff_portal(
     }
 
 
-def _pdf_job_from_portal_job(
-    job: Dict[str, Any],
-    staff_name: str = "",
-    is_all_staff: bool = False,
-) -> Dict[str, Any]:
-    crew_names = job.get("crew_names") or []
-    show_crew = bool(is_all_staff or len(crew_names) > 1)
-    duration = job.get("scheduled_hours_display") or ""
+def _pdf_status_label(job: Dict[str, Any]) -> str:
+    label = str(job.get("status_display") or "").strip()
+    if not label:
+        label = str(job.get("status") or "").strip()
+    return label.replace("_", " ").upper()
+
+
+def _pdf_job(job: Dict[str, Any], is_all_staff: bool) -> Dict[str, Any]:
+    """PDF card fields, copied from the same job dict the Weekly screen renders."""
+    duration = job.get("duration_label")
+    if duration is None:
+        duration = job.get("scheduled_hours_display") or ""
     if duration in ("—", ""):
         duration = ""
+    time_range = (
+        job.get("time_range")
+        if is_all_staff
+        else job.get("scheduled_range_display") or job.get("start_time")
+    )
     return {
-        "time_range": job.get("scheduled_range_display")
-        or job.get("start_time")
-        or "Time TBC",
+        "id": job.get("id"),
+        "time_range": time_range or "TIME TBC",
         "duration_label": duration,
         "customer_name": job.get("customer_name") or "—",
+        "num_movers": job.get("num_movers") or "",
         "crew_display": job.get("crew_display") or job.get("crew") or "—",
         "pickup_address": job.get("pickup_address") or "—",
-        "delivery_address": job.get("dropoff_address") or "—",
-        "status": job.get("status_display") or "",
-        "show_crew": show_crew,
+        "delivery_address": job.get("delivery_address")
+        or job.get("dropoff_address")
+        or "—",
+        "phone": job.get("phone") or "—",
+        "status": _pdf_status_label(job),
+        "notes": job.get("notes") or "",
+        "actual_hours_display": job.get("actual_hours_display") or "—",
+        "break_hours_label": job.get("break_hours_label") or "",
+        "callout_hours_label": job.get("callout_hours_label") or "",
+        "extra_pay_hours_label": job.get("extra_pay_hours_label") or "",
+        "paid_hours_display": job.get("paid_hours_display") or "—",
+        "show_movers": is_all_staff,
     }
 
 
@@ -1564,82 +1591,96 @@ def build_staff_weekly_pdf_schedule(
     week_offset: Any = 0,
     today: Optional[date] = None,
 ) -> Dict[str, Any]:
-    """Build a weekly schedule payload for staff portal PDF export."""
+    """Weekly PDF payload built from the exact data the Weekly screen renders.
+
+    Calls build_staff_portal(range=week) so the PDF shares the screen's booking
+    query, staff filter, cancelled rule, per-staff time overrides, start-time
+    sort and Paid Hours maths. Only the presentation differs.
+    """
     if today is None:
         today = perth_today()
-    offset = normalize_week_offset(week_offset)
-    start_iso, end_iso = _range_dates(RANGE_WEEK, today, offset)
-    staff, selected_staff_id, is_all_staff = resolve_portal_staff(view_staff_id)
-
-    if is_all_staff:
-        weekly = build_weekly_schedule(start_iso, reference=today)
-        return {
-            "mode": "owner",
-            "staff_id_key": STAFF_VIEW_ALL,
-            "week_start": weekly["week_start"],
-            "weekly": weekly,
-        }
-
-    bookings = _load_rows(staff, start_iso, end_iso) if staff else []
-    view_crew_id = None
-    try:
-        view_crew_id = int(selected_staff_id)
-    except (TypeError, ValueError):
-        view_crew_id = None
-    crew_hours_map: Dict[int, Dict[str, Any]] = {}
-    if view_crew_id and bookings:
-        crew_hours_map = db.map_booking_crew_hours(
-            [int(b["id"]) for b in bookings], view_crew_id
-        )
-    jobs: List[Dict[str, Any]] = []
-    for booking in bookings:
-        bid = int(booking["id"])
-        jobs.append(
-            _serialize_job(
-                booking,
-                today,
-                view_crew_id=view_crew_id,
-                crew_hours=crew_hours_map.get(bid),
-            )
-        )
-    jobs.sort(
-        key=lambda job: (
-            job.get("date_iso") or "",
-            *job_start_sort_key(job),
-        )
+    portal = build_staff_portal(
+        range_key=RANGE_WEEK,
+        today=today,
+        week_offset=week_offset,
+        view_staff_id=view_staff_id,
+        include_star_points=False,
     )
-
+    is_all_staff = bool(portal.get("is_all_staff"))
+    start_iso = portal["start_date"]
+    end_iso = portal["end_date"]
     monday = date.fromisoformat(start_iso)
     sunday = date.fromisoformat(end_iso)
     range_heading = _week_range_heading(monday, sunday)
 
-    week_days = _week_days(jobs, start_iso, end_iso, today)
-    paid_summary = _paid_hours_summary(jobs)
-    days = []
-    for day in week_days:
-        day_date = date.fromisoformat(day["date_iso"])
-        pdf_jobs = [
-            _pdf_job_from_portal_job(job, staff_name=staff)
-            for job in day.get("jobs") or []
-        ]
+    if is_all_staff:
+        source_days = (portal.get("owner_weekly") or {}).get("days") or []
+    else:
+        source_days = portal.get("week_days") or []
+    by_iso = {day.get("date_iso"): day for day in source_days}
+
+    days: List[Dict[str, Any]] = []
+    total_jobs = 0
+    for offset in range(7):
+        day_date = monday + timedelta(days=offset)
+        iso = day_date.isoformat()
+        source = by_iso.get(iso) or {}
+        pdf_jobs = [_pdf_job(job, is_all_staff) for job in source.get("jobs") or []]
+        total_jobs += len(pdf_jobs)
         days.append(
             {
-                "date_iso": day["date_iso"],
+                "date_iso": iso,
                 "heading": _day_heading(day_date),
                 "is_weekend": day_date.weekday() >= 5,
+                "is_today": day_date == today,
                 "is_empty": not pdf_jobs,
                 "jobs": pdf_jobs,
-                "paid_display": day.get("paid_display") or "0hr",
+                "paid_display": None
+                if is_all_staff
+                else (source.get("paid_display") or "0hr"),
             }
         )
+
+    if is_all_staff:
+        return {
+            "mode": "all",
+            "staff_id_key": STAFF_VIEW_ALL,
+            "title": "WEEKLY SCHEDULE",
+            "week_start": start_iso,
+            "week_end": end_iso,
+            "range_heading": range_heading,
+            "subtitle_lines": [
+                "All Staff · {0}".format(range_heading),
+                "{0} job{1} · times and hours are per booking".format(
+                    total_jobs, "" if total_jobs == 1 else "s"
+                ),
+            ],
+            "days": days,
+            "total_jobs": total_jobs,
+        }
+
+    worked = portal.get("weekly_worked") or {}
+    staff = portal.get("staff") or ""
     return {
         "mode": "individual",
-        "staff_id_key": selected_staff_id,
+        "staff_id_key": portal.get("selected_staff_id"),
+        "staff": staff,
+        "title": "WEEKLY STAFF SCHEDULE",
         "week_start": start_iso,
         "week_end": end_iso,
         "range_heading": range_heading,
-        "subtitle_lines": ["Staff: {0}".format(staff), range_heading],
-        "weekly_paid_display": paid_summary.get("paid_display") or "0hr",
-        "staff_paid_lines": [],
+        "subtitle_lines": [
+            "Staff: {0} · {1}".format(staff, range_heading),
+            "Work Days {0} · Scheduled {1} · Actual {2} · Call Out {3} · "
+            "Weekly Paid Hours: {4}".format(
+                worked.get("work_days", 0),
+                worked.get("scheduled_display") or "0hr",
+                worked.get("actual_display") or "0hr",
+                worked.get("callout_display") or "0hr",
+                worked.get("paid_display") or "0hr",
+            ),
+        ],
+        "weekly_paid_display": worked.get("paid_display") or "0hr",
         "days": days,
+        "total_jobs": total_jobs,
     }

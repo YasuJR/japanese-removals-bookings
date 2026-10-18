@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from html import escape
 from io import BytesIO
 from pathlib import Path
@@ -15,7 +16,10 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
+    BaseDocTemplate,
+    Frame,
     KeepInFrame,
+    PageTemplate,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -238,127 +242,344 @@ def _draw_schedule_header(
     canvas.restoreState()
 
 
-def _staff_header_extra(schedule: dict) -> float:
-    extra = 0.0
-    subtitle_lines = schedule.get("subtitle_lines") or []
-    if subtitle_lines:
-        extra += len(subtitle_lines) * 4.0 * mm
-    elif schedule.get("subtitle"):
-        extra += 4.0 * mm
-    footer_count = 0
-    if schedule.get("weekly_paid_display"):
-        footer_count += 1
-    footer_count += len(schedule.get("staff_paid_lines") or [])
-    extra += footer_count * 3.6 * mm
-    return extra
+# --- Staff Portal weekly PDF (All Staff + Individual) -------------------------
+#
+# Data comes from staff_portal.build_staff_weekly_pdf_schedule, which reuses the
+# Weekly screen builder. This section is presentation only: one card per job,
+# Monday→Sunday columns, fitted onto one A4 landscape page by stepping the font
+# size down to a readable floor. If a week still does not fit at the floor, the
+# grid continues on the next page (header row repeated) instead of cutting jobs.
+
+try:
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+
+    pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
+    CJK_FONT = "HeiseiKakuGo-W5"
+except Exception:  # pragma: no cover - reportlab always ships this CID font
+    CJK_FONT = ""
+
+STAFF_SCALES = (1.0, 0.93, 0.86, 0.8, 0.75)
+STAFF_JOB_FONT = 7.4
+STAFF_LINE_RATIO = 1.2
+STAFF_CELL_PAD = 2.0
+STAFF_CARD_PAD = 2.2
+STAFF_HEADER_H = 22 * mm
+
+_CJK_RE = re.compile(
+    "([\u2e80-\u2fdf\u3000-\u30ff\u3100-\u31ff\u3400-\u4dbf"
+    "\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]+)"
+)
+_INVISIBLE_RE = re.compile("[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]")
+
+CARD_BG = colors.HexColor("#f7f9fb")
+CARD_LINE = colors.HexColor("#d5dde6")
+STATUS_COLOURS = {
+    "COMPLETED": "#1f7a3f",
+    "PAID": "#1f7a3f",
+    "INVOICED": "#1f6f8b",
+    "CONFIRMED": "#1e3a5f",
+    "CANCELLED": "#a12a2a",
+}
 
 
-def _job_html_staff(job: dict) -> str:
-    time_range = _esc(job.get("time_range") or "Time TBC")
-    duration = _esc(job.get("duration_label") or "")
-    time_line = time_range
-    if duration:
-        time_line = "{0}&nbsp;&nbsp;<b>{1}</b>".format(time_range, duration)
+def _clean_text(value: Any) -> str:
+    text = _INVISIBLE_RE.sub("", str(value if value is not None else ""))
+    return " ".join(text.split())
 
-    name = _esc(job.get("customer_name") or "—")
-    pickup = _esc(job.get("pickup_address") or "—")
-    delivery = _esc(job.get("delivery_address") or "—")
-    status = _esc(str(job.get("status") or "").strip())
 
-    parts = [
-        "<b>{0}</b>".format(time_line),
-        "Job: <b>{0}</b>".format(name),
-    ]
-    if job.get("show_crew") and job.get("crew_display"):
-        parts.append("Crew: {0}".format(_esc(job.get("crew_display") or "—")))
-    parts.extend(
-        [
-            "P: {0}".format(pickup),
-            "D: {0}".format(delivery),
-        ]
+def _char_font(ch: str, font: str) -> str:
+    if CJK_FONT and _CJK_RE.match(ch):
+        return CJK_FONT
+    return font
+
+
+def _text_width(text: str, font: str, size: float) -> float:
+    return sum(
+        pdfmetrics.stringWidth(_pdf_text(ch), _char_font(ch, font), size) for ch in text
     )
+
+
+def _break_long_words(
+    text: str, font: str, size: float, width: float, lead_width: float = 0.0
+) -> str:
+    """Insert spaces inside words wider than the column so they wrap, not overflow.
+
+    ReportLab only breaks lines at spaces, so a long unspaced token (a run of
+    Japanese, a long URL or address without spaces) would otherwise spill into
+    the next day's column. Lines are simulated greedily, starting after a label
+    of lead_width (e.g. "P: "), so a split token fills the current line first.
+    """
+    space_w = _text_width(" ", font, size)
+    used = lead_width
+    out: list[str] = []
+    for word in text.split(" "):
+        if not word:
+            continue
+        word_w = _text_width(word, font, size)
+        gap = space_w if used > 0 else 0.0
+        if used + gap + word_w <= width:
+            out.append(word)
+            used += gap + word_w
+            continue
+        if word_w <= width:
+            out.append(word)
+            used = word_w
+            continue
+        # Split: first chunk fills what is left of this line (if anything useful).
+        chunk = ""
+        room = width - used - gap if used > 0 else width
+        if room < width * 0.25:
+            room = width
+            used = 0.0
+        for ch in word:
+            if chunk and _text_width(chunk + ch, font, size) > room:
+                out.append(chunk)
+                chunk = ch
+                room = width
+            else:
+                chunk += ch
+        out.append(chunk)
+        used = _text_width(chunk, font, size)
+    return " ".join(out)
+
+
+def _markup(value: Any, font: str, size: float, width: float, lead: str = "") -> str:
+    """Escape for Paragraph markup; switch CJK runs to the Japanese CID font."""
+    lead_width = _text_width(lead, font, size) if lead else 0.0
+    text = _break_long_words(_clean_text(value), font, size, width, lead_width)
+    parts = _CJK_RE.split(text)
+    html_parts: list[str] = []
+    for idx, part in enumerate(parts):
+        if not part:
+            continue
+        if idx % 2 == 1 and CJK_FONT:
+            html_parts.append('<font face="{0}">{1}</font>'.format(CJK_FONT, _esc(part)))
+        else:
+            html_parts.append(_esc(part))
+    return "".join(html_parts)
+
+
+def _staff_styles(scale: float) -> dict[str, ParagraphStyle]:
+    size = STAFF_JOB_FONT * scale
+    return {
+        "size": size,
+        "day": ParagraphStyle(
+            "sw_day",
+            fontName=FONT_BOLD,
+            fontSize=7.4,
+            leading=9,
+            alignment=TA_CENTER,
+            textColor=colors.white,
+        ),
+        "job": ParagraphStyle(
+            "sw_job",
+            fontName=FONT,
+            fontSize=size,
+            leading=size * STAFF_LINE_RATIO,
+            alignment=TA_LEFT,
+            textColor=BODY,
+        ),
+        "empty": ParagraphStyle(
+            "sw_empty",
+            fontName=FONT_OBLIQUE,
+            fontSize=7.4,
+            leading=9,
+            alignment=TA_CENTER,
+            textColor=EMPTY_FG,
+        ),
+        "paid": ParagraphStyle(
+            "sw_paid",
+            fontName=FONT_BOLD,
+            fontSize=size,
+            leading=size * STAFF_LINE_RATIO,
+            alignment=TA_LEFT,
+            textColor=NAVY,
+        ),
+    }
+
+
+def _hours_line(job: dict) -> list[str]:
+    parts = ["Actual {0}".format(job.get("actual_hours_display") or "—")]
+    if job.get("break_hours_label"):
+        parts.append("Break {0}".format(job["break_hours_label"]))
+    if job.get("callout_hours_label"):
+        parts.append("Call Out {0}".format(job["callout_hours_label"]))
+    if job.get("extra_pay_hours_label"):
+        parts.append("Extra Pay {0}".format(job["extra_pay_hours_label"]))
+    return parts
+
+
+def _staff_job_card(job: dict, styles: dict, width: float) -> Table:
+    size = styles["size"]
+    text_w = width - 2 * STAFF_CARD_PAD
+
+    def m(value: Any, font: str = FONT, lead: str = "") -> str:
+        return _markup(value, font, size, text_w, lead)
+
+    status = _clean_text(job.get("status")).upper()
+    time_line = "<b>{0}</b>".format(m(job.get("time_range") or "TIME TBC", FONT_BOLD))
+    if job.get("duration_label"):
+        time_line += " &nbsp;{0}".format(m(job["duration_label"]))
+    lines = [time_line]
     if status:
-        parts.append("Status: {0}".format(status))
-    return "<br/>".join(parts)
+        lines.append(
+            '<font color="{0}"><b>{1}</b></font>'.format(
+                STATUS_COLOURS.get(status, "#4a5563"), m(status, FONT_BOLD)
+            )
+        )
+    lines.append("<b>{0}</b>".format(m(job.get("customer_name") or "—", FONT_BOLD)))
+    crew = "Crew: {0}".format(m(job.get("crew_display") or "—", lead="Crew: "))
+    if job.get("show_movers") and job.get("num_movers"):
+        crew = "Movers: {0} · {1}".format(m(job["num_movers"]), crew)
+    lines.append(crew)
+    lines.append("P: {0}".format(m(job.get("pickup_address") or "—", lead="P: ")))
+    lines.append("D: {0}".format(m(job.get("delivery_address") or "—", lead="D: ")))
+    lines.append("Ph: {0}".format(m(job.get("phone") or "—", lead="Ph: ")))
+    if job.get("notes"):
+        lines.append("<i>Note: {0}</i>".format(m(job["notes"], lead="Note: ")))
+    lines.append(m(" · ".join(_hours_line(job))))
+    lines.append(
+        '<font color="#1e3a5f"><b>Paid {0}</b></font>'.format(
+            m(job.get("paid_hours_display") or "—", FONT_BOLD)
+        )
+    )
+    card = Table(
+        [[Paragraph("<br/>".join(lines), styles["job"])]],
+        colWidths=[width],
+    )
+    card.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), CARD_BG),
+                ("BOX", (0, 0), (-1, -1), 0.4, CARD_LINE),
+                ("LEFTPADDING", (0, 0), (-1, -1), STAFF_CARD_PAD),
+                ("RIGHTPADDING", (0, 0), (-1, -1), STAFF_CARD_PAD),
+                ("TOPPADDING", (0, 0), (-1, -1), STAFF_CARD_PAD),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), STAFF_CARD_PAD),
+            ]
+        )
+    )
+    return card
 
 
-def _day_body_staff_individual(day: dict, styles: dict[str, ParagraphStyle]) -> Paragraph:
+def _staff_day_cell(day: dict, styles: dict) -> list:
     jobs = day.get("jobs") or []
     if not jobs:
-        return Paragraph("NO JOBS", styles["empty"])
-    blocks = [_job_html_staff(job) for job in jobs]
-    html = "<br/><font color='#c5d0dc'>----------</font><br/>".join(blocks)
-    paid = _esc(day.get("paid_display") or "0hr")
-    html = "{0}<br/><br/><b>Daily Paid: {1}</b>".format(html, paid)
-    return Paragraph(html, styles["job"])
-
-
-def _day_body_staff_all(day: dict, styles: dict[str, ParagraphStyle]) -> Paragraph:
-    blocks = day.get("staff_blocks") or []
-    active = [block for block in blocks if block.get("jobs")]
-    if not active:
-        return Paragraph("NO JOBS", styles["empty"])
-    parts: list[str] = []
-    for block in active:
-        parts.append("<b>{0}</b>".format(_esc(block.get("staff") or "—")))
-        for job in block.get("jobs") or []:
-            parts.append(_job_html_staff(job))
-        parts.append(
-            "Paid: <b>{0}</b>".format(_esc(block.get("paid_display") or "0hr"))
+        return [Paragraph("NO JOBS", styles["empty"])]
+    width = COL_W - 2 * STAFF_CELL_PAD
+    flow: list = []
+    for idx, job in enumerate(jobs):
+        if idx:
+            flow.append(Spacer(1, 1.6 * mm))
+        flow.append(_staff_job_card(job, styles, width))
+    if day.get("paid_display") is not None:
+        flow.append(Spacer(1, 1.2 * mm))
+        flow.append(
+            Paragraph("Daily Paid: {0}".format(_esc(day["paid_display"])), styles["paid"])
         )
-        parts.append("<font color='#c5d0dc'>----------</font>")
-    return Paragraph("<br/>".join(parts), styles["job"])
+    return flow
+
+
+def _staff_grid(schedule: dict, scale: float) -> Table:
+    styles = _staff_styles(scale)
+    days = schedule["days"]
+    header = [Paragraph(_esc(day.get("heading") or ""), styles["day"]) for day in days]
+    body = [_staff_day_cell(day, styles) for day in days]
+    grid = Table(
+        [header, body],
+        colWidths=[COL_W] * 7,
+        repeatRows=1,
+        splitInRow=1,
+    )
+    cmds = [
+        ("BACKGROUND", (0, 0), (-1, 0), HEADER_BG),
+        ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
+        ("VALIGN", (0, 1), (-1, 1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), STAFF_CELL_PAD),
+        ("RIGHTPADDING", (0, 0), (-1, -1), STAFF_CELL_PAD),
+        ("TOPPADDING", (0, 0), (-1, 0), 2.6),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 2.6),
+        ("TOPPADDING", (0, 1), (-1, 1), STAFF_CELL_PAD),
+        ("BOTTOMPADDING", (0, 1), (-1, 1), STAFF_CELL_PAD),
+        ("BOX", (0, 0), (-1, -1), 0.4, LINE),
+        ("INNERGRID", (0, 0), (-1, -1), 0.3, LINE),
+    ]
+    for idx, day in enumerate(days):
+        if day.get("is_weekend"):
+            cmds.append(("BACKGROUND", (idx, 0), (idx, 0), colors.HexColor("#16304d")))
+            cmds.append(("BACKGROUND", (idx, 1), (idx, 1), WEEKEND_BG))
+    grid.setStyle(TableStyle(cmds))
+    return grid
+
+
+def _fit_staff_grid(schedule: dict, avail_h: float) -> tuple[Table, float, bool]:
+    """Largest scale whose grid fits on one page; else the floor scale, split."""
+    for scale in STAFF_SCALES:
+        grid = _staff_grid(schedule, scale)
+        _w, height = grid.wrap(INNER_W, avail_h)
+        if height <= avail_h:
+            return grid, scale, True
+    floor = STAFF_SCALES[-1]
+    return _staff_grid(schedule, floor), floor, False
 
 
 def _draw_staff_page_header(canvas, _doc, schedule: dict) -> None:
-    footer_lines: list[str] = []
-    if schedule.get("weekly_paid_display"):
-        footer_lines.append(
-            "Weekly Paid Hours: {0}".format(schedule.get("weekly_paid_display"))
-        )
-    for line in schedule.get("staff_paid_lines") or []:
-        footer_lines.append(line)
     _draw_schedule_header(
         canvas,
-        title="WEEKLY STAFF SCHEDULE",
-        subtitle_lines=schedule.get("subtitle_lines")
-        or ([schedule.get("subtitle")] if schedule.get("subtitle") else []),
-        footer_lines=footer_lines,
+        title=schedule.get("title") or "WEEKLY STAFF SCHEDULE",
+        subtitle_lines=list(schedule.get("subtitle_lines") or []),
     )
 
 
 def render_staff_weekly_schedule_pdf(schedule: dict) -> bytes:
-    """Render staff portal weekly schedule onto a single A4 landscape page."""
-    mode = str(schedule.get("mode") or "individual")
-    day_body_fn = (
-        _day_body_staff_all if mode == "all" else _day_body_staff_individual
-    )
-    header_extra = _staff_header_extra(schedule)
+    """Render a Staff Portal weekly schedule (All Staff or Individual).
+
+    Fits on one A4 landscape page whenever the text stays at or above the
+    readable floor (STAFF_SCALES[-1] × STAFF_JOB_FONT ≈ 5.6pt). A busier week
+    continues on a second page; nothing is cropped.
+    """
+    header_h = STAFF_HEADER_H + max(0, len(schedule.get("subtitle_lines") or []) - 1) * 4.0 * mm
+    avail_h = INNER_H - header_h
+    grid, scale, fits = _fit_staff_grid(schedule, avail_h)
+    schedule["_fit_scale"] = scale
+    schedule["_fits_one_page"] = fits
     buffer = BytesIO()
-    doc = SimpleDocTemplate(
+    doc = BaseDocTemplate(
         buffer,
         pagesize=PAGE,
         leftMargin=MARGIN,
         rightMargin=MARGIN,
-        topMargin=MARGIN + HEADER_H + header_extra,
+        topMargin=MARGIN + header_h,
         bottomMargin=MARGIN,
-        title="Staff Weekly Schedule {0}".format(schedule.get("range_heading") or "").strip(),
+        title="{0} {1}".format(
+            schedule.get("title") or "Weekly Schedule", schedule.get("range_heading") or ""
+        ).strip(),
         author=COMPANY_NAME,
     )
-    fitted = KeepInFrame(
+    # Zero-padding frame: exactly the INNER_W × avail_h area the fit check measured.
+    frame = Frame(
+        MARGIN,
+        MARGIN,
         INNER_W,
-        max(BODY_H - header_extra, 40 * mm),
-        _build_grid(schedule, scale=1.0, day_body_fn=day_body_fn),
-        mode="shrink",
-        hAlign="LEFT",
-        vAlign="TOP",
-        fakeWidth=False,
+        avail_h,
+        leftPadding=0,
+        rightPadding=0,
+        topPadding=0,
+        bottomPadding=0,
+        id="staff_week",
     )
-    doc.build(
-        [fitted],
-        onFirstPage=lambda canv, document: _draw_staff_page_header(canv, document, schedule),
-        onLaterPages=lambda canv, document: _draw_staff_page_header(canv, document, schedule),
+    doc.addPageTemplates(
+        [
+            PageTemplate(
+                id="staff_week",
+                frames=[frame],
+                onPage=lambda canv, document: _draw_staff_page_header(
+                    canv, document, schedule
+                ),
+            )
+        ]
     )
+    doc.build([grid])
     return buffer.getvalue()
 
 
