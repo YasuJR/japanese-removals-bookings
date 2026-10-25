@@ -235,8 +235,14 @@
         {% include '_dashboard_section_divider.html' %}
         {% endwith %}
         {% endif %}
-        {% if payment_unpaid_index is not none and loop.index0 == payment_unpaid_index %}
-        {% with divider_kind="unpaid", divider_label="UNPAID", divider_aria="Unpaid" %}
+        {% if (payment_unpaid_index is not none and loop.index0 == payment_unpaid_index)
+              or (payment_unpaid_index is none and payment_wg_index is not none and loop.index0 == payment_wg_index) %}
+        {% with divider_kind="unpaid", divider_label="REGULAR UNPAID", divider_aria="Regular unpaid", divider_summary=unpaid_summaries.regular %}
+        {% include '_dashboard_section_divider.html' %}
+        {% endwith %}
+        {% endif %}
+        {% if payment_wg_index is not none and loop.index0 == payment_wg_index %}
+        {% with divider_kind="wg", divider_label="WG OUTDOOR LIFE", divider_aria="WG Outdoor Life outstanding", divider_summary=unpaid_summaries.wg %}
         {% include '_dashboard_section_divider.html' %}
         {% endwith %}
         {% endif %}
@@ -245,7 +251,7 @@
         {% include '_dashboard_section_divider.html' %}
         {% endwith %}
         {% endif %}
-        <tr>
+        <tr{% if payment_wg_index is not none and payment_wg_index <= loop.index0 <= payment_wg_last_index %} class="dashboard-wg-row"{% endif %}>
           <td class="customer-cell">
             <a class="customer-link" href="{{ url_for('view_booking', booking_id=b.id) }}"><strong>{{ b.customer_name }}</strong></a>
             {% if b.dashboard_invoice_number %}
@@ -277,6 +283,11 @@
             <a class="btn-primary btn-sm" href="{{ url_for('edit_booking', booking_id=b.id) }}">Edit</a>
           </td>
         </tr>
+        {% if payment_wg_last_index is not none and loop.index0 == payment_wg_last_index %}
+        {% with divider_kind="wg-end", divider_label="", divider_aria="End of WG Outdoor Life", divider_summary=none %}
+        {% include '_dashboard_section_divider.html' %}
+        {% endwith %}
+        {% endif %}
         {% endfor %}
       </tbody>
     </table>

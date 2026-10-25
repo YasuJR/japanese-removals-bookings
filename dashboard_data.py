@@ -7,11 +7,13 @@ from zoneinfo import ZoneInfo
 import config
 import database as db
 import invoice
+import wg_jobs
 
 DASHBOARD_JOBS_INITIAL = 40
 DASHBOARD_JOBS_PAGE_SIZE = 40
 UPCOMING_DIVIDER_LABEL = "TODAY & UPCOMING"
-PAYMENT_UNPAID_DIVIDER_LABEL = "UNPAID"
+PAYMENT_UNPAID_DIVIDER_LABEL = "REGULAR UNPAID"
+PAYMENT_WG_DIVIDER_LABEL = wg_jobs.WG_SECTION_LABEL
 PAYMENT_PAID_DIVIDER_LABEL = "PAID"
 
 
@@ -44,7 +46,8 @@ def job_move_date_iso(job: Any) -> str:
 
 SECTION_TODAY_UPCOMING = 0
 SECTION_UNPAID = 1
-SECTION_PAID = 2
+SECTION_WG_UNPAID = 2
+SECTION_PAID = 3
 
 
 def is_dashboard_paid(job: Any) -> bool:
@@ -65,14 +68,19 @@ def dashboard_section_group(job: Any, today_iso: str) -> int:
     Independent Dashboard groups (each job belongs to exactly one):
 
     0. TODAY & UPCOMING — not Paid, job date today or later
-    1. UNPAID — not Paid, job date yesterday or earlier (Unpaid / Part Paid / Overdue)
-    2. PAID — Payment status Paid, any date
+    1. REGULAR UNPAID — not Paid, job date yesterday or earlier (Unpaid / Part Paid / Overdue)
+    2. WG OUTDOOR LIFE — same as 1 but a WG contract job (paid in batches, never hidden by age)
+    3. PAID — Payment status Paid, any date
+
+    Must match database._dashboard_section_group (the SQL list sort order).
     """
     if is_dashboard_paid(job):
         return SECTION_PAID
     boundary = (today_iso or "")[:10]
     if boundary and job_move_date_iso(job) >= boundary:
         return SECTION_TODAY_UPCOMING
+    if wg_jobs.is_wg_outdoor_life(job):
+        return SECTION_WG_UNPAID
     return SECTION_UNPAID
 
 
@@ -90,28 +98,69 @@ def dashboard_section_indexes(
     jobs: List[Any], today_iso: str
 ) -> Tuple[Optional[int], Optional[int], Optional[int]]:
     """
-    Indexes of the first TODAY & UPCOMING, past UNPAID, and PAID rows.
+    Indexes of the first TODAY & UPCOMING, past REGULAR UNPAID, and PAID rows.
 
     None when that group is not present in the visible list.
     """
-    upcoming_index = None
-    unpaid_index = None
-    paid_index = None
+    layout = dashboard_section_layout(jobs, today_iso)
+    return layout["upcoming"], layout["unpaid"], layout["paid"]
+
+
+def dashboard_section_layout(jobs: List[Any], today_iso: str) -> Dict[str, Optional[int]]:
+    """
+    Row indexes where each Dashboard divider goes (None when absent).
+
+    wg_last is the last visible WG row, so the template can close the WG block.
+    """
+    layout: Dict[str, Optional[int]] = {
+        "upcoming": None,
+        "unpaid": None,
+        "wg": None,
+        "wg_last": None,
+        "paid": None,
+    }
+    keys = {
+        SECTION_TODAY_UPCOMING: "upcoming",
+        SECTION_UNPAID: "unpaid",
+        SECTION_WG_UNPAID: "wg",
+        SECTION_PAID: "paid",
+    }
     for index, job in enumerate(jobs):
         group = dashboard_section_group(job, today_iso)
-        if group == SECTION_TODAY_UPCOMING and upcoming_index is None:
-            upcoming_index = index
-        elif group == SECTION_UNPAID and unpaid_index is None:
-            unpaid_index = index
-        elif group == SECTION_PAID and paid_index is None:
-            paid_index = index
-        if (
-            upcoming_index is not None
-            and unpaid_index is not None
-            and paid_index is not None
-        ):
-            break
-    return upcoming_index, unpaid_index, paid_index
+        key = keys[group]
+        if layout[key] is None:
+            layout[key] = index
+        if group == SECTION_WG_UNPAID:
+            layout["wg_last"] = index
+    return layout
+
+
+def dashboard_unpaid_summaries(jobs: List[Any], today_iso: str) -> Dict[str, Dict[str, Any]]:
+    """
+    Job count and invoice total for REGULAR UNPAID and WG OUTDOOR LIFE.
+
+    Counts every job in that group (not just the visible page), so the
+    totals stay right when the list is paginated.
+    """
+    groups = {SECTION_UNPAID: [], SECTION_WG_UNPAID: []}
+    for job in jobs:
+        group = dashboard_section_group(job, today_iso)
+        if group in groups:
+            groups[group].append(dict(job))
+    rows = groups[SECTION_UNPAID] + groups[SECTION_WG_UNPAID]
+    if rows:
+        db.attach_extra_charges(rows)
+
+    def _summary(items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        total = sum(
+            float(invoice.calculate_invoice_totals(item)["total"]) for item in items
+        )
+        return {"count": len(items), "total": round(total, 2)}
+
+    return {
+        "regular": _summary(groups[SECTION_UNPAID]),
+        "wg": _summary(groups[SECTION_WG_UNPAID]),
+    }
 
 
 def week_range(today: date) -> tuple:

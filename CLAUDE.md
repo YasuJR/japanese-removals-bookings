@@ -215,6 +215,18 @@ Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out 
 - **Sending** (`integrations/invoice_send.py`): email with the PDF via SMTP, else SMS with the pay link. The company's own phone or email is rejected as a recipient.
 - Bank CSV import and matching: `bank_transfer_match.py`, `/settings/bank-transfers`.
 
+### Dashboard Jobs sections (`/dashboard`)
+
+- Each job is in exactly one group (`dashboard_data.dashboard_section_group`, mirrored in `database._dashboard_section_group` for the SQL sort; keep the two in sync):
+  0. **TODAY & UPCOMING**: not Paid, job date today or later (Perth). Upcoming WG jobs stay here.
+  1. **REGULAR UNPAID**: not Paid, past date, not WG.
+  2. **WG OUTDOOR LIFE**: not Paid, past date, WG contract job. WG pays in batches weeks or months later, so these are never hidden by age.
+  3. **PAID**: Payment status Paid, any date.
+- Unpaid groups 1 and 2 sort **oldest date first**, then true start time. Upcoming and Paid keep status priority, then date.
+- The dividers show "N jobs · Total: $X" (`dashboard_unpaid_summaries`, invoice totals over the whole filtered list, not just the visible page). The WG block has navy 6px bars above and below it and a tinted row background.
+- **WG detection** (`wg_jobs.is_wg_outdoor_life_name`): there is no company / client field, so it uses `customer_name`. It matches when the first word is "WG" or the name contains the words "WG Outdoor Life" (case-, space- and punctuation-insensitive). Production spellings on 2026-10-25 were "WG", "WG Outdoor Life" and "WG Outdoor life". It never uses a raw substring, so "Wgrace" and "WGM Logistics" don't match.
+- The top "Unpaid Amount" stat card (`sales_dashboard.outstanding_invoices`) still includes WG.
+
 ---
 
 ## 8. Truck conflict / double booking
@@ -322,6 +334,7 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 | Invoice | `test_edit_booking_save_unifies_invoice_e2e.py`, `test_invoice_numbering_e2e.py`, `test_invoice_edit_e2e.py`, `test_invoice_negative_adjustments_e2e.py`, `test_invoice_pdf_layout_e2e.py` |
 | Double booking | `test_truck_double_booking_e2e.py`, `test_phase14_double_booking_e2e.py` |
 | Calendar / weekly | `test_calendar_data_e2e.py`, `test_weekly_schedule_e2e.py`, `test_daily_jobs_e2e.py` |
+| Dashboard sections | `test_dashboard_payment_status_divider_e2e.py`, `test_dashboard_today_upcoming_divider_e2e.py`, `test_dashboard_wg_unpaid_e2e.py` (WG name matching, Regular vs WG split, no duplicates, oldest first, counts and totals, Paid leaves WG) |
 | Staff weekly PDF | `test_staff_weekly_pdf_e2e.py` (screen ↔ PDF job/paid match, sort, Sunday, overrides, break, 45-min call out, Extra Pay, no duplicates, long text/Japanese inside columns, year crossing, busy week) |
 | Postgres boot | `test_postgres_init_ddl_e2e.py`, `test_postgres_invoice_sequence_init.py` |
 | Misc | `test_booking_cancel_e2e.py`, `test_mover_pricing_e2e.py`, `test_payment_sets_completed_e2e.py`, `test_navigation_e2e.py`, `test_search_invoice_number_e2e.py`, `test_job_note_display_e2e.py` |

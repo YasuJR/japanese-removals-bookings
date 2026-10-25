@@ -1177,6 +1177,44 @@ label > .field-label-stack {
   white-space: nowrap;
 }
 
+.dashboard-section-divider-meta {
+  margin-left: 0.6rem;
+  padding-left: 0.6rem;
+  border-left: 1px solid var(--border);
+  color: var(--muted);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* WG Outdoor Life — contract jobs paid in batches, kept apart from regular unpaid. */
+.dashboard-wg-divider-row td {
+  padding-top: 1.1rem;
+}
+
+.dashboard-wg-divider-row .dashboard-section-divider-label {
+  color: var(--navy);
+}
+
+.dashboard-wg-divider-row .dashboard-section-divider::before,
+.dashboard-wg-end-divider-row .dashboard-section-divider::before {
+  height: 6px;
+  background: var(--navy);
+  border-radius: 3px;
+}
+
+.dashboard-wg-end-divider-row td {
+  padding-top: 0.45rem;
+  padding-bottom: 0.9rem;
+}
+
+.dashboard-wg-end-divider-row .dashboard-section-divider {
+  min-height: 0.5rem;
+}
+
+.sheet tbody tr.dashboard-wg-row {
+  background: #f3f5f9;
+}
+
 .nowrap {
   white-space: nowrap;
 }

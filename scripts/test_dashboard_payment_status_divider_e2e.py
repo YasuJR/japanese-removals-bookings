@@ -211,7 +211,7 @@ def test_part_paid_and_overdue_past_jobs_are_in_unpaid_group():
     return True
 
 
-def test_status_order_is_preserved_within_each_group():
+def test_group_order_status_first_except_unpaid_oldest_first():
     today = perth_today()
     paid_confirmed = _unique("Paid Confirmed First Date")
     unpaid_invoiced = _unique("Unpaid Invoiced")
@@ -243,7 +243,8 @@ def test_status_order_is_preserved_within_each_group():
     )
     client = _login_client()
     html = client.get("/dashboard?filter=all&jobs_limit=500").get_data(as_text=True)
-    wanted = [unpaid_confirmed, unpaid_completed, unpaid_invoiced, paid_confirmed]
+    # Upcoming / Paid keep status order; REGULAR UNPAID is oldest date first.
+    wanted = [unpaid_confirmed, unpaid_invoiced, unpaid_completed, paid_confirmed]
     names = [name for name in _customer_names(html) if name in wanted]
     assert names == wanted, names
     assert dict(db.get_booking(unpaid_confirmed_id))["status"] == "Confirmed"
@@ -282,7 +283,7 @@ def main():
         test_today_upcoming_unpaid_then_paid_are_independent_groups,
         test_paid_jobs_stay_in_paid_group_regardless_of_date,
         test_part_paid_and_overdue_past_jobs_are_in_unpaid_group,
-        test_status_order_is_preserved_within_each_group,
+        test_group_order_status_first_except_unpaid_oldest_first,
         test_job_status_paid_is_not_payment_paid,
         test_mobile_and_desktop_css_cover_payment_dividers,
     ]

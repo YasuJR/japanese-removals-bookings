@@ -428,6 +428,21 @@
         padding: 0.05rem 0.55rem;
     }
 
+    .dashboard-section-divider-meta {
+        margin-left: 0.45rem;
+        padding-left: 0.45rem;
+    }
+
+    /* The jobs table scrolls sideways: keep divider labels on screen at the left. */
+    .dashboard-section-divider {
+        justify-content: flex-start;
+    }
+
+    .dashboard-section-divider-label {
+        position: sticky;
+        left: 0.35rem;
+    }
+
   .dashboard-actions-cell .btn-sm {
     min-height: var(--touch);
     padding: 0.45rem 0.65rem;

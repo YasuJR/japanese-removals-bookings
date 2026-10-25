@@ -8,9 +8,11 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import booking_times
 import db_backend
 import invoice_numbering
 import job_status
+import wg_jobs
 
 logger = logging.getLogger(__name__)
 
@@ -1779,18 +1781,30 @@ def _dashboard_move_date_iso(row: sqlite3.Row) -> str:
 
 
 def _dashboard_section_group(row: sqlite3.Row, today_iso: str) -> int:
-    """0 = TODAY & UPCOMING, 1 = past UNPAID, 2 = PAID."""
+    """0 = TODAY & UPCOMING, 1 = past REGULAR UNPAID, 2 = past WG unpaid, 3 = PAID."""
     if _dashboard_payment_is_paid(row):
-        return 2
+        return 3
     boundary = (today_iso or "")[:10]
     if boundary and _dashboard_move_date_iso(row) >= boundary:
         return 0
+    if wg_jobs.is_wg_outdoor_life(row):
+        return 2
     return 1
 
 
 def _dashboard_sort_key(row: sqlite3.Row, today_iso: str) -> tuple:
+    group = _dashboard_section_group(row, today_iso)
+    if group in (1, 2):
+        # Unpaid groups: oldest job first so long-outstanding jobs stand out.
+        return (
+            group,
+            0,
+            _dashboard_move_date_iso(row),
+            booking_times.job_start_minutes(dict(row)),
+            int(row["id"]),
+        )
     return (
-        _dashboard_section_group(row, today_iso),
+        group,
         job_status.sort_priority(row["status"]),
         row["move_date"] or "",
         row["start_time"] or "",
