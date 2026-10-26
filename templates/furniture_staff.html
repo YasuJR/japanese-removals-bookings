@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f3b2e">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Furniture list · {{ booking.customer_name }} — Japanese Removals</title>
+  {% include '_head_icons.html' %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='furniture.css') }}">
+</head>
+<body class="fl-body fl-staff-body" style="padding-bottom:24px">
+  <header class="fl-header">
+    <div class="fl-wrap fl-header-inner">
+      <img class="fl-logo" src="{{ url_for('static', filename='branding/japanese-removals-logo.png') }}" alt="">
+      <div>
+        <p class="fl-brand">{{ booking.customer_name }}</p>
+        <p class="fl-header-sub">{{ move_date }} · Furniture list {{ row.public_id }}</p>
+      </div>
+    </div>
+  </header>
+  <main class="fl-wrap fl-main">
+    <p><a class="fl-btn fl-btn-secondary" href="{{ url_for('staff_portal') }}">← Staff Portal</a></p>
+    <section class="fl-card fl-estimate">
+      <h2>Approximate volume</h2>
+      <p class="fl-estimate-value">{{ '%.1f'|format(summary.estimated_m3) }} m³ <span class="fl-estimate-tag">estimate</span></p>
+      <p class="fl-muted">{{ summary.item_count }} items · <span class="fl-chip fl-chip-{{ row.status }}">{{ row.status_label }}</span>{% if row.updated_display %} · updated {{ row.updated_display }}{% endif %}{% if summary.unsized_custom_count %} · {{ summary.unsized_custom_count }} other item(s) without size{% endif %}</p>
+    </section>
+
+    {% for room in summary.rooms %}
+    <section class="fl-card fl-ro-room">
+      <h3>{{ room.label }}</h3>
+      <ul class="fl-ro-list">
+        {% for line in room.lines %}
+        <li><span>{{ line.label }}</span><span class="fl-ro-qty">× {{ line.qty }}</span></li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endfor %}
+
+    {% if summary.custom_items %}
+    <section class="fl-card fl-ro-room">
+      <h3>Other items</h3>
+      <ul class="fl-ro-list">
+        {% for item in summary.custom_items %}
+        <li><span>{{ item.name }}{% if item.room %} <span class="fl-muted">· {{ item.room }}</span>{% endif %}{% if item.dims %} <span class="fl-muted">· {{ item.dims }}</span>{% endif %}{% if item.note %}<br><span class="fl-muted">{{ item.note }}</span>{% endif %}</span><span class="fl-ro-qty">× {{ item.qty }}</span></li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    {% if not summary.rooms and not summary.custom_items %}
+    <p class="fl-card fl-muted">No items added yet.</p>
+    {% endif %}
+
+    {% if summary.notes %}
+    <section class="fl-card">
+      <h3 class="fl-section-title">Customer notes</h3>
+      <p class="fl-notes-text">{{ summary.notes }}</p>
+    </section>
+    {% endif %}
+
+    {% if photos %}
+    <section class="fl-card">
+      <h3 class="fl-section-title">Photos ({{ photos|length }})</h3>
+      <div class="fl-photo-grid">
+        {% for photo in photos %}
+        <figure class="fl-photo"><a href="{{ url_for('staff_furniture_photo', token=token, photo_id=photo.id) }}" target="_blank" rel="noopener"><img src="{{ url_for('staff_furniture_photo', token=token, photo_id=photo.id) }}" alt="Customer photo" loading="lazy"></a></figure>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f3b2e">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Furniture list — Japanese Removals</title>
+  {% include '_head_icons.html' %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='furniture.css') }}">
+</head>
+<body class="fl-body fl-start-body">
+  <header class="fl-header">
+    <div class="fl-wrap fl-header-inner">
+      <img class="fl-logo" src="{{ url_for('static', filename='branding/japanese-removals-logo.png') }}" alt="">
+      <div>
+        <p class="fl-brand">Japanese Removals</p>
+        <p class="fl-header-sub">Furniture &amp; items list</p>
+      </div>
+    </div>
+  </header>
+  <main class="fl-wrap fl-main">
+    <section class="fl-card fl-intro">
+      <h1>Add your furniture list</h1>
+      <p>Tell us what we're moving, room by room. It's <strong>optional</strong>, takes a few minutes and helps us plan the right truck and team.</p>
+      <p class="fl-muted">You can save and come back later. We'll give you a list reference to include with your enquiry.</p>
+    </section>
+
+    {% if error %}
+    <p class="fl-card fl-error">Too many new lists from this connection. Please try again later or call us on 0481 089 573.</p>
+    {% endif %}
+
+    <section class="fl-card" id="fl-resume" hidden>
+      <h2>Continue your list</h2>
+      <p class="fl-muted">We found a list you started on this device.</p>
+      <div id="fl-resume-links"></div>
+    </section>
+
+    <form method="post" action="{{ url_for('furniture_create') }}" class="fl-card">
+      <input type="hidden" name="return_url" value="{{ return_url }}">
+      <button type="submit" class="fl-btn fl-btn-primary fl-btn-block" id="fl-start-new">Start a new list</button>
+      {% if return_url %}
+      <p class="fl-muted" style="margin-top:10px">Your booking form details are kept — you can go back to it at any time.</p>
+      <a class="fl-btn fl-btn-secondary fl-btn-block" href="{{ return_url }}#quote">Back to booking form</a>
+      {% endif %}
+    </form>
+  </main>
+  <script>
+  (function () {
+    var wanted = {{ code|tojson }};
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem("jr_furniture_lists") || "{}"); } catch (e) {}
+    var ids = Object.keys(saved).filter(function (id) {
+      var url = saved[id] && saved[id].url;
+      return url && url.indexOf(window.location.origin + "/furniture/") === 0;
+    });
+    if (wanted && saved[wanted]) { window.location.replace(saved[wanted].url); return; }
+    if (!ids.length) return;
+    ids.sort(function (a, b) { return saved[b].at - saved[a].at; });
+    var box = document.getElementById("fl-resume-links");
+    ids.slice(0, 3).forEach(function (id) {
+      var a = document.createElement("a");
+      a.className = "fl-btn fl-btn-primary fl-btn-block";
+      a.style.marginBottom = "8px";
+      a.href = saved[id].url;
+      a.textContent = "Continue list " + id;
+      box.appendChild(a);
+    });
+    document.getElementById("fl-resume").hidden = false;
+    var start = document.getElementById("fl-start-new");
+    start.className = "fl-btn fl-btn-secondary fl-btn-block";
+  })();
+  </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-{% set has_actions = job.pickup_map_url or job.delivery_map_url or job.tel_href or job.sms_href %}
+{% set has_actions = job.pickup_map_url or job.delivery_map_url or job.tel_href or job.sms_href or job.furniture_token %}
 {% if has_actions %}
 <div class="staff-job-actions{% if compact_actions %} staff-job-actions-compact{% endif %}">
   {% if job.pickup_map_url %}
@@ -12,6 +12,9 @@
   {% endif %}
   {% if job.sms_href %}
   <a class="staff-job-btn" href="{{ job.sms_href }}">Text</a>
+  {% endif %}
+  {% if job.furniture_token %}
+  <a class="staff-job-btn staff-job-btn-furniture" href="{{ url_for('staff_furniture_list', token=job.furniture_token) }}">Furniture{% if job.furniture_m3 %} · ~{{ '%.1f'|format(job.furniture_m3) }} m³{% endif %}</a>
   {% endif %}
 </div>
 {% endif %}

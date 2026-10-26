@@ -52,6 +52,7 @@
       <a href="{{ url_for('leads') }}" class="{% if request.endpoint == 'leads' %}active{% endif %}">Leads</a>
       <a href="{{ url_for('upcoming') }}" class="{% if request.endpoint == 'upcoming' %}active{% endif %}">Upcoming</a>
       <a href="{{ url_for('all_bookings') }}" class="{% if request.endpoint == 'all_bookings' %}active{% endif %}">All bookings</a>
+      <a href="{{ url_for('furniture_lists_index') }}" class="{% if request.endpoint in ('furniture_lists_index', 'office_furniture_list') %}active{% endif %}">Furniture lists</a>
       <a href="{{ url_for('export_csv') }}">Export CSV</a>
       <a href="{{ url_for('logout') }}" class="nav-logout">Log out{% if g.user %} ({{ g.user.username }}){% endif %}</a>
     </div>

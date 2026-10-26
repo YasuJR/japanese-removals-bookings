@@ -62,7 +62,7 @@ Auth key: **P** public · **L** `login_required` (office) · **A** `admin_requir
 
 | Area | Routes |
 |---|---|
-| Public / health | `/health` P · `/quote` GET/POST P (website quote form, rate limited) · `/review/go/<token>`, `/review/done/<token>` P · `/pay/<token>`, `/pay/<token>/success`, `/pay/<token>/cancel` P |
+| Public / health | `/health` P · `/quote` GET/POST P (website quote form, rate limited) · `/furniture`, `/furniture/start` P · `/furniture/<token>[/save|/photos|/photos/<id>[/delete]]` P (secret token, see §7b) · `/review/go/<token>`, `/review/done/<token>` P · `/pay/<token>`, `/pay/<token>/success`, `/pay/<token>/cancel` P |
 | Office auth | `/login`, `/logout` |
 | Settings (L) | `/settings`, `/settings/review`, `/settings/company`, `/settings/crew` (**A**), `/settings/trucks`, `/settings/sms`, `/settings/bank-transfers`, `/settings/xero`, `/settings/stripe`, `/settings/gmail` |
 | Integrations | `/integrations/google/connect` L, `/integrations/google/callback` L, `/integrations/xero/connect` L, `/integrations/xero/callback` P (state-checked), `/integrations/stripe/webhook` P (signature-verified), `/integrations/twilio/status` P, `/integrations/twilio/inbound` P |
@@ -229,6 +229,27 @@ Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out 
 
 ---
 
+## 7b. Customer furniture lists
+
+- Files: `furniture_catalog.py` (rooms, items, standard m³, `sanitize_content`, `summarize`), `furniture_lists.py` (storage, tokens, photos, linking), `static/furniture.js|css`, `templates/furniture_*.html`, `_booking_furniture_panel.html`, `static/furniture-embed.js` (website button).
+- Tables (`_ensure_furniture_list_tables`): **furniture_lists** has `public_id` (FL-XXXXXX), `access_token` (secret), `booking_id` (nullable, one list per booking), `source` (`booking`/`website`), `status` (`not_started`/`in_progress`/`submitted`), contact_* (website only), `content_json`, `estimated_m3`, counts, ISO-UTC `created_at`/`updated_at`/`submitted_at`, and `created_ip` (rate limit). **furniture_list_photos** stores JPEG bytes in the DB (`BYTEA`/`BLOB`), so photos survive redeploys. There is no disk.
+- **Access:**
+  - Customers reach their list only through `/furniture/<access_token>`. The 43-character token is never derived from the FL id. A photo is served only when `photo.list_id` matches the token's list.
+  - `public_id` is a reference only; only office users can open a list by it.
+  - Office routes (`/furniture-lists…`, `/bookings/<id>/furniture…`) are `login_required`.
+  - Staff open `/staff/furniture/<signed>`, a 30-day itsdangerous token per booking. It is added to Staff Portal job cards (`attach_staff_links`) only when the list has content.
+  - Public pages send `no-store`, `noindex` and `no-referrer`.
+- **m³** is an *estimate* only. Beds come as "bed + mattress", "frame only" or "mattress only" (mutually exclusive), so nothing is counted twice. Custom items count only when L×W×H are all given. It never sets price or time.
+- **Photos:** max 30 per list and 15 MB per upload. Pillow verifies JPEG/PNG/WebP/GIF, applies EXIF rotation, strips metadata (GPS) and re-encodes as JPEG at ≤2000px.
+- **Website flow:**
+  - `/furniture?return=<https://japaneseremovals.com.au/...>`, then POST `/furniture/start` creates a `website` list (20 per IP per hour).
+  - "Back to booking form" returns to the page with `?furniture_list=FL-XXXXXX#quote`. `safe_return_url` only allows https japaneseremovals.com.au.
+  - The WordPress quote form keeps its own draft (`jr_quote_draft_v1`). `furniture-embed.js` adds the button, re-opens step 2, and appends `Furniture list: FL-XXXXXX` to the message on send.
+  - **Linking:** opening a booking whose notes contain an FL id auto-links an unlinked list (`auto_link_from_booking_text`). Manual linking is on the booking page or `/furniture-lists/<id>`.
+- Homepage snippet (WordPress footer or Custom HTML): `<script src="https://japanese-removals-bookings.onrender.com/static/furniture-embed.js" defer></script>`. An optional `data-app` overrides the app URL.
+
+---
+
 ## 8. Truck conflict / double booking
 
 - **Blocking statuses** (`double_booking.blocks_availability`): Confirmed, On Route, Paid, Completed. Pending, Quote, Cancelled, In Progress and Invoiced never block.
@@ -337,6 +358,7 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 | Dashboard sections | `test_dashboard_payment_status_divider_e2e.py`, `test_dashboard_today_upcoming_divider_e2e.py`, `test_dashboard_wg_unpaid_e2e.py` (WG name matching, Regular vs WG split, no duplicates, oldest first, counts and totals, Paid leaves WG) |
 | Staff weekly PDF | `test_staff_weekly_pdf_e2e.py` (screen ↔ PDF job/paid match, sort, Sunday, overrides, break, 45-min call out, Extra Pay, no duplicates, long text/Japanese inside columns, year crossing, busy week) |
 | Postgres boot | `test_postgres_init_ddl_e2e.py`, `test_postgres_invoice_sequence_init.py` |
+| Furniture lists | `test_furniture_list_e2e.py` (m³ maths and no double count, save → re-edit → submit, photos and EXIF strip, cross-list isolation, office/staff access, website return link, auto-link from notes, rate limit). Passes on SQLite and Postgres |
 | Misc | `test_booking_cancel_e2e.py`, `test_mover_pricing_e2e.py`, `test_payment_sets_completed_e2e.py`, `test_navigation_e2e.py`, `test_search_invoice_number_e2e.py`, `test_job_note_display_e2e.py` |
 
 **Known test-baseline issues (as of 2026-10-17, verified identical on clean worktrees of `origin/main` = production code):**

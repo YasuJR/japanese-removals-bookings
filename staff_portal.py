@@ -9,10 +9,12 @@ from calendar import monthrange
 from collections import defaultdict
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+import logging
 import re
 
 import callout_pricing
 import database as db
+import furniture_lists
 import job_status
 from booking_helpers import apple_maps_url, pickup_suburb, sms_href, tel_href
 from booking_times import (
@@ -35,6 +37,8 @@ from display_dates import (
 import staff_job_times
 import star_points
 from weekly_schedule_data import _day_heading, _week_range_heading
+
+logger = logging.getLogger(__name__)
 
 RANGE_TODAY = "today"
 RANGE_CALENDAR = "calendar"
@@ -475,6 +479,8 @@ def _calendar_job_card(job: Dict[str, Any]) -> Dict[str, Any]:
         "sms_href": job.get("sms_href") or "",
         "pickup_map_url": job.get("pickup_map_url") or "",
         "delivery_map_url": job.get("delivery_map_url") or "",
+        "furniture_token": job.get("furniture_token") or "",
+        "furniture_status": job.get("furniture_status") or "",
         "job": job,
     }
 
@@ -1377,6 +1383,10 @@ def build_staff_portal(
         )
 
     jobs = _dedupe_jobs_by_id(jobs)
+    try:
+        furniture_lists.attach_staff_links(jobs)
+    except Exception:
+        logger.exception("Furniture list links failed in Staff Portal")
     if active_range == RANGE_TODAY:
         jobs.sort(key=job_start_sort_key)
     else:

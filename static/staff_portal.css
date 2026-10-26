@@ -2291,3 +2291,10 @@ a.staff-job-btn:active {
   text-transform: none;
   letter-spacing: normal;
 }
+
+.staff-job-btn-furniture {
+  color: #ffffff;
+  background: #0f3b2e;
+  border-color: #0f3b2e;
+  grid-column: 1 / -1;
+}

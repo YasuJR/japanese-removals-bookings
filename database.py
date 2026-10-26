@@ -214,6 +214,69 @@ def _ensure_booking_crew_hours_table(conn) -> None:
     _ensure_booking_crew_hours_columns(conn)
 
 
+def _ensure_furniture_list_tables(conn) -> None:
+    """Customer furniture lists (furniture_lists.py) and their photos."""
+    pg = db_backend.is_postgres()
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS furniture_lists (
+            id {pk},
+            public_id TEXT NOT NULL UNIQUE,
+            access_token TEXT NOT NULL UNIQUE,
+            booking_id INTEGER{booking_fk},
+            source TEXT NOT NULL DEFAULT 'booking',
+            status TEXT NOT NULL DEFAULT 'not_started',
+            contact_name TEXT NOT NULL DEFAULT '',
+            contact_email TEXT NOT NULL DEFAULT '',
+            contact_phone TEXT NOT NULL DEFAULT '',
+            contact_move_date TEXT NOT NULL DEFAULT '',
+            return_url TEXT NOT NULL DEFAULT '',
+            content_json TEXT NOT NULL DEFAULT '{{}}',
+            estimated_m3 {real} NOT NULL DEFAULT 0,
+            item_count INTEGER NOT NULL DEFAULT 0,
+            photo_count INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL DEFAULT '',
+            submitted_at TEXT NOT NULL DEFAULT '',
+            last_edited_by TEXT NOT NULL DEFAULT '',
+            created_ip TEXT NOT NULL DEFAULT ''
+        )
+        """.format(
+            pk="SERIAL PRIMARY KEY" if pg else "INTEGER PRIMARY KEY AUTOINCREMENT",
+            booking_fk=" REFERENCES bookings(id) ON DELETE SET NULL" if pg else "",
+            real="DOUBLE PRECISION" if pg else "REAL",
+        )
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS furniture_list_photos (
+            id {pk},
+            list_id INTEGER NOT NULL{list_fk},
+            content_type TEXT NOT NULL DEFAULT 'image/jpeg',
+            data {blob} NOT NULL,
+            size_bytes INTEGER NOT NULL DEFAULT 0,
+            width INTEGER NOT NULL DEFAULT 0,
+            height INTEGER NOT NULL DEFAULT 0,
+            caption TEXT NOT NULL DEFAULT '',
+            uploaded_by TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT ''
+        )
+        """.format(
+            pk="SERIAL PRIMARY KEY" if pg else "INTEGER PRIMARY KEY AUTOINCREMENT",
+            list_fk=" REFERENCES furniture_lists(id) ON DELETE CASCADE" if pg else "",
+            blob="BYTEA" if pg else "BLOB",
+        )
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_furniture_lists_booking "
+        "ON furniture_lists(booking_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_furniture_list_photos_list "
+        "ON furniture_list_photos(list_id)"
+    )
+
+
 def _ensure_booking_crew_hours_columns(conn) -> None:
     existing = db_backend.table_columns(conn, "booking_crew_hours")
     if "extra_paid_minutes" not in existing:
@@ -630,6 +693,7 @@ def init_db() -> None:
                 _ensure_crew_columns(conn)
                 _ensure_star_point_history_table(conn)
                 _ensure_booking_crew_hours_table(conn)
+                _ensure_furniture_list_tables(conn)
                 _ensure_invoice_sequence(conn)
                 _seed_crew_and_trucks(conn)
                 _ensure_indexes(conn)
@@ -814,6 +878,7 @@ def init_db() -> None:
         _ensure_crew_columns(conn)
         _ensure_star_point_history_table(conn)
         _ensure_booking_crew_hours_table(conn)
+        _ensure_furniture_list_tables(conn)
         _ensure_invoice_sequence(conn)
         _seed_crew_and_trucks(conn)
         _ensure_indexes(conn)

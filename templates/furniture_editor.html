@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f3b2e">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>{% if mode == 'office' %}{{ row.public_id }} furniture list{% else %}Your furniture list{% endif %} — Japanese Removals</title>
+  {% include '_head_icons.html' %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='furniture.css') }}">
+</head>
+<body class="fl-body fl-mode-{{ mode }}">
+  <header class="fl-header">
+    <div class="fl-wrap fl-header-inner">
+      <img class="fl-logo" src="{{ url_for('static', filename='branding/japanese-removals-logo.png') }}" alt="">
+      <div>
+        <p class="fl-brand">Japanese Removals</p>
+        <p class="fl-header-sub">Furniture &amp; items list</p>
+      </div>
+    </div>
+  </header>
+
+  {% if mode == 'office' %}
+  <section class="fl-office">
+    <div class="fl-wrap">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+      <p class="fl-flash fl-flash-{{ category }}">{{ message }}</p>
+      {% endfor %}
+      {% endwith %}
+      <nav class="fl-office-nav">
+        {% if booking %}
+        <a href="{{ url_for('view_booking', booking_id=row.booking_id) }}">← Booking #{{ row.booking_id }}</a>
+        {% endif %}
+        <a href="{{ url_for('furniture_lists_index') }}">All furniture lists</a>
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+      </nav>
+      <h1 class="fl-office-title">{{ row.public_id }} <span class="fl-chip fl-chip-{{ row.status }}">{{ row.status_label }}</span></h1>
+      <dl class="fl-office-grid">
+        <div><dt>Booking</dt><dd>{% if booking %}<a href="{{ url_for('view_booking', booking_id=row.booking_id) }}">#{{ row.booking_id }} · {{ booking.customer_name }}</a> · {{ move_date }}{% else %}Not linked{% endif %}</dd></div>
+        <div><dt>Source</dt><dd>{{ 'Website (before booking)' if row.source == 'website' else 'Booking link' }}</dd></div>
+        <div><dt>Last updated</dt><dd>{{ row.updated_display or '—' }}{% if row.last_edited_by %} · by {{ row.last_edited_by }}{% endif %}</dd></div>
+        <div><dt>Submitted</dt><dd>{{ row.submitted_display or '—' }}</dd></div>
+        {% if row.source == 'website' %}
+        <div><dt>Contact (from list)</dt><dd>{{ row.contact_name or '—' }} · {{ row.contact_phone or '—' }} · {{ row.contact_email or '—' }}{% if row.contact_move_date %} · move {{ row.contact_move_date }}{% endif %}</dd></div>
+        {% endif %}
+      </dl>
+      <div class="fl-office-actions">
+        <div class="fl-copy">
+          <label for="fl-customer-url">Customer link (private — only send to this customer)</label>
+          <div class="fl-copy-row">
+            <input id="fl-customer-url" type="text" readonly value="{{ customer_url }}">
+            <button type="button" class="fl-btn fl-btn-secondary" data-copy-target="fl-customer-url">Copy</button>
+          </div>
+        </div>
+        <form method="post" class="fl-inline-form">
+          <input type="hidden" name="action" value="status">
+          <label for="fl-status">Status</label>
+          <select id="fl-status" name="status">
+            {% for key, label in status_labels.items() %}
+            <option value="{{ key }}"{% if key == row.status %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="fl-btn fl-btn-secondary">Set</button>
+        </form>
+        {% if row.booking_id %}
+        <form method="post" class="fl-inline-form" onsubmit="return confirm('Unlink this list from booking #{{ row.booking_id }}?');">
+          <input type="hidden" name="action" value="unlink">
+          <button type="submit" class="fl-btn fl-btn-secondary">Unlink from booking</button>
+        </form>
+        {% else %}
+        <form method="post" class="fl-inline-form">
+          <input type="hidden" name="action" value="link">
+          <label for="fl-booking-id">Link to booking #</label>
+          <input id="fl-booking-id" name="booking_id" inputmode="numeric" pattern="#?[0-9]+" required placeholder="e.g. 142">
+          <button type="submit" class="fl-btn fl-btn-secondary">Link</button>
+        </form>
+        {% endif %}
+        <form method="post" class="fl-inline-form" onsubmit="return confirm('Delete {{ row.public_id }} and all its photos? This cannot be undone.');">
+          <input type="hidden" name="action" value="delete">
+          <button type="submit" class="fl-btn fl-btn-danger">Delete list</button>
+        </form>
+      </div>
+      <p class="fl-office-note">You are editing as office staff. Changes save to the same list the customer sees.</p>
+    </div>
+  </section>
+  {% endif %}
+
+  <main class="fl-wrap fl-main" id="fl-app">
+    {% if mode != 'office' %}
+    <section class="fl-card fl-intro">
+      <h1>{% if greeting %}Hi {{ greeting }}, w{% else %}W{% endif %}hat are we moving?</h1>
+      <p>Add your furniture room by room, plus any boxes and special items. It only takes a few minutes and helps us plan the right truck and team.</p>
+      {% if move_date %}<p class="fl-muted">Moving date: {{ move_date }}</p>{% endif %}
+      <p class="fl-ref">List reference <strong>{{ row.public_id }}</strong> · <span class="fl-chip fl-chip-{{ row.status }}" data-status-chip>{{ row.status_label }}</span></p>
+      <p class="fl-muted" data-saved-line>{% if row.updated_display and row.status != 'not_started' %}Last saved {{ row.updated_display }}{% endif %}</p>
+    </section>
+    {% endif %}
+
+    <noscript><p class="fl-card fl-error">Please turn on JavaScript to edit your list, or call us on 0481 089 573.</p></noscript>
+
+    {% if row.source == 'website' and mode != 'office' %}
+    <section class="fl-card" id="fl-contact">
+      <h2>Your details <span class="fl-opt">(optional)</span></h2>
+      <p class="fl-muted">Helps us match this list to your enquiry.</p>
+      <div class="fl-fields">
+        <label>Name<input type="text" name="name" autocomplete="name" maxlength="120" data-contact="name"></label>
+        <label>Mobile<input type="tel" name="phone" autocomplete="tel" inputmode="tel" maxlength="40" data-contact="phone"></label>
+        <label>Email<input type="email" name="email" autocomplete="email" maxlength="160" data-contact="email" autocapitalize="off"></label>
+        <label>Moving date<input type="date" name="move_date" data-contact="move_date"></label>
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="fl-section" aria-labelledby="fl-rooms-title">
+      <h2 id="fl-rooms-title" class="fl-section-title">Rooms</h2>
+      <p class="fl-muted fl-section-hint">Tap a room to open it, then use + and − to set how many.</p>
+      <div id="fl-rooms"></div>
+      <div class="fl-add-room">
+        <label for="fl-add-room-type">Add a room</label>
+        <div class="fl-copy-row">
+          <select id="fl-add-room-type"></select>
+          <button type="button" class="fl-btn fl-btn-secondary" id="fl-add-room">+ Add</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="fl-card" aria-labelledby="fl-other-title">
+      <h2 id="fl-other-title">Other items</h2>
+      <p class="fl-muted">Anything not in the lists above (e.g. aquarium, safe, artwork). Sizes are optional but help our estimate.</p>
+      <div id="fl-custom"></div>
+      <button type="button" class="fl-btn fl-btn-secondary fl-btn-block" id="fl-add-custom">+ Add an item</button>
+    </section>
+
+    <section class="fl-card" aria-labelledby="fl-photos-title">
+      <h2 id="fl-photos-title">Photos <span class="fl-opt">(optional)</span></h2>
+      <p class="fl-muted">Photos of large, heavy or unusual items help a lot. JPG, PNG or WebP, up to 15 MB each, max {{ max_photos }} photos.</p>
+      <div id="fl-photos" class="fl-photo-grid"></div>
+      <label class="fl-btn fl-btn-secondary fl-btn-block fl-upload">
+        <input type="file" id="fl-photo-input" accept="image/jpeg,image/png,image/webp,image/*" multiple>
+        + Add photos
+      </label>
+      <p class="fl-photo-status" id="fl-photo-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="fl-card" aria-labelledby="fl-notes-title">
+      <h2 id="fl-notes-title"><label for="fl-notes">Notes <span class="fl-opt">(optional)</span></label></h2>
+      <textarea id="fl-notes" rows="4" maxlength="4000" placeholder="Stairs or lifts, parking, items to dismantle, fragile or very heavy items…"></textarea>
+    </section>
+
+    <section class="fl-card fl-estimate" aria-live="polite">
+      <h2>Approximate volume</h2>
+      <p class="fl-estimate-value"><span id="fl-m3">0.0</span> m³ <span class="fl-estimate-tag">estimate</span></p>
+      <p class="fl-muted" id="fl-estimate-detail"></p>
+      <p class="fl-muted">This is a rough guide based on typical item sizes. It is <strong>not a quote</strong> — we will confirm the price, team and time with you.</p>
+    </section>
+
+    {% if mode != 'office' %}
+    <section class="fl-card fl-done" id="fl-done" hidden>
+      <h2>Thank you!</h2>
+      <p>Your list <strong>{{ row.public_id }}</strong> has been sent to Japanese Removals. You can come back and update it any time using the same link.</p>
+      {% if return_link %}
+      <a class="fl-btn fl-btn-primary fl-btn-block" href="{{ return_link }}" data-return-link>Back to booking form</a>
+      {% endif %}
+    </section>
+    <section class="fl-card fl-keep">
+      <h2>Keep this link</h2>
+      <p class="fl-muted">This private link lets you (and only you) see and edit this list. Please don't share it publicly.</p>
+      <div class="fl-copy-row">
+        <input id="fl-own-url" type="text" readonly value="{{ customer_url }}" aria-label="Your private list link">
+        <button type="button" class="fl-btn fl-btn-secondary" data-copy-target="fl-own-url">Copy</button>
+      </div>
+    </section>
+    {% endif %}
+  </main>
+
+  <div class="fl-bar" role="region" aria-label="Save your list">
+    <div class="fl-wrap fl-bar-inner">
+      <div class="fl-bar-summary">
+        <strong><span id="fl-bar-m3">0.0</span> m³</strong> <span class="fl-muted">approx. · <span id="fl-bar-count">0</span> items</span>
+        <span class="fl-save-state" id="fl-save-state" role="status" aria-live="polite"></span>
+      </div>
+      <div class="fl-bar-actions">
+        {% if mode == 'office' %}
+        <button type="button" class="fl-btn fl-btn-primary" id="fl-save">Save changes</button>
+        {% else %}
+        {% if return_link %}
+        <a class="fl-btn fl-btn-secondary" href="{{ return_link }}" id="fl-back" data-return-link>Back to form</a>
+        {% endif %}
+        <button type="button" class="fl-btn fl-btn-secondary" id="fl-save">Save</button>
+        <button type="button" class="fl-btn fl-btn-primary" id="fl-submit">{{ 'Update list' if row.status == 'submitted' else 'Send list' }}</button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <script type="application/json" id="fl-data">{{ {
+    "mode": mode,
+    "state": state,
+    "catalog": catalog,
+    "endpoints": endpoints,
+    "max_photos": max_photos,
+    "public_id": row.public_id,
+    "own_url": customer_url if mode != 'office' else '',
+    "return_link": return_link
+  }|tojson }}</script>
+  <script src="{{ url_for('static', filename='furniture.js') }}"></script>
+</body>
+</html>

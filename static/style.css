@@ -3901,3 +3901,22 @@ button:disabled {
   height: 0;
   overflow: hidden;
 }
+
+/* Furniture lists (office) */
+.furniture-status {
+  display: inline-block;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: #eef0ee;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.furniture-status-in_progress { background: #fff4d6; color: #7a5600; }
+.furniture-status-submitted { background: #e8f1ed; color: #0f3b2e; }
+.furniture-panel-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.6rem; }
+.furniture-copy-fallback { width: 100%; margin-top: 0.5rem; }
+.furniture-attach-hint { margin-top: 0.75rem; }
+.furniture-lookup-form { display: flex; gap: 0.5rem; align-items: center; }
+.furniture-lookup-form input { max-width: 10rem; }

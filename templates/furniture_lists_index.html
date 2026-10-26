@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Furniture lists{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-head panel-head-wrap">
+    <div class="panel-head-main">
+      <h2>Furniture lists</h2>
+      <p class="hint">Customer furniture &amp; item lists. Website lists can be linked to a booking from the list page, or automatically when the booking notes contain the list reference (e.g. FL-ABC234).</p>
+    </div>
+    <form method="post" class="furniture-lookup-form">
+      <input id="fl-code" name="code" placeholder="FL-XXXXXX" aria-label="List reference" required>
+      <button type="submit" class="btn-secondary btn-sm">Open</button>
+    </form>
+  </div>
+  {% if lists %}
+  <div class="table-scroll">
+    <table class="sheet">
+      <thead>
+        <tr><th>Reference</th><th>Status</th><th>Booking / contact</th><th>Approx. m³</th><th>Items</th><th>Photos</th><th>Source</th><th>Last updated</th></tr>
+      </thead>
+      <tbody>
+        {% for f in lists %}
+        <tr>
+          <td><a class="customer-link" href="{{ url_for('office_furniture_list', list_id=f.id) }}"><strong>{{ f.public_id }}</strong></a></td>
+          <td>{% include '_furniture_status_badge.html' %}</td>
+          <td>
+            {% if f.booking_id %}
+            <a href="{{ url_for('view_booking', booking_id=f.booking_id) }}">#{{ f.booking_id }} · {{ f.booking_customer or '—' }}</a>
+            {% else %}
+            <span class="muted">Not linked</span>{% if f.contact_name or f.contact_phone %} · {{ f.contact_name }} {{ f.contact_phone }}{% endif %}
+            {% endif %}
+          </td>
+          <td class="center">{{ '%.1f'|format(f.estimated_m3 or 0) }}</td>
+          <td class="center">{{ f.item_count }}</td>
+          <td class="center">{{ f.photo_count }}</td>
+          <td>{{ 'Website' if f.source == 'website' else 'Booking' }}</td>
+          <td class="nowrap">{{ f.updated_display }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No furniture lists yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

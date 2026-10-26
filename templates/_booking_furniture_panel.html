@@ -1,0 +1,51 @@
+<section class="booking-details-section booking-furniture-section" id="furniture-list">
+  <h3>Furniture list</h3>
+  {% set f = furniture %}
+  {% if f and f.status != 'not_started' %}
+  <dl class="booking-details-grid">
+    <div><dt>Status</dt><dd>{% include '_furniture_status_badge.html' %}</dd></div>
+    <div><dt>Last updated</dt><dd>{{ f.updated_display or '—' }}</dd></div>
+    <div><dt>Approx. volume</dt><dd>{{ '%.1f'|format(f.estimated_m3) }} m³ <span class="muted">(estimate)</span></dd></div>
+    <div><dt>Items / photos</dt><dd>{{ f.item_count }} item{{ '' if f.item_count == 1 else 's' }} · {{ f.photo_count }} photo{{ '' if f.photo_count == 1 else 's' }}</dd></div>
+    <div><dt>Reference</dt><dd>{{ f.public_id }}</dd></div>
+  </dl>
+  {% else %}
+  <p class="hint">Status: <span class="furniture-status furniture-status-not_started">Not started</span>{% if f %} · link created ({{ f.public_id }}){% endif %}</p>
+  {% endif %}
+  <div class="furniture-panel-actions">
+    <a class="btn-primary btn-sm" href="{{ url_for('booking_furniture', booking_id=booking.id) }}">Furniture list</a>
+    <button type="button" class="btn-secondary btn-sm" data-furniture-copy="{{ url_for('booking_furniture_link', booking_id=booking.id) }}">Copy input link</button>
+    <span class="hint furniture-copy-status" role="status" aria-live="polite"></span>
+  </div>
+  <input type="text" class="furniture-copy-fallback" readonly hidden aria-label="Customer furniture list link">
+  {% if not f or f.status == 'not_started' %}
+  <p class="hint furniture-attach-hint">Customer already made a list on the website? Open it from <a href="{{ url_for('furniture_lists_index') }}">Furniture lists</a> (search the FL reference) and use “Link to booking #{{ booking.id }}”. Lists are also linked automatically when the booking notes contain the FL reference.</p>
+  {% endif %}
+</section>
+<script>
+(function () {
+  var button = document.querySelector("[data-furniture-copy]");
+  if (!button) return;
+  var status = document.querySelector(".furniture-copy-status");
+  var fallback = document.querySelector(".furniture-copy-fallback");
+  button.addEventListener("click", function () {
+    status.textContent = "Creating link…";
+    fetch(button.getAttribute("data-furniture-copy"), { method: "POST", credentials: "same-origin" })
+      .then(function (res) { return res.json(); })
+      .then(function (body) {
+        if (!body.ok) throw new Error(body.error || "failed");
+        function shown() {
+          fallback.hidden = false;
+          fallback.value = body.url;
+          fallback.select();
+        }
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(body.url).then(function () {
+            status.textContent = "Copied " + body.public_id + " link — paste it into an SMS or email to the customer.";
+          }, function () { shown(); status.textContent = "Copy the link below:"; });
+        } else { shown(); status.textContent = "Copy the link below:"; }
+      })
+      .catch(function () { status.textContent = "Could not create the link. Please try again."; });
+  });
+})();
+</script>

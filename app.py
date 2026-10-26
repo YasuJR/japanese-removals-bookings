@@ -75,6 +75,8 @@ from crew import CREW_OPTIONS, active_crew_names, all_crew_names, crew_from_stor
 from resource_conflicts import find_resource_conflict_warnings
 from trucks import active_truck_names
 import double_booking
+import furniture_catalog
+import furniture_lists
 import job_status
 from crew_schedule_data import RANGE_OPTIONS, build_crew_schedule
 from ceo_dashboard_data import build_ceo_dashboard
@@ -2494,11 +2496,370 @@ def view_booking(booking_id):
     if row is None:
         flash("Booking not found.", "error")
         return redirect(url_for("all_bookings"))
+    try:
+        furniture_lists.auto_link_from_booking_text(row)
+        furniture = furniture_lists.get_for_booking(booking_id)
+    except Exception:
+        app.logger.exception("Furniture list lookup failed for booking %s", booking_id)
+        furniture = None
     return render_template(
         "view_booking.html",
         booking=row,
+        furniture=furniture,
         **_view_booking_extras(row),
     )
+
+
+# ---------------------------------------------------------------- Furniture lists
+# Customer pages are public but scoped to one list by its secret token.
+
+
+def _furniture_private(response):
+    response.headers["Cache-Control"] = "private, no-store"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+def _furniture_not_found():
+    return _furniture_private(
+        app.make_response((render_template("furniture_missing.html"), 404))
+    )
+
+
+def _furniture_date_text(value) -> str:
+    parts = format_display_date(value)
+    if parts["weekday"] == "—":
+        return "" if parts["day_month"] == "—" else parts["day_month"]
+    return "{0} {1}".format(parts["weekday"], parts["day_month"])
+
+
+def _furniture_json_body() -> dict:
+    payload = request.get_json(silent=True)
+    return payload if isinstance(payload, dict) else {}
+
+
+def _furniture_editor_page(row, mode: str, **extra):
+    endpoints = {}
+    if mode == "office":
+        endpoints = {
+            "save": url_for("office_furniture_save", list_id=row["id"]),
+            "upload": url_for("office_furniture_photo_upload", list_id=row["id"]),
+            "photo": url_for("office_furniture_photo", list_id=row["id"], photo_id=0),
+            "delete_photo": url_for("office_furniture_photo_delete", list_id=row["id"], photo_id=0),
+        }
+    else:
+        token = row["access_token"]
+        endpoints = {
+            "save": url_for("furniture_save", token=token),
+            "upload": url_for("furniture_photo_upload", token=token),
+            "photo": url_for("furniture_photo", token=token, photo_id=0),
+            "delete_photo": url_for("furniture_photo_delete", token=token, photo_id=0),
+        }
+    booking = db.get_booking(row["booking_id"]) if row.get("booking_id") else None
+    greeting = ""
+    if booking is not None and mode != "office":
+        first = str(dict(booking).get("customer_name") or "").split()
+        greeting = first[0] if first else ""
+    response = app.make_response(
+        render_template(
+            "furniture_editor.html",
+            mode=mode,
+            row=row,
+            booking=booking,
+            greeting=greeting,
+            move_date=_furniture_date_text(dict(booking).get("move_date")) if booking is not None else "",
+            state=furniture_lists.editor_state(row),
+            catalog=furniture_catalog.catalog_payload(),
+            endpoints=endpoints,
+            return_link=furniture_lists.return_link(row) if mode != "office" else "",
+            customer_url=url_for("furniture_edit", token=row["access_token"], _external=True),
+            max_photos=furniture_lists.MAX_PHOTOS,
+            **extra,
+        )
+    )
+    return _furniture_private(response)
+
+
+def _furniture_save_response(row, editor: str):
+    payload = _furniture_json_body()
+    updated = furniture_lists.save_content(
+        row, payload, editor=editor, submit=bool(payload.get("submit"))
+    )
+    return jsonify(
+        {
+            "ok": True,
+            "status": updated["status"],
+            "status_label": updated["status_label"],
+            "updated_display": updated["updated_display"],
+            "estimated_m3": updated["estimated_m3"],
+            "item_count": updated["item_count"],
+            "return_link": furniture_lists.return_link(updated),
+        }
+    )
+
+
+def _furniture_photo_upload_response(row, uploaded_by: str):
+    if (request.content_length or 0) > furniture_lists.MAX_UPLOAD_BYTES + 1024 * 1024:
+        return jsonify({"ok": False, "error": "Photos must be 15 MB or smaller."}), 413
+    upload = request.files.get("photo")
+    if upload is None:
+        return jsonify({"ok": False, "error": "No photo received."}), 400
+    raw = upload.stream.read(furniture_lists.MAX_UPLOAD_BYTES + 1)
+    try:
+        photo = furniture_lists.add_photo(row, raw, uploaded_by=uploaded_by)
+    except furniture_lists.FurnitureError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "photo": photo})
+
+
+def _furniture_photo_response(list_id: int, photo_id: int):
+    photo = furniture_lists.get_photo(list_id, photo_id)
+    if not photo:
+        abort(404)
+    response = app.make_response(photo["data"])
+    response.headers["Content-Type"] = photo["content_type"] or "image/jpeg"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Content-Disposition"] = "inline"
+    response.headers["Cache-Control"] = "private, max-age=3600"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+@app.route("/furniture", methods=["GET"], endpoint="furniture_start")
+def furniture_start():
+    response = app.make_response(
+        render_template(
+            "furniture_start.html",
+            return_url=furniture_lists.safe_return_url(request.args.get("return")),
+            code=furniture_lists.normalize_public_id(request.args.get("code")),
+            error=request.args.get("error") == "limit",
+        )
+    )
+    return _furniture_private(response)
+
+
+@app.route("/furniture/start", methods=["POST"], endpoint="furniture_create")
+def furniture_create():
+    ip_address = request.remote_addr or ""
+    return_url = furniture_lists.safe_return_url(request.form.get("return_url"))
+    if furniture_lists.website_lists_created_recently(ip_address) >= furniture_lists.WEBSITE_LISTS_PER_IP_PER_HOUR:
+        return redirect(url_for("furniture_start", error="limit", **({"return": return_url} if return_url else {})))
+    row = furniture_lists.create_list(
+        furniture_lists.SOURCE_WEBSITE, return_url=return_url, created_ip=ip_address
+    )
+    return redirect(url_for("furniture_edit", token=row["access_token"]))
+
+
+@app.route("/furniture/<token>", methods=["GET"], endpoint="furniture_edit")
+def furniture_edit(token):
+    row = furniture_lists.get_by_token(token)
+    if not row:
+        return _furniture_not_found()
+    return _furniture_editor_page(row, "customer")
+
+
+@app.route("/furniture/<token>/save", methods=["POST"], endpoint="furniture_save")
+def furniture_save(token):
+    row = furniture_lists.get_by_token(token)
+    if not row:
+        return jsonify({"ok": False, "error": "This link is not valid."}), 404
+    return _furniture_save_response(row, editor="customer")
+
+
+@app.route("/furniture/<token>/photos", methods=["POST"], endpoint="furniture_photo_upload")
+def furniture_photo_upload(token):
+    row = furniture_lists.get_by_token(token)
+    if not row:
+        return jsonify({"ok": False, "error": "This link is not valid."}), 404
+    return _furniture_photo_upload_response(row, uploaded_by="customer")
+
+
+@app.route("/furniture/<token>/photos/<int:photo_id>", methods=["GET"], endpoint="furniture_photo")
+def furniture_photo(token, photo_id):
+    row = furniture_lists.get_by_token(token)
+    if not row:
+        abort(404)
+    return _furniture_photo_response(row["id"], photo_id)
+
+
+@app.route(
+    "/furniture/<token>/photos/<int:photo_id>/delete",
+    methods=["POST"],
+    endpoint="furniture_photo_delete",
+)
+def furniture_photo_delete(token, photo_id):
+    row = furniture_lists.get_by_token(token)
+    if not row:
+        return jsonify({"ok": False, "error": "This link is not valid."}), 404
+    return jsonify({"ok": furniture_lists.delete_photo(row["id"], photo_id)})
+
+
+@app.route("/furniture-lists", methods=["GET", "POST"], endpoint="furniture_lists_index")
+@auth.login_required
+def furniture_lists_index():
+    if request.method == "POST":
+        code = request.form.get("code", "")
+        row = furniture_lists.get_by_public_id(code)
+        if row:
+            return redirect(url_for("office_furniture_list", list_id=row["id"]))
+        flash("No furniture list found for {0}.".format(code.strip() or "that code"), "error")
+        return redirect(url_for("furniture_lists_index"))
+    return render_template(
+        "furniture_lists_index.html", lists=furniture_lists.list_recent()
+    )
+
+
+@app.route("/furniture-lists/<int:list_id>", methods=["GET", "POST"], endpoint="office_furniture_list")
+@auth.login_required
+def office_furniture_list(list_id):
+    row = furniture_lists.get_by_id(list_id)
+    if not row:
+        flash("Furniture list not found.", "error")
+        return redirect(url_for("furniture_lists_index"))
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        try:
+            if action == "link":
+                booking_id = int(str(request.form.get("booking_id") or "").strip().lstrip("#") or 0)
+                furniture_lists.link_to_booking(row["id"], booking_id)
+                flash("Linked {0} to booking #{1}.".format(row["public_id"], booking_id), "success")
+            elif action == "unlink":
+                furniture_lists.unlink(row["id"])
+                flash("Unlinked {0}.".format(row["public_id"]), "success")
+            elif action == "status":
+                furniture_lists.set_status(row, request.form.get("status", ""), editor="office")
+                flash("Status updated.", "success")
+            elif action == "delete":
+                furniture_lists.delete_list(row["id"])
+                flash("Deleted furniture list {0}.".format(row["public_id"]), "success")
+                if row.get("booking_id"):
+                    return redirect(url_for("view_booking", booking_id=row["booking_id"]))
+                return redirect(url_for("furniture_lists_index"))
+        except (ValueError, furniture_lists.FurnitureError) as exc:
+            flash(str(exc) or "Could not update the furniture list.", "error")
+        return redirect(url_for("office_furniture_list", list_id=list_id))
+    return _furniture_editor_page(
+        row,
+        "office",
+        status_labels=furniture_lists.STATUS_LABELS,
+    )
+
+
+@app.route("/furniture-lists/<int:list_id>/save", methods=["POST"], endpoint="office_furniture_save")
+@auth.login_required
+def office_furniture_save(list_id):
+    row = furniture_lists.get_by_id(list_id)
+    if not row:
+        return jsonify({"ok": False, "error": "Not found."}), 404
+    return _furniture_save_response(row, editor="office")
+
+
+@app.route("/furniture-lists/<int:list_id>/photos", methods=["POST"], endpoint="office_furniture_photo_upload")
+@auth.login_required
+def office_furniture_photo_upload(list_id):
+    row = furniture_lists.get_by_id(list_id)
+    if not row:
+        return jsonify({"ok": False, "error": "Not found."}), 404
+    return _furniture_photo_upload_response(row, uploaded_by="office")
+
+
+@app.route("/furniture-lists/<int:list_id>/photos/<int:photo_id>", endpoint="office_furniture_photo")
+@auth.login_required
+def office_furniture_photo(list_id, photo_id):
+    return _furniture_photo_response(list_id, photo_id)
+
+
+@app.route(
+    "/furniture-lists/<int:list_id>/photos/<int:photo_id>/delete",
+    methods=["POST"],
+    endpoint="office_furniture_photo_delete",
+)
+@auth.login_required
+def office_furniture_photo_delete(list_id, photo_id):
+    return jsonify({"ok": furniture_lists.delete_photo(list_id, photo_id)})
+
+
+@app.route("/bookings/<int:booking_id>/furniture", methods=["GET"], endpoint="booking_furniture")
+@auth.login_required
+def booking_furniture(booking_id):
+    if db.get_booking(booking_id) is None:
+        flash("Booking not found.", "error")
+        return redirect(url_for("all_bookings"))
+    row = furniture_lists.ensure_for_booking(booking_id)
+    return redirect(url_for("office_furniture_list", list_id=row["id"]))
+
+
+@app.route("/bookings/<int:booking_id>/furniture/link", methods=["POST"], endpoint="booking_furniture_link")
+@auth.login_required
+def booking_furniture_link(booking_id):
+    if db.get_booking(booking_id) is None:
+        return jsonify({"ok": False, "error": "Booking not found."}), 404
+    row = furniture_lists.ensure_for_booking(booking_id)
+    return jsonify(
+        {
+            "ok": True,
+            "public_id": row["public_id"],
+            "url": url_for("furniture_edit", token=row["access_token"], _external=True),
+        }
+    )
+
+
+@app.route("/bookings/<int:booking_id>/furniture/attach", methods=["POST"], endpoint="booking_furniture_attach")
+@auth.login_required
+def booking_furniture_attach(booking_id):
+    code = request.form.get("code", "")
+    row = furniture_lists.get_by_public_id(code)
+    if not row:
+        flash("No furniture list found for {0}.".format(code.strip() or "that code"), "error")
+    else:
+        try:
+            furniture_lists.link_to_booking(row["id"], booking_id)
+            flash("Linked furniture list {0}.".format(row["public_id"]), "success")
+        except furniture_lists.FurnitureError as exc:
+            flash(str(exc), "error")
+    return redirect(url_for("view_booking", booking_id=booking_id))
+
+
+def _staff_furniture_row(token):
+    booking_id = furniture_lists.booking_id_from_staff_token(token)
+    if not booking_id:
+        return None, None
+    booking = db.get_booking(booking_id)
+    row = furniture_lists.get_for_booking(booking_id)
+    if booking is None or not row:
+        return None, None
+    return booking, row
+
+
+@app.route("/staff/furniture/<token>", endpoint="staff_furniture_list")
+@staff_auth.staff_login_required
+def staff_furniture_list(token):
+    booking, row = _staff_furniture_row(token)
+    if not row:
+        return _furniture_not_found()
+    booking = dict(booking)
+    response = app.make_response(
+        render_template(
+            "furniture_staff.html",
+            token=token,
+            row=row,
+            booking=booking,
+            move_date=_furniture_date_text(booking.get("move_date")),
+            summary=furniture_catalog.summarize(row["content"]),
+            photos=furniture_lists.list_photos(row["id"]),
+        )
+    )
+    return _furniture_private(response)
+
+
+@app.route("/staff/furniture/<token>/photos/<int:photo_id>", endpoint="staff_furniture_photo")
+@staff_auth.staff_login_required
+def staff_furniture_photo(token, photo_id):
+    _booking, row = _staff_furniture_row(token)
+    if not row:
+        abort(404)
+    return _furniture_photo_response(row["id"], photo_id)
 
 
 @app.route("/bookings/<int:booking_id>/edit", methods=["GET", "POST"])

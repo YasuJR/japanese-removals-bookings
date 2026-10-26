@@ -1,0 +1,387 @@
+#!/usr/bin/env python3
+"""E2E tests — customer furniture & items lists (customer link, office, staff, website)."""
+
+import io
+import json
+import os
+import re
+import sys
+from datetime import date, timedelta
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-local-tests-only")
+for _flag in ("GOOGLE_CALENDAR_ENABLED", "GMAIL_INBOX_ENABLED", "XERO_ENABLED", "SMS_ENABLED", "STRIPE_ENABLED", "EMAIL_ENABLED"):
+    os.environ.setdefault(_flag, "false")
+
+import auth
+import database as db
+import furniture_catalog as catalog
+import furniture_lists
+from app import app
+from staff_portal import RANGE_TODAY, build_staff_portal
+
+_counter = 0
+
+
+def _tag():
+    global _counter
+    _counter += 1
+    return "{0}-{1}".format(os.getpid(), _counter)
+
+
+def _office_client():
+    db.init_db()
+    label = "fl-test-{0}".format(_tag())
+    uid = db.create_staff_user(label, auth.hash_password("test"), "Furniture Test")
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = uid
+        sess["username"] = label
+    return client
+
+
+def _public_client(ip="10.9.0.1"):
+    client = app.test_client()
+    client.environ_base["REMOTE_ADDR"] = ip
+    return client
+
+
+def _booking(name, move_date=None, crew="", notes="furniture test"):
+    db.init_db()
+    return db.create_booking(
+        name, "0400111222", "fl-test@example.com", "1 Test St, Perth", "2 Test Ave, Fremantle",
+        move_date or (date.today() + timedelta(days=5)).isoformat(), 2, notes, crew=crew,
+        status="Confirmed",
+    )
+
+
+def _token_from_url(url):
+    return url.rstrip("/").split("/furniture/")[-1]
+
+
+def _png_bytes(size=(1200, 800), color=(200, 30, 30)):
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", size, color).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _jpeg_with_exif():
+    from PIL import Image
+
+    image = Image.new("RGB", (640, 480), (20, 120, 60))
+    exif = Image.Exif()
+    exif[0x010F] = "SecretCamera"  # Make
+    exif[0x0112] = 6  # Orientation: rotate 90
+    buf = io.BytesIO()
+    image.save(buf, format="JPEG", exif=exif)
+    return buf.getvalue()
+
+
+def _sample_content():
+    return {
+        "rooms": [
+            {"id": "r1", "type": "bedroom", "label": "Bedroom 1", "items": {"bed_queen": 1, "bedside_table": 2}},
+            {"id": "r2", "type": "living", "label": "Living room", "items": {"sofa_3": 1, "tv_small": 1, "bogus_item": 4}},
+            {"id": "r3", "type": "nope", "label": "Hacked", "items": {"sofa_3": 9}},
+        ],
+        "custom_items": [
+            {"name": "Fish tank", "qty": 1, "length_cm": 120, "width_cm": 50, "height_cm": 60},
+            {"name": "Antique clock", "qty": 2},
+            {"name": "", "qty": 3},
+        ],
+        "notes": "2nd floor, no lift. <script>alert(1)</script>",
+    }
+
+
+def test_catalog_math_and_no_double_count():
+    content = catalog.sanitize_content(_sample_content())
+    assert [r["type"] for r in content["rooms"]] == ["bedroom", "living"]
+    assert "bogus_item" not in content["rooms"][1]["items"]
+    assert len(content["custom_items"]) == 2
+    s = catalog.summarize(content)
+    expected = 1.8 + 2 * 0.2 + 1.7 + 0.2 + (1.2 * 0.5 * 0.6)
+    assert abs(s["estimated_m3"] - round(expected, 1)) < 1e-9, s
+    assert s["item_count"] == 1 + 2 + 1 + 1 + 1 + 2
+    assert s["unsized_custom_count"] == 2
+    # Bed with mattress, frame only and mattress only are separate, mutually exclusive choices.
+    assert catalog.ITEMS["bed_queen"][1] == 1.8
+    assert catalog.ITEMS["bed_frame_queen"][1] + catalog.ITEMS["mattress_queen"][1] <= 1.8 + 1e-9
+    assert "mattress" in catalog.ITEMS["bed_queen"][0].lower()
+    # Quantities are clamped.
+    clamped = catalog.sanitize_content({"rooms": [{"id": "x", "type": "living", "items": {"sofa_3": 99999}}]})
+    assert clamped["rooms"][0]["items"]["sofa_3"] == catalog.MAX_QTY
+    return True
+
+
+def test_booking_link_save_reedit_submit_and_office_view():
+    tag = _tag()
+    name = "Furniture Customer {0}".format(tag)
+    other = "Other Customer {0}".format(tag)
+    booking_id = _booking(name)
+    _booking(other)
+    office = _office_client()
+
+    page = office.get("/bookings/{0}".format(booking_id)).get_data(as_text=True)
+    assert "Furniture list" in page and "Copy input link" in page and "Not started" in page
+
+    res = office.post("/bookings/{0}/furniture/link".format(booking_id)).get_json()
+    assert res["ok"] and res["public_id"].startswith("FL-")
+    again = office.post("/bookings/{0}/furniture/link".format(booking_id)).get_json()
+    assert again["url"] == res["url"], "link must be stable per booking"
+    token = _token_from_url(res["url"])
+    assert len(token) >= 40
+
+    customer = _public_client()
+    html = customer.get("/furniture/{0}".format(token))
+    assert html.status_code == 200
+    body = html.get_data(as_text=True)
+    assert res["public_id"] in body and "Hi Furniture" in body
+    assert other not in body and "0400111222" not in body and "1 Test St" not in body
+    assert "no-store" in html.headers["Cache-Control"] and "noindex" in html.headers["X-Robots-Tag"]
+
+    save = customer.post("/furniture/{0}/save".format(token), json={"content": _sample_content()}).get_json()
+    assert save["ok"] and save["status"] == "in_progress", save
+    assert save["estimated_m3"] == 4.5 and save["item_count"] == 8, save
+
+    # Re-open: saved state comes back.
+    body = customer.get("/furniture/{0}".format(token)).get_data(as_text=True)
+    data = json.loads(re.search(r'<script type="application/json" id="fl-data">(.*?)</script>', body, re.S).group(1))
+    rooms = {r["label"]: r for r in data["state"]["content"]["rooms"]}
+    assert rooms["Bedroom 1"]["items"] == {"bed_queen": 1, "bedside_table": 2}
+    assert "<script>alert(1)</script>" not in body.split('id="fl-data">')[0]
+
+    # Edit and submit.
+    edited = _sample_content()
+    edited["rooms"][0]["items"]["bed_queen"] = 2
+    sub = customer.post("/furniture/{0}/save".format(token), json={"content": edited, "submit": True}).get_json()
+    assert sub["status"] == "submitted" and sub["estimated_m3"] == 6.3, sub
+    row = furniture_lists.get_for_booking(booking_id)
+    assert row["submitted_at"] and row["last_edited_by"] == "customer"
+
+    # Later customer edits keep Submitted.
+    edited["rooms"][0]["items"]["bed_queen"] = 1
+    later = customer.post("/furniture/{0}/save".format(token), json={"content": edited}).get_json()
+    assert later["status"] == "submitted"
+
+    page = office.get("/bookings/{0}".format(booking_id)).get_data(as_text=True)
+    assert "Submitted" in page and "4.5 m³" in page and res["public_id"] in page
+    # Office editor (same list) and office save.
+    office_page = office.get("/bookings/{0}/furniture".format(booking_id), follow_redirects=True)
+    assert office_page.status_code == 200 and res["public_id"] in office_page.get_data(as_text=True)
+    office_save = office.post("/furniture-lists/{0}/save".format(row["id"]), json={"content": {"rooms": [], "custom_items": [], "notes": "office fix"}}).get_json()
+    assert office_save["ok"] and office_save["status"] == "submitted" and office_save["estimated_m3"] == 0
+    assert furniture_lists.get_by_id(row["id"])["last_edited_by"] == "office"
+    listing = office.get("/furniture-lists").get_data(as_text=True)
+    assert res["public_id"] in listing
+    return True
+
+
+def test_photos_storage_limits_and_isolation():
+    tag = _tag()
+    office = _office_client()
+    a_id = _booking("Photo A {0}".format(tag))
+    b_id = _booking("Photo B {0}".format(tag))
+    a_token = _token_from_url(office.post("/bookings/{0}/furniture/link".format(a_id)).get_json()["url"])
+    b_token = _token_from_url(office.post("/bookings/{0}/furniture/link".format(b_id)).get_json()["url"])
+    client = _public_client()
+
+    up = client.post("/furniture/{0}/photos".format(a_token), data={"photo": (io.BytesIO(_jpeg_with_exif()), "sofa.jpg")}, content_type="multipart/form-data").get_json()
+    assert up["ok"], up
+    photo_id = up["photo"]["id"]
+    # Rotation applied (640x480 with orientation 6 → 480x640) and EXIF stripped.
+    assert (up["photo"]["width"], up["photo"]["height"]) == (480, 640), up
+    got = client.get("/furniture/{0}/photos/{1}".format(a_token, photo_id))
+    assert got.status_code == 200 and got.headers["Content-Type"] == "image/jpeg"
+    assert got.headers["X-Content-Type-Options"] == "nosniff"
+    assert b"SecretCamera" not in got.data
+
+    big = client.post("/furniture/{0}/photos".format(a_token), data={"photo": (io.BytesIO(_png_bytes((3000, 2400))), "big.png")}, content_type="multipart/form-data").get_json()
+    assert big["ok"] and max(big["photo"]["width"], big["photo"]["height"]) == furniture_lists.PHOTO_MAX_EDGE
+
+    bad = client.post("/furniture/{0}/photos".format(a_token), data={"photo": (io.BytesIO(b"%PDF-1.4 not an image"), "doc.pdf")}, content_type="multipart/form-data")
+    assert bad.status_code == 400 and not bad.get_json()["ok"]
+    svg = client.post("/furniture/{0}/photos".format(a_token), data={"photo": (io.BytesIO(b"<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>"), "x.svg")}, content_type="multipart/form-data")
+    assert svg.status_code == 400
+
+    # Other customer's token cannot read or delete list A's photo.
+    assert client.get("/furniture/{0}/photos/{1}".format(b_token, photo_id)).status_code == 404
+    assert client.post("/furniture/{0}/photos/{1}/delete".format(b_token, photo_id)).get_json()["ok"] is False
+    assert client.get("/furniture/{0}/photos/{1}".format("x" * 43, photo_id)).status_code == 404
+    # Not logged in → office photo URL redirects to login.
+    row_a = furniture_lists.get_for_booking(a_id)
+    anon = client.get("/furniture-lists/{0}/photos/{1}".format(row_a["id"], photo_id))
+    assert anon.status_code in (302, 401) and b"\xff\xd8" not in anon.data
+    # Office can see it.
+    assert office.get("/furniture-lists/{0}/photos/{1}".format(row_a["id"], photo_id)).status_code == 200
+    assert furniture_lists.get_by_id(row_a["id"])["photo_count"] == 2
+
+    # Photo limit.
+    original = furniture_lists.MAX_PHOTOS
+    furniture_lists.MAX_PHOTOS = 2
+    try:
+        over = client.post("/furniture/{0}/photos".format(a_token), data={"photo": (io.BytesIO(_png_bytes()), "c.png")}, content_type="multipart/form-data")
+        assert over.status_code == 400 and "up to 2" in over.get_json()["error"]
+    finally:
+        furniture_lists.MAX_PHOTOS = original
+
+    assert client.post("/furniture/{0}/photos/{1}/delete".format(a_token, photo_id)).get_json()["ok"] is True
+    assert client.get("/furniture/{0}/photos/{1}".format(a_token, photo_id)).status_code == 404
+    assert furniture_lists.get_by_id(row_a["id"])["photo_count"] == 1
+    return True
+
+
+def test_access_control_for_public_and_office_routes():
+    tag = _tag()
+    office = _office_client()
+    booking_id = _booking("Access {0}".format(tag))
+    res = office.post("/bookings/{0}/furniture/link".format(booking_id)).get_json()
+    anon = _public_client()
+    # Public id alone gives no access.
+    assert anon.get("/furniture/{0}".format(res["public_id"])).status_code == 404
+    assert anon.get("/furniture/" + "A" * 43).status_code == 404
+    assert anon.post("/furniture/{0}/save".format("B" * 43), json={}).status_code == 404
+    # Office routes need login.
+    for path in ("/furniture-lists", "/bookings/{0}/furniture".format(booking_id)):
+        assert anon.get(path).status_code == 302, path
+    assert anon.post("/bookings/{0}/furniture/link".format(booking_id)).status_code == 302
+    row = furniture_lists.get_for_booking(booking_id)
+    assert anon.post("/furniture-lists/{0}/save".format(row["id"]), json={}).status_code == 302
+    return True
+
+
+def test_website_list_return_link_contact_and_linking():
+    tag = _tag()
+    client = _public_client("10.9.1.{0}".format(_counter % 250))
+    start = client.get("/furniture?return=https://japaneseremovals.com.au/contact-us/%3Fa%3D1")
+    assert start.status_code == 200 and "Start a new list" in start.get_data(as_text=True)
+    created = client.post("/furniture/start", data={"return_url": "https://japaneseremovals.com.au/contact-us/?a=1"})
+    assert created.status_code == 302 and "/furniture/" in created.headers["Location"]
+    token = _token_from_url(created.headers["Location"])
+    row = furniture_lists.get_by_token(token)
+    assert row["source"] == "website" and row["booking_id"] is None
+    link = furniture_lists.return_link(row)
+    assert link.startswith("https://japaneseremovals.com.au/contact-us/?a=1&furniture_list=FL-"), link
+    page = client.get("/furniture/{0}".format(token)).get_data(as_text=True)
+    assert "Back to booking form" in page and "Your details" in page
+
+    saved = client.post("/furniture/{0}/save".format(token), json={
+        "content": {"rooms": [{"id": "r1", "type": "living", "label": "Living", "items": {"sofa_2": 1}}]},
+        "contact": {"name": "Web Person {0}".format(tag), "phone": "0400999888", "email": "web@example.com", "move_date": "2026-12-01"},
+        "submit": True,
+    }).get_json()
+    assert saved["status"] == "submitted" and saved["return_link"] == link
+    row = furniture_lists.get_by_token(token)
+    assert row["contact_name"] == "Web Person {0}".format(tag)
+
+    # Open redirects are refused.
+    for evil in ("https://evil.example.com/", "http://japaneseremovals.com.au/", "javascript:alert(1)", "https://japaneseremovals.com.au.evil.com/"):
+        assert furniture_lists.safe_return_url(evil) == "", evil
+
+    # Booking created later with the reference in its notes links automatically.
+    office = _office_client()
+    booking_id = _booking("Website Booking {0}".format(tag), notes="Quote request.\n\nFurniture list: {0}".format(row["public_id"].lower()))
+    page = office.get("/bookings/{0}".format(booking_id)).get_data(as_text=True)
+    assert row["public_id"] in page and "Submitted" in page
+    assert furniture_lists.get_for_booking(booking_id)["id"] == row["id"]
+
+    # Manual link by code, and the one-list-per-booking rule.
+    second = furniture_lists.create_list(furniture_lists.SOURCE_WEBSITE)
+    other_booking = _booking("Manual Link {0}".format(tag))
+    office.post("/bookings/{0}/furniture/attach".format(other_booking), data={"code": second["public_id"]})
+    assert furniture_lists.get_for_booking(other_booking)["id"] == second["id"]
+    third = furniture_lists.create_list(furniture_lists.SOURCE_WEBSITE)
+    try:
+        furniture_lists.link_to_booking(third["id"], other_booking)
+        raise AssertionError("second list linked to the same booking")
+    except furniture_lists.FurnitureError:
+        pass
+    return True
+
+
+def test_staff_portal_link_only_for_assigned_jobs():
+    tag = _tag()
+    crew_name = "Yasu"
+    today = date.today()
+    with_list = _booking("Staff Furniture {0}".format(tag), move_date=today.isoformat(), crew=crew_name)
+    without_list = _booking("Staff NoList {0}".format(tag), move_date=today.isoformat(), crew=crew_name)
+    row = furniture_lists.ensure_for_booking(with_list)
+    furniture_lists.save_content(row, {"content": _sample_content()}, editor="customer")
+    photo = furniture_lists.add_photo(furniture_lists.get_by_id(row["id"]), _png_bytes(), uploaded_by="customer")
+
+    portal = build_staff_portal(staff_name=crew_name, range_key=RANGE_TODAY, today=today)
+    jobs = {job["id"]: job for job in portal["jobs"]}
+    assert jobs[with_list].get("furniture_token"), "assigned job with a list gets a staff link"
+    assert not jobs[without_list].get("furniture_token")
+
+    token = jobs[with_list]["furniture_token"]
+    assert furniture_lists.booking_id_from_staff_token(token) == with_list
+    client = _public_client()
+    page = client.get("/staff/furniture/{0}".format(token))
+    assert page.status_code == 200
+    text = page.get_data(as_text=True)
+    assert "Queen bed + mattress" in text and "Fish tank" in text and row["public_id"] in text
+    assert "&lt;script&gt;" in text and "<script>alert(1)</script>" not in text
+    assert client.get("/staff/furniture/{0}/photos/{1}".format(token, photo["id"])).status_code == 200
+    assert client.get("/staff/furniture/{0}x".format(token)).status_code == 404
+    assert client.get("/staff/furniture/{0}".format(furniture_lists.staff_link_token(without_list))).status_code == 404
+
+    html = client.get("/staff?staff_id=&range=today").get_data(as_text=True)
+    assert html is not None
+    return True
+
+
+def test_website_list_rate_limit():
+    ip = "10.77.{0}.{1}".format(os.getpid() % 250, _counter % 250)
+    client = _public_client(ip)
+    for _ in range(furniture_lists.WEBSITE_LISTS_PER_IP_PER_HOUR):
+        assert client.post("/furniture/start").status_code == 302
+    blocked = client.post("/furniture/start")
+    assert blocked.status_code == 302 and "error=limit" in blocked.headers["Location"]
+    return True
+
+
+def test_booking_view_without_list_and_invoice_page_still_work():
+    office = _office_client()
+    booking_id = _booking("Plain Booking {0}".format(_tag()))
+    assert office.get("/bookings/{0}".format(booking_id)).status_code == 200
+    assert office.get("/bookings/{0}/edit".format(booking_id)).status_code == 200
+    assert office.get("/bookings/{0}/invoice/preview".format(booking_id)).status_code == 200
+    assert furniture_lists.get_for_booking(booking_id) is None, "viewing must not create a list"
+    return True
+
+
+def main():
+    tests = [
+        test_catalog_math_and_no_double_count,
+        test_booking_link_save_reedit_submit_and_office_view,
+        test_photos_storage_limits_and_isolation,
+        test_access_control_for_public_and_office_routes,
+        test_website_list_return_link_contact_and_linking,
+        test_staff_portal_link_only_for_assigned_jobs,
+        test_website_list_rate_limit,
+        test_booking_view_without_list_and_invoice_page_still_work,
+    ]
+    passed = 0
+    for test in tests:
+        try:
+            if test():
+                print("PASS:", test.__name__)
+                passed += 1
+            else:
+                print("FAIL:", test.__name__)
+        except Exception as exc:
+            import traceback
+
+            traceback.print_exc()
+            print("FAIL:", test.__name__, "—", repr(exc))
+    print("\n{0}/{1} passed".format(passed, len(tests)))
+    return 0 if passed == len(tests) else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
