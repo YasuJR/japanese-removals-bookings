@@ -461,5 +461,9 @@ Remove an item from this list in the same commit that finishes it.
   - To do: create it (Render Dashboard → New → Cron Job, or Blueprint sync). It needs the same env vars as the web service: `DATABASE_URL`, the Xero settings, and `SECRET_KEY`. Xero OAuth credentials are stored in the DB.
   - Then confirm the first run marks Xero-paid bookings as Paid.
   - Costs money on Render, so get Yasu's OK first. Until then, use the manual sync button on `/dashboard`. See §1 and §17.
+- [ ] **Furniture list button on the website.** The WordPress site (custom theme `japanese-removals`, quote form `[data-quote-form]`) is not in this repo and there are no WP credentials here. Paste once in the WordPress footer, or in a Custom HTML block on pages with the quote form:
+  `<script src="https://japanese-removals-bookings.onrender.com/static/furniture-embed.js" defer></script>`
+  - No PHP change is needed: the reference travels inside the `message` field. A hidden `furniture_list` field is also sent.
+  - Verified 2026-10-27 against a copy of /contact-us/ with sending mocked.
 - [ ] **Stale call-out tests.** Six tests post `callout_fee` without `callout_minutes` (pre-32b3313 style), so they fail on production code: `test_invoice_edit_e2e.py`, `test_invoice_duration_from_times_e2e.py`, `test_edit_booking_save_unifies_invoice_e2e.py`, `test_invoice_negative_adjustments_e2e.py`, `test_booking_details_e2e.py`, `test_edit_finish_time_e2e.py`.
   - To do: add `callout_minutes` to their form fixtures, update the expected totals (fee = rate × minutes / 60), and confirm they pass in a clean worktree. Details in §13.
