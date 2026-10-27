@@ -20,6 +20,8 @@ import auth
 import database as db
 import furniture_catalog as catalog
 import furniture_lists
+import furniture_volume_refs as refs
+import furniture_volumes
 from app import app
 from staff_portal import RANGE_TODAY, build_staff_portal
 
@@ -32,10 +34,10 @@ def _tag():
     return "{0}-{1}".format(os.getpid(), _counter)
 
 
-def _office_client():
+def _office_client(admin=False):
     db.init_db()
     label = "fl-test-{0}".format(_tag())
-    uid = db.create_staff_user(label, auth.hash_password("test"), "Furniture Test")
+    uid = db.create_staff_user(label, auth.hash_password("test"), "Furniture Test", is_admin=1 if admin else 0)
     client = app.test_client()
     with client.session_transaction() as sess:
         sess["user_id"] = uid
@@ -104,13 +106,13 @@ def test_catalog_math_and_no_double_count():
     assert "bogus_item" not in content["rooms"][1]["items"]
     assert len(content["custom_items"]) == 2
     s = catalog.summarize(content)
-    expected = 1.8 + 2 * 0.2 + 1.7 + 0.2 + (1.2 * 0.5 * 0.6)
+    expected = 1.5 + 2 * 0.175 + 2.0 + 0.35 + (1.2 * 0.5 * 0.6)
     assert abs(s["estimated_m3"] - round(expected, 1)) < 1e-9, s
     assert s["item_count"] == 1 + 2 + 1 + 1 + 1 + 2
     assert s["unsized_custom_count"] == 2
     # Bed with mattress, frame only and mattress only are separate, mutually exclusive choices.
-    assert catalog.ITEMS["bed_queen"][1] == 1.8
-    assert catalog.ITEMS["bed_frame_queen"][1] + catalog.ITEMS["mattress_queen"][1] <= 1.8 + 1e-9
+    assert catalog.ITEMS["bed_queen"][1] == 1.5
+    assert abs(catalog.ITEMS["bed_frame_queen"][1] + catalog.ITEMS["mattress_queen"][1] - 1.5) < 1e-9
     assert "mattress" in catalog.ITEMS["bed_queen"][0].lower()
     # Quantities are clamped.
     clamped = catalog.sanitize_content({"rooms": [{"id": "x", "type": "living", "items": {"sofa_3": 99999}}]})
@@ -146,7 +148,8 @@ def test_booking_link_save_reedit_submit_and_office_view():
 
     save = customer.post("/furniture/{0}/save".format(token), json={"content": _sample_content()}).get_json()
     assert save["ok"] and save["status"] == "in_progress", save
-    assert save["estimated_m3"] == 4.5 and save["item_count"] == 8, save
+    assert save["estimated_m3"] == 4.6 and save["item_count"] == 8, save
+    assert save["units"]["r1"] == {"bed_queen": 1.5, "bedside_table": 0.175}, save["units"]
 
     # Re-open: saved state comes back.
     body = customer.get("/furniture/{0}".format(token)).get_data(as_text=True)
@@ -159,7 +162,7 @@ def test_booking_link_save_reedit_submit_and_office_view():
     edited = _sample_content()
     edited["rooms"][0]["items"]["bed_queen"] = 2
     sub = customer.post("/furniture/{0}/save".format(token), json={"content": edited, "submit": True}).get_json()
-    assert sub["status"] == "submitted" and sub["estimated_m3"] == 6.3, sub
+    assert sub["status"] == "submitted" and sub["estimated_m3"] == 6.1, sub
     row = furniture_lists.get_for_booking(booking_id)
     assert row["submitted_at"] and row["last_edited_by"] == "customer"
 
@@ -169,7 +172,7 @@ def test_booking_link_save_reedit_submit_and_office_view():
     assert later["status"] == "submitted"
 
     page = office.get("/bookings/{0}".format(booking_id)).get_data(as_text=True)
-    assert "Submitted" in page and "4.5 m³" in page and res["public_id"] in page
+    assert "Submitted" in page and "4.6 m³" in page and res["public_id"] in page
     # Office editor (same list) and office save.
     office_page = office.get("/bookings/{0}/furniture".format(booking_id), follow_redirects=True)
     assert office_page.status_code == 200 and res["public_id"] in office_page.get_data(as_text=True)
@@ -355,9 +358,180 @@ def test_booking_view_without_list_and_invoice_page_still_work():
     return True
 
 
+def test_volume_references_are_consistent():
+    assert refs.CHECKED_ON == "2026-10-27"
+    assert set(refs.REFS) == set(catalog.ITEMS), "every item needs a reference entry"
+    for key, ref in refs.REFS.items():
+        basis = ref["basis"]
+        used = [src for src, _label, _m3 in ref["refs"]]
+        assert len(used) == len(set(used)), (key, "one value per source")
+        for src in used:
+            assert refs.SOURCES[src][2] == refs.REMOVALIST, (key, src, "load volumes only from removalists")
+        for src, _label, _value, why in ref["excluded"]:
+            assert src in refs.SOURCES and why, key
+        for src, _label, dims, outer in ref["outer"]:
+            assert src in refs.SOURCES and dims and outer > 0, key
+        assert ref["reason"], key
+        if basis == refs.MEDIAN:
+            assert len(used) >= 2, key
+        elif basis == refs.SINGLE:
+            assert len(used) == 1, key
+        elif basis == refs.DERIVED:
+            assert not used and ref["derived_from"], key
+        else:
+            assert basis == refs.PROVISIONAL and not used and ref["value"], key
+        assert 0 < catalog.ITEMS[key][1] <= catalog.MAX_UNIT_M3, key
+    for name, url, kind, note in refs.SOURCES.values():
+        assert url.startswith("https://") and name and note and kind in (refs.REMOVALIST, refs.PRODUCT)
+    # Frame only + mattress only == bed with mattress, for every size (no double count, no gap).
+    for size in ("single", "king_single", "double", "queen", "king"):
+        whole = catalog.ITEMS["bed_" + size][1]
+        parts = catalog.ITEMS["bed_frame_" + size][1] + catalog.ITEMS["mattress_" + size][1]
+        assert abs(whole - parts) < 1e-9, size
+    expected = {
+        "sofa_3": 2.0, "bed_queen": 1.5, "mattress_queen": 0.8, "bed_frame_queen": 0.7,
+        "fridge_double": 1.15, "fridge_large": 1.6, "washing_machine": 0.6,
+        "box_small": 0.05, "box_medium": 0.08, "box_large": 0.15, "box_wardrobe": 0.35,
+    }
+    for key, value in expected.items():
+        assert catalog.ITEMS[key][1] == value, (key, catalog.ITEMS[key][1])
+    # Old values are frozen for lists saved before the review.
+    assert catalog.LEGACY_M3["bed_queen"] == 1.8 and catalog.LEGACY_M3["sofa_3"] == 1.7
+    return True
+
+
+def _set_legacy_content(list_id, content, m3):
+    with db.get_connection() as conn:
+        conn.execute(
+            "UPDATE furniture_lists SET content_json = ?, estimated_m3 = ?, item_count = ?, status = ? WHERE id = ?",
+            (json.dumps(content), m3, 2, "submitted", list_id),
+        )
+        conn.commit()
+
+
+def test_existing_lists_keep_numbers_and_admin_change_applies_to_new_items():
+    office = _office_client()
+    booking_id = _booking("Volume Snapshot {0}".format(_tag()))
+    res = office.post("/bookings/{0}/furniture/link".format(booking_id)).get_json()
+    token = _token_from_url(res["url"])
+    row = furniture_lists.get_for_booking(booking_id)
+    # A list saved before the review: no per-item m³ stored, old totals.
+    legacy = {"rooms": [{"id": "r1", "type": "bedroom", "label": "Bedroom 1", "items": {"bed_queen": 1}},
+                        {"id": "r2", "type": "living", "label": "Living", "items": {"sofa_3": 1}}],
+              "custom_items": [], "notes": ""}
+    _set_legacy_content(row["id"], legacy, 3.5)
+    loaded = furniture_lists.get_by_id(row["id"])
+    assert loaded["content"]["rooms"][0]["unit_m3"] == {"bed_queen": 1.8}
+    assert loaded["estimated_m3"] == 3.5
+    assert catalog.summarize(loaded["content"])["estimated_m3"] == 3.5
+
+    customer = _public_client("10.9.7.1")
+    body = customer.get("/furniture/{0}".format(token)).get_data(as_text=True)
+    data = json.loads(re.search(r'id="fl-data">(.*?)</script>', body, re.S).group(1))
+    assert data["state"]["content"]["rooms"][0]["unit_m3"] == {"bed_queen": 1.8}
+    assert data["catalog"]["items"]["bed_queen"]["m3"] == 1.5
+
+    # Re-saving unchanged keeps 3.5, even if the browser tries to send its own volumes.
+    tampered = json.loads(json.dumps(legacy))
+    tampered["rooms"][0]["unit_m3"] = {"bed_queen": 0.01}
+    same = customer.post("/furniture/{0}/save".format(token), json={"content": tampered}).get_json()
+    assert same["estimated_m3"] == 3.5 and same["units"]["r1"] == {"bed_queen": 1.8}, same
+    assert same["status"] == "submitted"
+
+    admin = _office_client(admin=True)
+    try:
+        r = admin.post("/furniture-lists/volumes", data={"item_key": "bed_queen", "m3": "1.65", "note": "test"})
+        assert r.status_code == 302
+        assert furniture_volumes.effective_volumes()["bed_queen"] == 1.65
+        # Existing item keeps 1.8; more of the same item in the same room keeps 1.8 too.
+        grown = json.loads(json.dumps(legacy))
+        grown["rooms"][0]["items"]["bed_queen"] = 2
+        # A new item and the same item in a new room use today's standard.
+        grown["rooms"][1]["items"]["washing_machine"] = 1
+        grown["rooms"].append({"id": "r9", "type": "bedroom", "label": "Bedroom 2", "items": {"bed_queen": 1}})
+        out = customer.post("/furniture/{0}/save".format(token), json={"content": grown}).get_json()
+        assert out["units"]["r1"] == {"bed_queen": 1.8}, out["units"]
+        assert out["units"]["r2"] == {"sofa_3": 1.7, "washing_machine": 0.6}, out["units"]
+        assert out["units"]["r9"] == {"bed_queen": 1.65}, out["units"]
+        assert out["estimated_m3"] == round(1.8 * 2 + 1.7 + 0.6 + 1.65, 1), out
+
+        # Removing an item and adding it back later uses the standard of that time.
+        removed = json.loads(json.dumps(grown))
+        del removed["rooms"][1]["items"]["sofa_3"]
+        customer.post("/furniture/{0}/save".format(token), json={"content": removed})
+        back = customer.post("/furniture/{0}/save".format(token), json={"content": grown}).get_json()
+        assert back["units"]["r2"]["sofa_3"] == 2.0, back["units"]
+
+        # Another, untouched list is never rewritten by the admin change.
+        other_booking = _booking("Volume Untouched {0}".format(_tag()))
+        office.post("/bookings/{0}/furniture/link".format(other_booking))
+        other = furniture_lists.get_for_booking(other_booking)
+        _set_legacy_content(other["id"], legacy, 3.5)
+        assert furniture_lists.get_by_id(other["id"])["estimated_m3"] == 3.5
+
+        # Office view and staff summary use the stored per-item m³.
+        page = office.get("/furniture-lists/{0}".format(row["id"])).get_data(as_text=True)
+        assert row["public_id"] in page
+    finally:
+        admin.post("/furniture-lists/volumes", data={"item_key": "bed_queen", "action": "reset"})
+    assert furniture_volumes.effective_volumes()["bed_queen"] == 1.5
+    return True
+
+
+def test_standard_volume_admin_page_permissions_and_validation():
+    anon = app.test_client()
+    r = anon.get("/furniture-lists/volumes")
+    assert r.status_code == 302 and "/login" in r.headers["Location"]
+
+    staff = _office_client()
+    page = staff.get("/furniture-lists/volumes")
+    html = page.get_data(as_text=True)
+    assert page.status_code == 200 and "View only" in html
+    assert "https://yourmovingsolution.com.au/furniture-volume-calculator/" in html
+    assert "Provisional (no source)" in html and "Product size (outer volume" in html
+    assert 'name="m3"' not in html
+    assert staff.post("/furniture-lists/volumes", data={"item_key": "sofa_3", "m3": "9"}).status_code == 403
+    assert "sofa_3" not in furniture_volumes.overrides()
+
+    admin = _office_client(admin=True)
+    html = admin.get("/furniture-lists/volumes").get_data(as_text=True)
+    assert 'name="m3"' in html and "View only" not in html
+    try:
+        for bad in ("abc", "0", "-1", "25", ""):
+            r = admin.post("/furniture-lists/volumes", data={"item_key": "sofa_3", "m3": bad}, follow_redirects=True)
+            assert "must be between" in r.get_data(as_text=True) or "Enter a number" in r.get_data(as_text=True), bad
+        assert "sofa_3" not in furniture_volumes.overrides()
+        assert admin.post("/furniture-lists/volumes", data={"item_key": "nope", "m3": "1"}, follow_redirects=True).status_code == 200
+        r = admin.post("/furniture-lists/volumes", data={"item_key": "sofa_3", "m3": "2.25", "note": "Measured on our jobs"}, follow_redirects=True)
+        html = r.get_data(as_text=True)
+        assert "standard volume is now 2.25" in html and "Changed by admin" in html and "Measured on our jobs" in html
+        assert furniture_volumes.overrides()["sofa_3"]["m3"] == 2.25
+        row = [i for g in furniture_volumes.admin_rows() for i in g["items"] if i["key"] == "sofa_3"][0]
+        assert re.match(r"^[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2} \d{4}, ", row["updated_display"]), row["updated_display"]
+        changes = furniture_volumes.recent_changes(5)
+        assert changes[0]["item_key"] == "sofa_3" and changes[0]["old_m3"] == 2.0 and changes[0]["new_m3"] == 2.25
+        # New lists pick it up in the editor catalogue.
+        customer = _public_client("10.9.8.1")
+        start = customer.post("/furniture/start")
+        body = customer.get(start.headers["Location"]).get_data(as_text=True)
+        data = json.loads(re.search(r'id="fl-data">(.*?)</script>', body, re.S).group(1))
+        assert data["catalog"]["items"]["sofa_3"]["m3"] == 2.25
+        # Setting the researched value again clears the override.
+        admin.post("/furniture-lists/volumes", data={"item_key": "sofa_3", "m3": "2.0"})
+        assert "sofa_3" not in furniture_volumes.overrides()
+        assert furniture_volumes.recent_changes(1)[0]["action"] == "reset"
+    finally:
+        admin.post("/furniture-lists/volumes", data={"item_key": "sofa_3", "action": "reset"})
+    assert furniture_volumes.effective_volumes()["sofa_3"] == 2.0
+    return True
+
+
 def main():
     tests = [
         test_catalog_math_and_no_double_count,
+        test_volume_references_are_consistent,
+        test_existing_lists_keep_numbers_and_admin_change_applies_to_new_items,
+        test_standard_volume_admin_page_permissions_and_validation,
         test_booking_link_save_reedit_submit_and_office_view,
         test_photos_storage_limits_and_isolation,
         test_access_control_for_public_and_office_routes,

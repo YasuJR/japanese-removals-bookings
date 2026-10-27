@@ -26,6 +26,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 import config
 import database as db
 import furniture_catalog as catalog
+import furniture_volumes
 
 STATUS_NOT_STARTED = "not_started"
 STATUS_IN_PROGRESS = "in_progress"
@@ -86,7 +87,9 @@ def _row_dict(row: Any) -> Optional[Dict[str, Any]]:
         return None
     item = dict(row)
     try:
-        item["content"] = catalog.sanitize_content(json.loads(item.get("content_json") or "{}"))
+        item["content"] = catalog.sanitize_content(
+            json.loads(item.get("content_json") or "{}"), keep_units=True
+        )
     except (TypeError, ValueError):
         item["content"] = catalog.sanitize_content({})
     if not item["content"]["rooms"] and item.get("status") == STATUS_NOT_STARTED:
@@ -311,8 +314,11 @@ def save_content(
     editor: str,
     submit: bool = False,
 ) -> Dict[str, Any]:
+    volumes = furniture_volumes.effective_volumes()
     content = catalog.sanitize_content(payload.get("content") if isinstance(payload, dict) else {})
-    summary = catalog.summarize(content)
+    # Items already in the list keep their m³; only newly added items use today's standard.
+    content = catalog.freeze_units(content, row.get("content"), volumes)
+    summary = catalog.summarize(content, volumes)
     contact = _clean_contact(payload.get("contact") or {}) if isinstance(payload, dict) else {}
     status = row.get("status") or STATUS_NOT_STARTED
     if submit:

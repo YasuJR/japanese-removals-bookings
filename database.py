@@ -275,6 +275,35 @@ def _ensure_furniture_list_tables(conn) -> None:
         "CREATE INDEX IF NOT EXISTS idx_furniture_list_photos_list "
         "ON furniture_list_photos(list_id)"
     )
+    # Admin overrides of the standard m³ per item (furniture_volumes.py) and their history.
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS furniture_item_volumes (
+            item_key TEXT PRIMARY KEY,
+            m3 {real} NOT NULL,
+            note TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL DEFAULT '',
+            updated_by TEXT NOT NULL DEFAULT ''
+        )
+        """.format(real="DOUBLE PRECISION" if pg else "REAL")
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS furniture_item_volume_log (
+            id {pk},
+            item_key TEXT NOT NULL,
+            old_m3 {real} NOT NULL DEFAULT 0,
+            new_m3 {real} NOT NULL DEFAULT 0,
+            action TEXT NOT NULL DEFAULT '',
+            note TEXT NOT NULL DEFAULT '',
+            changed_at TEXT NOT NULL DEFAULT '',
+            changed_by TEXT NOT NULL DEFAULT ''
+        )
+        """.format(
+            pk="SERIAL PRIMARY KEY" if pg else "INTEGER PRIMARY KEY AUTOINCREMENT",
+            real="DOUBLE PRECISION" if pg else "REAL",
+        )
+    )
 
 
 def _ensure_booking_crew_hours_columns(conn) -> None:

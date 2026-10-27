@@ -124,6 +124,7 @@ class CompatConnection:
                 "INTO PROCESSED_GMAIL_MESSAGES" in upper
                 or "INTO INTEGRATION_SETTINGS" in upper
                 or "INTO INVOICE_SEQUENCE" in upper
+                or "INTO FURNITURE_ITEM_VOLUMES " in upper
                 or "ON CONFLICT" in upper
             )
             if upper.startswith("INSERT") and "RETURNING" not in upper and not skip_returning:

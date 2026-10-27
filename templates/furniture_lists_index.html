@@ -7,6 +7,7 @@
       <h2>Furniture lists</h2>
       <p class="hint">Customer furniture &amp; item lists. Website lists can be linked to a booking from the list page, or automatically when the booking notes contain the list reference (e.g. FL-ABC234).</p>
     </div>
+    <a class="btn-secondary btn-sm" href="{{ url_for('furniture_volumes_admin') }}">Standard m³</a>
     <form method="post" class="furniture-lookup-form">
       <input id="fl-code" name="code" placeholder="FL-XXXXXX" aria-label="List reference" required>
       <button type="submit" class="btn-secondary btn-sm">Open</button>

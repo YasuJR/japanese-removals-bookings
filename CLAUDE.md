@@ -81,7 +81,7 @@ When adding a route: put it in `app.py` near its area, use the right decorator, 
 ### Backend switch (`db_backend.py`)
 - `is_postgres()` ⇔ `config.get_database_url()` (first of `DATABASE_URL`, `POSTGRES_URL`, `POSTGRESQL_URL`, `INTERNAL_DATABASE_URL` starting with `postgres`). Otherwise SQLite `<repo>/bookings.db`.
 - `adapt_sql()` (Postgres only): `?`→`%s` (**naive — never put a literal `?` in SQL**), `datetime('now')`→`CURRENT_TIMESTAMP`, `INSERT OR REPLACE`→`INSERT … ON CONFLICT` (gmail table only).
-- Postgres INSERTs get `RETURNING id` appended automatically, except `processed_gmail_messages`, `integration_settings`, `invoice_sequence`, and statements with `ON CONFLICT`. Fallback `SELECT lastval()` in a savepoint.
+- Postgres INSERTs get `RETURNING id` appended automatically, except `processed_gmail_messages`, `integration_settings`, `invoice_sequence`, `furniture_item_volumes`, and statements with `ON CONFLICT`. A new table without an `id` column must be added to that skip list. Fallback `SELECT lastval()` in a savepoint.
 - Inside a request one connection lives on `g._db_connection` (`close()` is a no-op, closed in `teardown_request`).
 - **Postgres can return `date`/`datetime` objects** for date-like values. Normalize with `display_dates.normalize_move_date()` / `dashboard_data.job_move_date_iso()`. Never call `.strip()` on a raw DB value.
 
@@ -231,7 +231,7 @@ Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out 
 
 ## 7b. Customer furniture lists
 
-- Files: `furniture_catalog.py` (rooms, items, standard m³, `sanitize_content`, `summarize`), `furniture_lists.py` (storage, tokens, photos, linking), `static/furniture.js|css`, `templates/furniture_*.html`, `_booking_furniture_panel.html`, `static/furniture-embed.js` (website button).
+- Files: `furniture_catalog.py` (rooms, items, `sanitize_content`, `freeze_units`, `summarize`, frozen `LEGACY_M3`), `furniture_volume_refs.py` (where every standard m³ comes from), `furniture_volumes.py` (admin overrides + change log), `furniture_lists.py` (storage, tokens, photos, linking), `static/furniture.js|css`, `templates/furniture_*.html`, `_booking_furniture_panel.html`, `static/furniture-embed.js` (website button).
 - Tables (`_ensure_furniture_list_tables`): **furniture_lists** has `public_id` (FL-XXXXXX), `access_token` (secret), `booking_id` (nullable, one list per booking), `source` (`booking`/`website`), `status` (`not_started`/`in_progress`/`submitted`), contact_* (website only), `content_json`, `estimated_m3`, counts, ISO-UTC `created_at`/`updated_at`/`submitted_at`, and `created_ip` (rate limit). **furniture_list_photos** stores JPEG bytes in the DB (`BYTEA`/`BLOB`), so photos survive redeploys. There is no disk.
 - **Access:**
   - Customers reach their list only through `/furniture/<access_token>`. The 43-character token is never derived from the FL id. A photo is served only when `photo.list_id` matches the token's list.
@@ -239,7 +239,13 @@ Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out 
   - Office routes (`/furniture-lists…`, `/bookings/<id>/furniture…`) are `login_required`.
   - Staff open `/staff/furniture/<signed>`, a 30-day itsdangerous token per booking. It is added to Staff Portal job cards (`attach_staff_links`) only when the list has content.
   - Public pages send `no-store`, `noindex` and `no-referrer`.
-- **m³** is an *estimate* only. Beds come as "bed + mattress", "frame only" or "mattress only" (mutually exclusive), so nothing is counted twice. Custom items count only when L×W×H are all given. It never sets price or time.
+- **m³** is an *estimate* of truck load volume only. Beds come as "bed + mattress", "frame only" or "mattress only" (mutually exclusive), so nothing is counted twice. Custom items count only when L×W×H are all given. It never sets price or time.
+- **Standard m³ sources** (`furniture_volume_refs.py`, reviewed 2026-10-27):
+  - Load volumes come only from Australian removalists' published per-item tables (You Pack, Goldline, Easy Peasy, Your Moving Solution, Quick 'n' Slick, Moving With Sam, TT Moving, Get n Go). A value is used only when item, size and condition match (e.g. "bed **with mattress**", cot **assembled**). Otherwise it goes in `excluded` with the reason.
+  - 2+ matching values → median; 1 → that value; bed frame only = bed+mattress − mattress (so frame + mattress == bed); none → `provisional` (old value or an interpolation, clearly marked). Ranges (A1) and tape-measure/manufacturer sizes (`outer`) are shown for comparison and never used.
+  - `test_volume_references_are_consistent` enforces this. Change a number by editing the refs (with source, label and date), not by typing a new value into the catalogue.
+- **Admin overrides:** `/furniture-lists/volumes` (L to view, office admin to change; others get 403) → table `furniture_item_volumes` (item_key PK, no `id`, so it is in `db_backend`'s RETURNING skip list) + `furniture_item_volume_log`. Setting the researched value again deletes the override.
+- **Existing lists never change:** each room stores `unit_m3` per item. `freeze_units` keeps the stored m³ for items already in that room (quantity changes included) and gives newly added items the current standard. Browser-sent `unit_m3` is ignored. Lists saved before 2026-10-27 have no `unit_m3`; they read as `LEGACY_M3` (the old unsourced values), so their totals stay the same.
 - **Photos:** max 30 per list and 15 MB per upload. Pillow verifies JPEG/PNG/WebP/GIF, applies EXIF rotation, strips metadata (GPS) and re-encodes as JPEG at ≤2000px.
 - **Website flow:**
   - `/furniture?return=<https://japaneseremovals.com.au/...>`, then POST `/furniture/start` creates a `website` list (20 per IP per hour).
@@ -358,7 +364,7 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 | Dashboard sections | `test_dashboard_payment_status_divider_e2e.py`, `test_dashboard_today_upcoming_divider_e2e.py`, `test_dashboard_wg_unpaid_e2e.py` (WG name matching, Regular vs WG split, no duplicates, oldest first, counts and totals, Paid leaves WG) |
 | Staff weekly PDF | `test_staff_weekly_pdf_e2e.py` (screen ↔ PDF job/paid match, sort, Sunday, overrides, break, 45-min call out, Extra Pay, no duplicates, long text/Japanese inside columns, year crossing, busy week) |
 | Postgres boot | `test_postgres_init_ddl_e2e.py`, `test_postgres_invoice_sequence_init.py` |
-| Furniture lists | `test_furniture_list_e2e.py` (m³ maths and no double count, save → re-edit → submit, photos and EXIF strip, cross-list isolation, office/staff access, website return link, auto-link from notes, rate limit). Passes on SQLite and Postgres |
+| Furniture lists | `test_furniture_list_e2e.py` (m³ maths and no double count, volume sources/medians, legacy lists keep their m³, admin m³ change applies to new items only, admin page permissions/validation, save → re-edit → submit, photos and EXIF strip, cross-list isolation, office/staff access, website return link, auto-link from notes, rate limit). Passes on SQLite and Postgres |
 | Misc | `test_booking_cancel_e2e.py`, `test_mover_pricing_e2e.py`, `test_payment_sets_completed_e2e.py`, `test_navigation_e2e.py`, `test_search_invoice_number_e2e.py`, `test_job_note_display_e2e.py` |
 
 **Known test-baseline issues (as of 2026-10-17, verified identical on clean worktrees of `origin/main` = production code):**

@@ -3920,3 +3920,35 @@ button:disabled {
 .furniture-attach-hint { margin-top: 0.75rem; }
 .furniture-lookup-form { display: flex; gap: 0.5rem; align-items: center; }
 .furniture-lookup-form input { max-width: 10rem; }
+
+/* Furniture standard volumes (office admin) */
+.fv-sub { font-size: 0.8rem; font-weight: 400; color: var(--muted); }
+.fv-readonly { font-weight: 700; }
+.fv-jump { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; margin-top: 0.5rem; font-size: 0.9rem; }
+.fv-group-title { margin: 0 0 0.6rem; }
+.fv-list { display: grid; gap: 0.6rem; }
+.fv-item { border: 1px solid #dfe5e2; border-radius: 10px; padding: 0.7rem 0.8rem; scroll-margin-top: 4rem; }
+.fv-item-override { border-color: #e3b341; background: #fffbef; }
+.fv-item-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 1rem; }
+.fv-item-label { margin: 0 0 0.25rem; font-size: 1rem; }
+.fv-basis { display: inline-block; padding: 0.08rem 0.5rem; border-radius: 999px; font-size: 0.74rem; font-weight: 700; background: #e8f1ed; color: #0f3b2e; margin-right: 0.25rem; }
+.fv-basis-single { background: #eef3fb; color: #1d4677; }
+.fv-basis-derived { background: #f1eefb; color: #4a347a; }
+.fv-basis-provisional { background: #fde8e6; color: #8a2a1d; }
+.fv-basis-override { background: #fff1c7; color: #7a5600; }
+.fv-numbers { display: flex; gap: 1rem; text-align: right; }
+.fv-num-label { display: block; font-size: 0.72rem; color: var(--muted); }
+.fv-num { font-size: 1.05rem; }
+.fv-override-note { margin: 0.35rem 0 0; }
+.fv-sources { margin-top: 0.4rem; font-size: 0.88rem; }
+.fv-sources summary { cursor: pointer; color: #0f3b2e; font-weight: 600; }
+.fv-reason { margin: 0.4rem 0; }
+.fv-sub-title { margin: 0.5rem 0 0.2rem; font-weight: 700; font-size: 0.8rem; }
+.fv-ref-list { margin: 0; padding-left: 1.1rem; }
+.fv-ref-list li { margin: 0.15rem 0; overflow-wrap: anywhere; }
+.fv-excluded { color: var(--muted); }
+.fv-form { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; margin-top: 0.6rem; }
+.fv-field { display: flex; flex-direction: column; font-size: 0.78rem; color: var(--muted); }
+.fv-field input[name="m3"] { width: 6.5rem; }
+.fv-note { flex: 1 1 12rem; }
+.fv-note input { width: 100%; }

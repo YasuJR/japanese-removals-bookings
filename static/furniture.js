@@ -51,6 +51,23 @@
     if (!(l > 0 && w > 0 && h > 0)) return null;
     return (l * w * h) / 1000000;
   }
+  // Items keep the m³ they were added with (set by the server on save); new ones use today's standard.
+  function unitM3(room, key, info) {
+    var units = room.unit_m3 || {};
+    return typeof units[key] === "number" ? units[key] : info.m3;
+  }
+  function applyUnits(units) {
+    if (!units) return;
+    content.rooms.forEach(function (room) {
+      var saved = units[room.id] || {};
+      var next = {};
+      Object.keys(room.items).forEach(function (key) {
+        if (typeof saved[key] === "number") next[key] = saved[key];
+        else if (room.unit_m3 && typeof room.unit_m3[key] === "number") next[key] = room.unit_m3[key];
+      });
+      room.unit_m3 = next;
+    });
+  }
   function computeSummary() {
     var total = 0, count = 0, unsized = 0;
     content.rooms.forEach(function (room) {
@@ -58,7 +75,7 @@
         var qty = room.items[key] || 0;
         var info = itemInfo(key);
         if (!info || qty <= 0) return;
-        total += info.m3 * qty;
+        total += unitM3(room, key, info) * qty;
         count += qty;
       });
     });
@@ -130,6 +147,8 @@
         saving = false;
         dirty = false;
         state.status = body.status;
+        applyUnits(body.units);
+        updateSummary();
         rememberList();
         setSaveState("Saved " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }), "ok");
         var chip = document.querySelector("[data-status-chip]");
@@ -218,7 +237,11 @@
             info.hint ? el("span", { class: "fl-item-hint", text: info.hint }) : null,
           ]),
           stepper(qty, function (n) {
-            if (n > 0) room.items[key] = n; else delete room.items[key];
+            if (n > 0) room.items[key] = n;
+            else {
+              delete room.items[key];
+              if (room.unit_m3) delete room.unit_m3[key];
+            }
             row.className = "fl-item" + (n ? " fl-item-on" : "");
             refreshCount();
             markDirty();

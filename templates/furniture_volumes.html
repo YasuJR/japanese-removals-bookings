@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Standard volumes{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-head panel-head-wrap">
+    <div class="panel-head-main">
+      <h2>Standard volumes (m³) <span class="fv-sub">家具の標準容積</span></h2>
+      <p class="hint">Approximate <strong>truck load</strong> volume per item for customer furniture lists. It never sets a price or job time.</p>
+      <p class="hint">Researched values come from Australian removalists' published volume tables (checked {{ checked_on }}). Matching values → median; one value → that value; none → <strong>provisional</strong>. Product sizes (outer volume) are shown separately and are not used.</p>
+      <p class="hint"><strong>Changing a value applies to items added from now on.</strong> Items already in a customer's list keep the m³ they were added with. 変更は今後追加される荷物にのみ適用され、既存リストの数値は変わりません。</p>
+    </div>
+    <a class="btn-secondary btn-sm" href="{{ url_for('furniture_lists_index') }}">Furniture lists</a>
+  </div>
+  {% if not can_edit %}
+  <p class="hint fv-readonly">View only — an admin login is needed to change values.</p>
+  {% endif %}
+  <nav class="fv-jump" aria-label="Groups">
+    {% for group in groups %}<a href="#group-{{ group.key }}">{{ group.label }}</a>{% endfor %}
+  </nav>
+</section>
+
+{% for group in groups %}
+<section class="panel" id="group-{{ group.key }}">
+  <h3 class="fv-group-title">{{ group.label }}</h3>
+  <div class="fv-list">
+    {% for item in group["items"] %}
+    <article class="fv-item{% if item.override %} fv-item-override{% endif %}" id="item-{{ item.key }}">
+      <div class="fv-item-head">
+        <div>
+          <h4 class="fv-item-label">{{ item.label }}</h4>
+          <span class="fv-basis fv-basis-{{ item.basis }}">{{ item.basis_label }}</span>
+          {% if item.override %}<span class="fv-basis fv-basis-override">Changed by admin</span>{% endif %}
+        </div>
+        <div class="fv-numbers">
+          <div><span class="fv-num-label">In use</span><strong class="fv-num">{{ '%g'|format(item.current_m3) }}</strong></div>
+          <div><span class="fv-num-label">Researched</span><span class="fv-num">{{ '%g'|format(item.default_m3) }}</span></div>
+          <div><span class="fv-num-label">Before review</span><span class="fv-num muted">{{ '%g'|format(item.legacy_m3) if item.legacy_m3 is not none else '—' }}</span></div>
+        </div>
+      </div>
+      {% if item.override %}
+      <p class="hint fv-override-note">Admin value since {{ item.updated_display or '—' }}{% if item.override.updated_by %} · {{ item.override.updated_by }}{% endif %}{% if item.override.note %} · “{{ item.override.note }}”{% endif %}</p>
+      {% endif %}
+      <details class="fv-sources">
+        <summary>Sources &amp; reason</summary>
+        <p class="fv-reason">{{ item.reason }}</p>
+        {% if item.refs %}
+        <p class="fv-sub-title">Used (removalist load volume)</p>
+        <ul class="fv-ref-list">
+          {% for r in item.refs %}
+          <li><strong>{{ '%g'|format(r.m3) }} m³</strong> — “{{ r.label }}” · <a href="{{ r.url }}" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        {% if item.derived_from %}
+        <p class="fv-sub-title">Derived from</p>
+        <ul class="fv-ref-list">
+          {% for d in item.derived_from %}<li>{{ d.label }}: {{ '%g'|format(d.m3) }} m³</li>{% endfor %}
+        </ul>
+        {% endif %}
+        {% if item.excluded %}
+        <p class="fv-sub-title">Seen but not used</p>
+        <ul class="fv-ref-list fv-excluded">
+          {% for r in item.excluded %}
+          <li>{{ r.m3 if r.m3 is string else '%g'|format(r.m3) }} m³ — “{{ r.label }}” · <a href="{{ r.url }}" target="_blank" rel="noopener noreferrer">{{ r.name }}</a> — <em>{{ r.why }}</em></li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        {% if item.outer %}
+        <p class="fv-sub-title">Product size (outer volume — not a load volume)</p>
+        <ul class="fv-ref-list">
+          {% for r in item.outer %}
+          <li>{{ r.label }}: {{ r.dims }} ≈ {{ '%g'|format(r.m3) }} m³ · <a href="{{ r.url }}" target="_blank" rel="noopener noreferrer">{{ r.name }}</a></li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        <p class="hint">Checked {{ checked_on }}.</p>
+      </details>
+      {% if can_edit %}
+      <form method="post" class="fv-form">
+        <input type="hidden" name="item_key" value="{{ item.key }}">
+        <label class="fv-field">m³
+          <input name="m3" type="number" inputmode="decimal" step="0.001" min="{{ min_m3 }}" max="{{ max_m3 }}" value="{{ '%g'|format(item.current_m3) }}" required>
+        </label>
+        <label class="fv-field fv-note">Note
+          <input name="note" maxlength="300" placeholder="Why (e.g. measured on our jobs)">
+        </label>
+        <button type="submit" name="action" value="set" class="btn-secondary btn-sm">Save</button>
+        {% if item.override %}
+        <button type="submit" name="action" value="reset" class="btn-secondary btn-sm" formnovalidate>Use researched {{ '%g'|format(item.default_m3) }}</button>
+        {% endif %}
+      </form>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+
+<section class="panel">
+  <h3 class="fv-group-title">Recent changes</h3>
+  {% if changes %}
+  <div class="table-scroll">
+    <table class="sheet">
+      <thead><tr><th>When</th><th>Item</th><th>From</th><th>To</th><th>By</th><th>Note</th></tr></thead>
+      <tbody>
+        {% for c in changes %}
+        <tr>
+          <td class="nowrap">{{ c.changed_display }}</td>
+          <td>{{ c.label }}</td>
+          <td class="center">{{ '%g'|format(c.old_m3) }}</td>
+          <td class="center">{{ '%g'|format(c.new_m3) }}</td>
+          <td>{{ c.changed_by }}</td>
+          <td>{{ c.note }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No changes yet — all items use the researched values.</p>
+  {% endif %}
+</section>
+{% endblock %}

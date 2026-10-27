@@ -77,6 +77,8 @@ from trucks import active_truck_names
 import double_booking
 import furniture_catalog
 import furniture_lists
+import furniture_volume_refs
+import furniture_volumes
 import job_status
 from crew_schedule_data import RANGE_OPTIONS, build_crew_schedule
 from ceo_dashboard_data import build_ceo_dashboard
@@ -2570,7 +2572,7 @@ def _furniture_editor_page(row, mode: str, **extra):
             greeting=greeting,
             move_date=_furniture_date_text(dict(booking).get("move_date")) if booking is not None else "",
             state=furniture_lists.editor_state(row),
-            catalog=furniture_catalog.catalog_payload(),
+            catalog=furniture_catalog.catalog_payload(furniture_volumes.effective_volumes()),
             endpoints=endpoints,
             return_link=furniture_lists.return_link(row) if mode != "office" else "",
             customer_url=url_for("furniture_edit", token=row["access_token"], _external=True),
@@ -2594,6 +2596,7 @@ def _furniture_save_response(row, editor: str):
             "updated_display": updated["updated_display"],
             "estimated_m3": updated["estimated_m3"],
             "item_count": updated["item_count"],
+            "units": furniture_catalog.room_units(updated["content"]),
             "return_link": furniture_lists.return_link(updated),
         }
     )
@@ -2707,6 +2710,42 @@ def furniture_lists_index():
         return redirect(url_for("furniture_lists_index"))
     return render_template(
         "furniture_lists_index.html", lists=furniture_lists.list_recent()
+    )
+
+
+@app.route("/furniture-lists/volumes", methods=["GET", "POST"], endpoint="furniture_volumes_admin")
+@auth.login_required
+def furniture_volumes_admin():
+    can_edit = staff_portal_owner.can_manage_staff_portal(g.user)
+    if request.method == "POST":
+        if not can_edit:
+            abort(403)
+        key = request.form.get("item_key", "")
+        label = furniture_catalog.ITEMS.get(key, (key,))[0]
+        user = (g.user["username"] if g.user else "")
+        try:
+            if request.form.get("action") == "reset":
+                value = furniture_volumes.reset_volume(key, user)
+            else:
+                value = furniture_volumes.set_volume(
+                    key, request.form.get("m3"), user, note=request.form.get("note", "")
+                )
+            flash(
+                "{0}: standard volume is now {1:g} m³. It applies to items added from now on; "
+                "existing lists keep their numbers.".format(label, value),
+                "success",
+            )
+        except furniture_volumes.VolumeError as exc:
+            flash("{0}: {1}".format(label, exc), "error")
+        return redirect(url_for("furniture_volumes_admin") + "#item-" + key)
+    return render_template(
+        "furniture_volumes.html",
+        groups=furniture_volumes.admin_rows(),
+        changes=furniture_volumes.recent_changes(),
+        can_edit=can_edit,
+        checked_on=furniture_volume_refs.CHECKED_ON,
+        min_m3=furniture_volumes.MIN_M3,
+        max_m3=furniture_volumes.MAX_M3,
     )
 
 
