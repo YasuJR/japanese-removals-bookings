@@ -49,6 +49,8 @@ WEBSITE_LISTS_PER_IP_PER_HOUR = 20
 STAFF_LINK_MAX_AGE = 60 * 60 * 24 * 30
 
 RETURN_HOSTS = {"japaneseremovals.com.au", "www.japaneseremovals.com.au"}
+# Website lists opened without a return address go back to the quote form here.
+DEFAULT_RETURN_URL = "https://japaneseremovals.com.au/contact-us/"
 
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{24,64}$")
 _PUBLIC_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -58,7 +60,7 @@ _LIST_COLUMNS = (
     "id, public_id, access_token, booking_id, source, status, contact_name, "
     "contact_email, contact_phone, contact_move_date, return_url, content_json, "
     "estimated_m3, item_count, photo_count, created_at, updated_at, submitted_at, "
-    "last_edited_by"
+    "last_edited_by, enquiry_received_at, enquiry_fetch_count"
 )
 
 
@@ -97,8 +99,24 @@ def _row_dict(row: Any) -> Optional[Dict[str, Any]]:
     item["status_label"] = STATUS_LABELS.get(item.get("status"), "Not started")
     item["updated_display"] = format_perth(item.get("updated_at"))
     item["submitted_display"] = format_perth(item.get("submitted_at"))
+    item["enquiry_display"] = format_perth(item.get("enquiry_received_at"))
     item["estimated_m3"] = float(item.get("estimated_m3") or 0)
+    item["quote_flow"] = is_quote_flow(item)
     return item
+
+
+def is_quote_flow(row: Dict[str, Any]) -> bool:
+    """Flow A: a list started on the website, not (yet) tied to a booking. It is a draft until
+    the website enquiry is sent; saving never notifies anyone."""
+    return row.get("source") == SOURCE_WEBSITE and not row.get("booking_id")
+
+
+def customer_status_label(row: Dict[str, Any]) -> str:
+    if row.get("quote_flow") or is_quote_flow(row):
+        if row.get("enquiry_received_at"):
+            return "Received with your quote request"
+        return "Draft — sent with your quote request"
+    return row.get("status_label") or STATUS_LABELS.get(row.get("status"), "Not started")
 
 
 def normalize_public_id(value: Any) -> str:
@@ -131,6 +149,8 @@ def safe_return_url(value: Any) -> str:
 
 def return_link(row: Dict[str, Any]) -> str:
     base = safe_return_url(row.get("return_url"))
+    if not base and is_quote_flow(row):
+        base = DEFAULT_RETURN_URL
     if not base:
         return ""
     parsed = urlparse(base)
@@ -321,6 +341,9 @@ def save_content(
     summary = catalog.summarize(content, volumes)
     contact = _clean_contact(payload.get("contact") or {}) if isinstance(payload, dict) else {}
     status = row.get("status") or STATUS_NOT_STARTED
+    if submit and editor == "customer" and is_quote_flow(row):
+        # Flow A: the list is only received when the website enquiry is sent (furniture_enquiry).
+        submit = False
     if submit:
         status = STATUS_SUBMITTED
     elif status == STATUS_NOT_STARTED and (

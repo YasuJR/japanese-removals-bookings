@@ -247,12 +247,20 @@ Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out 
 - **Admin overrides:** `/furniture-lists/volumes` (L to view, office admin to change; others get 403) → table `furniture_item_volumes` (item_key PK, no `id`, so it is in `db_backend`'s RETURNING skip list) + `furniture_item_volume_log`. Setting the researched value again deletes the override.
 - **Existing lists never change:** each room stores `unit_m3` per item. `freeze_units` keeps the stored m³ for items already in that room (quantity changes included) and gives newly added items the current standard. Browser-sent `unit_m3` is ignored. Lists saved before 2026-10-27 have no `unit_m3`; they read as `LEGACY_M3` (the old unsourced values), so their totals stay the same.
 - **Photos:** max 30 per list and 15 MB per upload. Pillow verifies JPEG/PNG/WebP/GIF, applies EXIF rotation, strips metadata (GPS) and re-encodes as JPEG at ≤2000px.
+- **Two flows (WordPress contract: website repo `docs/24-booking-app-instructions.md`):**
+  - **A. Website quote flow** (`source=website`, no booking yet → `is_quote_flow`): the list is a *draft*. The editor shows "Save" and **"Save & Return to Quote"** (always saves, then goes back to the quote form; a failed save stays on the page). A customer `submit` is ignored, and nothing emails or SMSes on save. The list is received only when the website sends the enquiry and fetches the PDF.
+  - **B. Existing-booking link** (`source=booking`): unchanged. "Send list" submits, and the list can be updated any time.
+- **Enquiry PDF API** `GET /api/enquiry-list/<FL-ID>.pdf` (`furniture_enquiry.py`, `furniture_pdf.py`), called server to server by WordPress (`jr_furniture_pdf` in the theme's `inc/enquiry.php`):
+  - Header `X-JR-Enquiry-Key` must equal env `FURNITURE_ENQUIRY_KEY` (same value as `JR_FURNITURE_KEY` in wp-config.php). Unset → 503. Missing/wrong → 401. 10 bad keys/IP/hour, or 60 requests/IP/hour → 429.
+  - Only `source=website` lists are served (a booking list → 404). The first fetch sets `enquiry_received_at`, status Submitted, editor "website enquiry". Re-fetches (retry/double send) are OK for 24 h, then 409, so an FL-ID can't ride along with a later enquiry. Every request is logged in `furniture_api_log` (also the rate-limit source).
+  - PDF (ReportLab, CID font HeiseiKakuGo-W5): List ID, rooms → items, qty, m³ each/subtotal, room totals, other items, total m³, notes, "写真あり / has photos (N)" (not embedded), "数量・体積は概算（推定値）です".
+- `static/furniture-embed.js` is kept identical to the website's self-hosted copy (`theme/japanese-removals/assets/js/furniture-embed.js`). The website does not load it from this app.
 - **Website flow:**
-  - `/furniture?return=<https://japaneseremovals.com.au/...>`, then POST `/furniture/start` creates a `website` list (20 per IP per hour).
+  - `/furniture?return=<https://japaneseremovals.com.au/...>`, then POST `/furniture/start` creates a `website` list (20 per IP per hour). Without a return URL, it returns to `DEFAULT_RETURN_URL` (`/contact-us/`).
   - "Back to booking form" returns to the page with `?furniture_list=FL-XXXXXX#quote`. `safe_return_url` only allows https japaneseremovals.com.au.
   - The WordPress quote form keeps its own draft (`jr_quote_draft_v1`). `furniture-embed.js` adds the button, re-opens step 2, and appends `Furniture list: FL-XXXXXX` to the message on send.
   - **Linking:** opening a booking whose notes contain an FL id auto-links an unlinked list (`auto_link_from_booking_text`). Manual linking is on the booking page or `/furniture-lists/<id>`.
-- Homepage snippet (WordPress footer or Custom HTML): `<script src="https://japanese-removals-bookings.onrender.com/static/furniture-embed.js" defer></script>`. An optional `data-app` overrides the app URL.
+- The live website (theme `japanese-removals`) self-hosts the embed script and sets `data-app` to this app's URL. Don't ask for the old `<script src=…onrender.com…>` snippet.
 
 ---
 
@@ -467,9 +475,6 @@ Remove an item from this list in the same commit that finishes it.
   - To do: create it (Render Dashboard → New → Cron Job, or Blueprint sync). It needs the same env vars as the web service: `DATABASE_URL`, the Xero settings, and `SECRET_KEY`. Xero OAuth credentials are stored in the DB.
   - Then confirm the first run marks Xero-paid bookings as Paid.
   - Costs money on Render, so get Yasu's OK first. Until then, use the manual sync button on `/dashboard`. See §1 and §17.
-- [ ] **Furniture list button on the website.** The WordPress site (custom theme `japanese-removals`, quote form `[data-quote-form]`) is not in this repo and there are no WP credentials here. Paste once in the WordPress footer, or in a Custom HTML block on pages with the quote form:
-  `<script src="https://japanese-removals-bookings.onrender.com/static/furniture-embed.js" defer></script>`
-  - No PHP change is needed: the reference travels inside the `message` field. A hidden `furniture_list` field is also sent.
-  - Verified 2026-10-27 against a copy of /contact-us/ with sending mocked.
+- [ ] **Furniture enquiry PDF secret.** Set `FURNITURE_ENQUIRY_KEY` on Render (Dashboard → Environment) and the same value as `define( 'JR_FURNITURE_KEY', '…' );` plus `define( 'JR_FURNITURE_API', 'https://japanese-removals-bookings.onrender.com' );` in WordPress `wp-config.php`. Until both are set, `/api/enquiry-list/…` returns 503 and the enquiry email notes the List ID instead of attaching the PDF.
 - [ ] **Stale call-out tests.** Six tests post `callout_fee` without `callout_minutes` (pre-32b3313 style), so they fail on production code: `test_invoice_edit_e2e.py`, `test_invoice_duration_from_times_e2e.py`, `test_edit_booking_save_unifies_invoice_e2e.py`, `test_invoice_negative_adjustments_e2e.py`, `test_booking_details_e2e.py`, `test_edit_finish_time_e2e.py`.
   - To do: add `callout_minutes` to their form fixtures, update the expected totals (fee = rate × minutes / 60), and confirm they pass in a clean worktree. Details in §13.

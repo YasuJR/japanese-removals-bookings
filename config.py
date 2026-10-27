@@ -202,6 +202,12 @@ STAFF_DISPLAY_NAME = _env("STAFF_DISPLAY_NAME", "Admin")
 def staff_portal_password() -> str:
     return os.environ.get("STAFF_PORTAL_PASSWORD", "").strip()
 
+# Shared secret the WordPress site sends as X-JR-Enquiry-Key to fetch a furniture-list PDF
+# (/api/enquiry-list/<FL>.pdf). Same value as JR_FURNITURE_KEY in the site's wp-config.php.
+# Read at call time; empty = endpoint disabled (503).
+def furniture_enquiry_key() -> str:
+    return os.environ.get("FURNITURE_ENQUIRY_KEY", "").strip()
+
 # Background job auth (Render cron → web health optional)
 CRON_SECRET = _env("CRON_SECRET")
 

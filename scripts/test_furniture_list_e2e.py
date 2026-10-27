@@ -19,6 +19,7 @@ for _flag in ("GOOGLE_CALENDAR_ENABLED", "GMAIL_INBOX_ENABLED", "XERO_ENABLED", 
 import auth
 import database as db
 import furniture_catalog as catalog
+import furniture_enquiry
 import furniture_lists
 import furniture_volume_refs as refs
 import furniture_volumes
@@ -270,14 +271,14 @@ def test_website_list_return_link_contact_and_linking():
     link = furniture_lists.return_link(row)
     assert link.startswith("https://japaneseremovals.com.au/contact-us/?a=1&furniture_list=FL-"), link
     page = client.get("/furniture/{0}".format(token)).get_data(as_text=True)
-    assert "Back to booking form" in page and "Your details" in page
+    assert "Save &amp; Return to Quote" in page and "Your details" in page
 
     saved = client.post("/furniture/{0}/save".format(token), json={
         "content": {"rooms": [{"id": "r1", "type": "living", "label": "Living", "items": {"sofa_2": 1}}]},
         "contact": {"name": "Web Person {0}".format(tag), "phone": "0400999888", "email": "web@example.com", "move_date": "2026-12-01"},
         "submit": True,
     }).get_json()
-    assert saved["status"] == "submitted" and saved["return_link"] == link
+    assert saved["status"] == "in_progress" and saved["return_link"] == link  # draft until the enquiry
     row = furniture_lists.get_by_token(token)
     assert row["contact_name"] == "Web Person {0}".format(tag)
 
@@ -289,7 +290,7 @@ def test_website_list_return_link_contact_and_linking():
     office = _office_client()
     booking_id = _booking("Website Booking {0}".format(tag), notes="Quote request.\n\nFurniture list: {0}".format(row["public_id"].lower()))
     page = office.get("/bookings/{0}".format(booking_id)).get_data(as_text=True)
-    assert row["public_id"] in page and "Submitted" in page
+    assert row["public_id"] in page and "In progress" in page
     assert furniture_lists.get_for_booking(booking_id)["id"] == row["id"]
 
     # Manual link by code, and the one-list-per-booking rule.
@@ -526,8 +527,141 @@ def test_standard_volume_admin_page_permissions_and_validation():
     return True
 
 
+def _pdf_text(pdf_bytes):
+    import pymupdf
+
+    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    return "\n".join(page.get_text() for page in doc)
+
+
+def _website_list(client, content=None):
+    start = client.post("/furniture/start")
+    assert start.status_code == 302
+    token = start.headers["Location"].rstrip("/").split("/furniture/")[-1]
+    row = furniture_lists.get_by_token(token)
+    if content is not None:
+        client.post("/furniture/{0}/save".format(token), json={"content": content})
+    return token, furniture_lists.get_by_token(token)
+
+
+def test_quote_flow_list_is_a_draft_with_save_and_return():
+    customer = _public_client("10.9.20.1")
+    token, row = _website_list(customer)
+    html = customer.get("/furniture/{0}".format(token)).get_data(as_text=True)
+    assert "Save &amp; Return to Quote" in html and 'id="fl-submit"' not in html and "Send list" not in html
+    assert "Draft — sent with your quote request" in html
+    # No return address given → back to the website quote form, carrying the FL reference.
+    assert "https://japaneseremovals.com.au/contact-us/?furniture_list={0}#quote".format(row["public_id"]) in html
+    # Saving — even with submit=True from the browser — never submits a website list.
+    res = customer.post("/furniture/{0}/save".format(token), json={"content": _sample_content(), "submit": True}).get_json()
+    assert res["ok"] and res["status"] == "in_progress", res
+    assert res["status_label"] == "Draft — sent with your quote request"
+    row = furniture_lists.get_by_token(token)
+    assert row["status"] == "in_progress" and not row["submitted_at"] and not row["enquiry_received_at"]
+    # The flow-A code paths have no email/SMS sending at all.
+    for module in ("furniture_lists.py", "furniture_enquiry.py", "furniture_pdf.py"):
+        source = (ROOT / module).read_text()
+        assert not re.search(r"(?i)\b(sms|smtp|send_email|twilio|invoice_send|gmail)\b", source), module
+    # Flow B (existing booking link) is unchanged: Send list submits.
+    office = _office_client()
+    booking_id = _booking("Flow B {0}".format(_tag()))
+    link = office.post("/bookings/{0}/furniture/link".format(booking_id)).get_json()
+    btoken = _token_from_url(link["url"])
+    bhtml = customer.get("/furniture/{0}".format(btoken)).get_data(as_text=True)
+    assert "Send list" in bhtml and "Save &amp; Return to Quote" not in bhtml
+    sub = customer.post("/furniture/{0}/save".format(btoken), json={"content": _sample_content(), "submit": True}).get_json()
+    assert sub["status"] == "submitted"
+    return True
+
+
+def test_enquiry_pdf_api_security_receipt_and_dedupe():
+    key = "test-enquiry-key-{0}".format(_tag())
+    old = os.environ.pop("FURNITURE_ENQUIRY_KEY", None)
+    api = app.test_client()
+    api.environ_base["REMOTE_ADDR"] = "10.9.30.{0}".format(_counter % 200 + 1)
+    try:
+        customer = _public_client("10.9.21.1")
+        token, row = _website_list(customer, _sample_content())
+        pid = row["public_id"]
+        url = "/api/enquiry-list/{0}.pdf".format(pid)
+        assert api.get(url, headers={"X-JR-Enquiry-Key": key}).status_code == 503, "disabled without a server key"
+        os.environ["FURNITURE_ENQUIRY_KEY"] = key
+        assert api.get(url).status_code == 401
+        assert api.get(url, headers={"X-JR-Enquiry-Key": "wrong"}).status_code == 401
+        assert api.get("/api/enquiry-list/FL-ZZZZZZ.pdf", headers={"X-JR-Enquiry-Key": key}).status_code == 404
+        assert api.get("/api/enquiry-list/nonsense.pdf", headers={"X-JR-Enquiry-Key": key}).status_code == 404
+        # A list made for an existing booking (flow B) is never served, even with the key.
+        office = _office_client()
+        booking_id = _booking("Enquiry Other {0}".format(_tag()))
+        other = office.post("/bookings/{0}/furniture/link".format(booking_id)).get_json()["public_id"]
+        assert api.get("/api/enquiry-list/{0}.pdf".format(other), headers={"X-JR-Enquiry-Key": key}).status_code == 404
+        assert furniture_lists.get_by_token(token)["status"] == "in_progress", "nothing received before the enquiry"
+
+        customer.post("/furniture/{0}/photos".format(token), data={"photo": (io.BytesIO(_png_bytes()), "sofa.png")}, content_type="multipart/form-data")
+        res = api.get(url.lower(), headers={"X-JR-Enquiry-Key": key})
+        assert res.status_code == 200 and res.headers["Content-Type"] == "application/pdf"
+        assert res.data[:4] == b"%PDF" and "no-store" in res.headers["Cache-Control"]
+        text = _pdf_text(res.data)
+        for needle in (pid, "Bedroom 1", "Queen bed + mattress", "3-seater sofa", "Fish tank", "has photos (1)",
+                       "写真あり", "推定値", "2nd floor, no lift", "approx. 4.6 m³"):
+            assert needle in text, (needle, text[:800])
+        received = furniture_lists.get_by_token(token)
+        assert received["status"] == "submitted" and received["enquiry_received_at"] and received["submitted_at"]
+        assert received["last_edited_by"] == "website enquiry" and received["enquiry_fetch_count"] == 1
+        # Customer view now says it was received; office view shows the enquiry.
+        assert "Received with your quote request" in customer.get("/furniture/{0}".format(token)).get_data(as_text=True)
+        assert "Received " in office.get("/furniture-lists/{0}".format(received["id"])).get_data(as_text=True)
+        # Retry / double send of the same enquiry: same PDF, received only once.
+        again = api.get(url, headers={"X-JR-Enquiry-Key": key})
+        assert again.status_code == 200 and again.data[:4] == b"%PDF"
+        twice = furniture_lists.get_by_token(token)
+        assert twice["enquiry_fetch_count"] == 2 and twice["enquiry_received_at"] == received["enquiry_received_at"]
+        # The same reference can't ride along with a later, different enquiry.
+        with db.get_connection() as conn:
+            conn.execute("UPDATE furniture_lists SET enquiry_received_at = ? WHERE id = ?", ("2026-01-01T00:00:00Z", received["id"]))
+            conn.commit()
+        assert api.get(url, headers={"X-JR-Enquiry-Key": key}).status_code == 409
+        # Every request is logged.
+        with db.get_connection() as conn:
+            rows = conn.execute("SELECT status_code FROM furniture_api_log WHERE public_id = ?", (pid,)).fetchall()
+        codes = sorted(int(dict(r)["status_code"]) for r in rows)
+        assert codes.count(200) == 2 and 401 in codes and 409 in codes and 503 in codes, codes
+        # Repeated bad keys from one IP lock that IP out, even with the right key afterwards.
+        brute = app.test_client()
+        brute.environ_base["REMOTE_ADDR"] = "10.9.31.{0}".format(_counter % 200 + 1)
+        for _ in range(furniture_enquiry.BAD_KEYS_PER_IP_PER_HOUR):
+            assert brute.get(url, headers={"X-JR-Enquiry-Key": "guess"}).status_code == 401
+        assert brute.get(url, headers={"X-JR-Enquiry-Key": key}).status_code == 429
+    finally:
+        if old is None:
+            os.environ.pop("FURNITURE_ENQUIRY_KEY", None)
+        else:
+            os.environ["FURNITURE_ENQUIRY_KEY"] = old
+    return True
+
+
+def test_empty_website_list_pdf_still_valid():
+    key = "test-enquiry-key-empty"
+    os.environ["FURNITURE_ENQUIRY_KEY"] = key
+    try:
+        customer = _public_client("10.9.22.1")
+        _token, row = _website_list(customer)
+        api = app.test_client()
+        api.environ_base["REMOTE_ADDR"] = "10.9.32.1"
+        res = api.get("/api/enquiry-list/{0}.pdf".format(row["public_id"]), headers={"X-JR-Enquiry-Key": key})
+        assert res.status_code == 200 and res.data[:4] == b"%PDF"
+        text = _pdf_text(res.data)
+        assert "No items entered" in text and "写真なし" in text and row["public_id"] in text
+    finally:
+        os.environ.pop("FURNITURE_ENQUIRY_KEY", None)
+    return True
+
+
 def main():
     tests = [
+        test_quote_flow_list_is_a_draft_with_save_and_return,
+        test_enquiry_pdf_api_security_receipt_and_dedupe,
+        test_empty_website_list_pdf_still_valid,
         test_catalog_math_and_no_double_count,
         test_volume_references_are_consistent,
         test_existing_lists_keep_numbers_and_admin_change_applies_to_new_items,

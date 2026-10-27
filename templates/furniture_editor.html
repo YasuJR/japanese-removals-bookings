@@ -43,6 +43,7 @@
         <div><dt>Last updated</dt><dd>{{ row.updated_display or '—' }}{% if row.last_edited_by %} · by {{ row.last_edited_by }}{% endif %}</dd></div>
         <div><dt>Submitted</dt><dd>{{ row.submitted_display or '—' }}</dd></div>
         {% if row.source == 'website' %}
+        <div><dt>Website enquiry</dt><dd>{% if row.enquiry_received_at %}Received {{ row.enquiry_display }} (PDF attached to the enquiry email{% if row.enquiry_fetch_count and row.enquiry_fetch_count > 1 %}, fetched {{ row.enquiry_fetch_count }}×{% endif %}){% else %}Not sent yet — draft{% endif %}</dd></div>
         <div><dt>Contact (from list)</dt><dd>{{ row.contact_name or '—' }} · {{ row.contact_phone or '—' }} · {{ row.contact_email or '—' }}{% if row.contact_move_date %} · move {{ row.contact_move_date }}{% endif %}</dd></div>
         {% endif %}
       </dl>
@@ -92,8 +93,11 @@
     <section class="fl-card fl-intro">
       <h1>{% if greeting %}Hi {{ greeting }}, w{% else %}W{% endif %}hat are we moving?</h1>
       <p>Add your furniture room by room, plus any boxes and special items. It only takes a few minutes and helps us plan the right truck and team.</p>
+      {% if quote_flow %}
+      <p class="fl-flow-note">Your list is saved as you go. When you're done, tap <strong>Save &amp; Return to Quote</strong> and send your quote request — we receive this list together with it.</p>
+      {% endif %}
       {% if move_date %}<p class="fl-muted">Moving date: {{ move_date }}</p>{% endif %}
-      <p class="fl-ref">List reference <strong>{{ row.public_id }}</strong> · <span class="fl-chip fl-chip-{{ row.status }}" data-status-chip>{{ row.status_label }}</span></p>
+      <p class="fl-ref">List reference <strong>{{ row.public_id }}</strong> · <span class="fl-chip fl-chip-{{ row.status }}" data-status-chip>{{ chip_label }}</span></p>
       <p class="fl-muted" data-saved-line>{% if row.updated_display and row.status != 'not_started' %}Last saved {{ row.updated_display }}{% endif %}</p>
     </section>
     {% endif %}
@@ -156,7 +160,7 @@
       <p class="fl-muted">This is a rough guide based on typical item sizes. It is <strong>not a quote</strong> — we will confirm the price, team and time with you.</p>
     </section>
 
-    {% if mode != 'office' %}
+    {% if mode != 'office' and not quote_flow %}
     <section class="fl-card fl-done" id="fl-done" hidden>
       <h2>Thank you!</h2>
       <p>Your list <strong>{{ row.public_id }}</strong> has been sent to Japanese Removals. You can come back and update it any time using the same link.</p>
@@ -164,6 +168,8 @@
       <a class="fl-btn fl-btn-primary fl-btn-block" href="{{ return_link }}" data-return-link>Back to booking form</a>
       {% endif %}
     </section>
+    {% endif %}
+    {% if mode != 'office' %}
     <section class="fl-card fl-keep">
       <h2>Keep this link</h2>
       <p class="fl-muted">This private link lets you (and only you) see and edit this list. Please don't share it publicly.</p>
@@ -184,6 +190,9 @@
       <div class="fl-bar-actions">
         {% if mode == 'office' %}
         <button type="button" class="fl-btn fl-btn-primary" id="fl-save">Save changes</button>
+        {% elif quote_flow %}
+        <button type="button" class="fl-btn fl-btn-secondary" id="fl-save">Save</button>
+        <a class="fl-btn fl-btn-primary" href="{{ return_link }}" id="fl-return" data-return-link data-always-save>Save &amp; Return to Quote</a>
         {% else %}
         {% if return_link %}
         <a class="fl-btn fl-btn-secondary" href="{{ return_link }}" id="fl-back" data-return-link>Back to form</a>
@@ -203,7 +212,8 @@
     "max_photos": max_photos,
     "public_id": row.public_id,
     "own_url": customer_url if mode != 'office' else '',
-    "return_link": return_link
+    "return_link": return_link,
+    "quote_flow": quote_flow
   }|tojson }}</script>
   <script src="{{ url_for('static', filename='furniture.js') }}"></script>
 </body>

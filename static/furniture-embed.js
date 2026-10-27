@@ -63,14 +63,15 @@
     var css = document.createElement("style");
     css.id = "jr-fl-embed-css";
     css.textContent =
-      ".jr-fl-card{grid-column:1/-1;border:1px solid #c9ddd4;background:#f1f7f4;border-radius:12px;padding:14px 16px;margin:4px 0 6px}" +
-      ".jr-fl-card h3{margin:0 0 4px;font-size:1rem;color:#0f3b2e}" +
-      ".jr-fl-card p{margin:0 0 10px;font-size:.92rem;line-height:1.45}" +
-      ".jr-fl-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}" +
-      ".jr-fl-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 18px;border-radius:10px;background:#0f3b2e;color:#fff!important;font-weight:700;text-decoration:none!important;border:0;cursor:pointer;font-size:.95rem}" +
+      ".jr-fl-card{grid-column:1/-1;border:2px solid #0f3b2e;background:#f1f7f4;border-radius:14px;padding:18px;margin:10px 0}" +
+      ".jr-fl-card h3{margin:0 0 6px;font-size:1.45rem;line-height:1.2;font-weight:800;color:#0f3b2e}" +
+      ".jr-fl-card p{margin:0 0 12px;font-size:.98rem;line-height:1.5;color:#1d3b31}" +
+      ".jr-fl-saved{display:flex;align-items:center;gap:6px;margin:0 0 12px;font-size:1rem;font-weight:800;color:#0f3b2e}" +
+      ".jr-fl-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}" +
+      ".jr-fl-btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 22px;border-radius:12px;background:#0f3b2e;color:#fff!important;font-weight:800;text-decoration:none!important;border:0;cursor:pointer;font-size:1rem}" +
       ".jr-fl-btn:hover{background:#1d5c47}" +
       ".jr-fl-remove{background:none;border:0;color:#5b6b65;text-decoration:underline;cursor:pointer;font-size:.85rem;padding:8px 4px}" +
-      ".jr-fl-ok{font-weight:700;color:#0f3b2e}" +
+      ".jr-fl-id{display:block;margin-top:10px;font-size:.78rem;color:#5b6b65}" +
       ".jr-fl-inline{display:inline-block;margin-top:6px;color:#0f3b2e;font-weight:700}";
     document.head.appendChild(css);
   }
@@ -83,9 +84,22 @@
   function renderCard(card, form) {
     var ref = getRef();
     card.innerHTML = "";
+
     var title = document.createElement("h3");
-    title.textContent = "Furniture list (optional)";
-    var text = document.createElement("p");
+    title.textContent = "Furniture List";
+    card.appendChild(title);
+
+    if (ref) {
+      var saved = document.createElement("p");
+      saved.className = "jr-fl-saved";
+      saved.textContent = "✓ Saved — will be included with your quote request";
+      card.appendChild(saved);
+    } else {
+      var text = document.createElement("p");
+      text.textContent = "List your furniture room by room (add photos if you like) for a more accurate quote. Your form details are kept while you do it. Optional.";
+      card.appendChild(text);
+    }
+
     var actions = document.createElement("div");
     actions.className = "jr-fl-actions";
     var button = document.createElement("a");
@@ -93,23 +107,24 @@
     button.href = listUrl(ref);
     button.setAttribute("data-track", "furniture_list");
     button.addEventListener("click", function () { saveFormDraft(form); });
+    button.textContent = ref ? "Edit Furniture List" : "Add Furniture List";
     actions.appendChild(button);
     if (ref) {
-      text.innerHTML = '<span class="jr-fl-ok">✓ Furniture list ' + ref + " added.</span> It will be sent with your quote request.";
-      button.textContent = "Edit furniture list";
       var remove = document.createElement("button");
       remove.type = "button";
       remove.className = "jr-fl-remove";
       remove.textContent = "Don't include it";
       remove.addEventListener("click", function () { clearRef(); renderAll(); });
       actions.appendChild(remove);
-    } else {
-      text.textContent = "List your furniture room by room (with photos if you like) for a more accurate quote. Your form details are kept while you do it.";
-      button.textContent = "Add your furniture list";
     }
-    card.appendChild(title);
-    card.appendChild(text);
     card.appendChild(actions);
+
+    if (ref) {
+      var idline = document.createElement("span");
+      idline.className = "jr-fl-id";
+      idline.textContent = "List ID: " + ref;
+      card.appendChild(idline);
+    }
   }
 
   var cards = [];
@@ -147,15 +162,26 @@
   function enhance(form) {
     if (form.getAttribute("data-jr-fl") === "1") return;
     form.setAttribute("data-jr-fl", "1");
+    var step1 = form.querySelector('[data-step="1"] .fields');
     var step2 = form.querySelector('[data-step="2"] .fields') || form.querySelector(".fields");
     var messageField = form.querySelector('[name="message"]');
-    var card = document.createElement("div");
-    card.className = "jr-fl-card field field--wide";
-    var anchor = messageField && messageField.closest(".field");
-    if (anchor && step2 && step2.contains(anchor)) step2.insertBefore(card, anchor);
-    else if (step2) step2.appendChild(card);
-    else form.appendChild(card);
-    cards.push({ card: card, form: form });
+    function mkCard() {
+      var c = document.createElement("div");
+      c.className = "jr-fl-card field field--wide";
+      cards.push({ card: c, form: form });
+      return c;
+    }
+    // Step 2: just before "Tell us about your move".
+    if (step2) {
+      var card2 = mkCard();
+      var anchor = messageField && messageField.closest(".field");
+      if (anchor && step2.contains(anchor)) step2.insertBefore(card2, anchor);
+      else step2.appendChild(card2);
+    }
+    // Step 1: at the end of the essentials, so it's reachable without opening step 2. renderAll keeps
+    // both cards in sync (add on one step → both show "Saved").
+    if (step1 && step1 !== step2) step1.appendChild(mkCard());
+    if (!step1 && !step2) form.appendChild(mkCard());
 
     var hint = form.querySelector("[data-step-hint]");
     if (hint && !hint.querySelector("[data-jr-fl-inline]")) {

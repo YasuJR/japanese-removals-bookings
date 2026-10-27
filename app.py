@@ -76,7 +76,9 @@ from resource_conflicts import find_resource_conflict_warnings
 from trucks import active_truck_names
 import double_booking
 import furniture_catalog
+import furniture_enquiry
 import furniture_lists
+import furniture_pdf
 import furniture_volume_refs
 import furniture_volumes
 import job_status
@@ -2575,6 +2577,8 @@ def _furniture_editor_page(row, mode: str, **extra):
             catalog=furniture_catalog.catalog_payload(furniture_volumes.effective_volumes()),
             endpoints=endpoints,
             return_link=furniture_lists.return_link(row) if mode != "office" else "",
+            quote_flow=bool(row.get("quote_flow")) and mode != "office",
+            chip_label=furniture_lists.customer_status_label(row) if mode != "office" else row["status_label"],
             customer_url=url_for("furniture_edit", token=row["access_token"], _external=True),
             max_photos=furniture_lists.MAX_PHOTOS,
             **extra,
@@ -2592,7 +2596,9 @@ def _furniture_save_response(row, editor: str):
         {
             "ok": True,
             "status": updated["status"],
-            "status_label": updated["status_label"],
+            "status_label": (
+                furniture_lists.customer_status_label(updated) if editor == "customer" else updated["status_label"]
+            ),
             "updated_display": updated["updated_display"],
             "estimated_m3": updated["estimated_m3"],
             "item_count": updated["item_count"],
@@ -2696,6 +2702,40 @@ def furniture_photo_delete(token, photo_id):
     if not row:
         return jsonify({"ok": False, "error": "This link is not valid."}), 404
     return jsonify({"ok": furniture_lists.delete_photo(row["id"], photo_id)})
+
+
+@app.route("/api/enquiry-list/<fl_id>.pdf", methods=["GET"], endpoint="furniture_enquiry_pdf")
+def furniture_enquiry_pdf(fl_id):
+    """Website (server to server) fetches the list PDF when it sends the quote enquiry.
+
+    Needs header X-JR-Enquiry-Key = FURNITURE_ENQUIRY_KEY. See furniture_enquiry.py.
+    """
+    ip_address = request.remote_addr or ""
+    status, outcome, row = furniture_enquiry.check_request(
+        ip_address, fl_id, request.headers.get("X-JR-Enquiry-Key")
+    )
+    public_id = row["public_id"] if row else furniture_lists.normalize_public_id(fl_id)
+    if status != 200:
+        furniture_enquiry.log_request(ip_address, public_id, status, outcome)
+        messages = {401: "Unauthorized", 404: "Not found", 409: "Already used", 429: "Too many requests", 503: "Not configured"}
+        response = app.make_response((messages.get(status, "Error"), status))
+        response.headers["Content-Type"] = "text/plain; charset=utf-8"
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    try:
+        pdf = furniture_pdf.render_list_pdf(row, photo_count=int(row.get("photo_count") or 0))
+    except Exception:
+        app.logger.exception("Furniture list PDF failed for %s", public_id)
+        furniture_enquiry.log_request(ip_address, public_id, 500, "pdf error")
+        return app.make_response(("PDF error", 500))
+    furniture_enquiry.mark_received(row)
+    furniture_enquiry.log_request(ip_address, public_id, 200, outcome)
+    response = app.make_response(pdf)
+    response.headers["Content-Type"] = "application/pdf"
+    response.headers["Content-Disposition"] = 'inline; filename="furniture-list-{0}.pdf"'.format(public_id)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
 
 
 @app.route("/furniture-lists", methods=["GET", "POST"], endpoint="furniture_lists_index")

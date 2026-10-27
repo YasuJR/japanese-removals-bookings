@@ -457,11 +457,23 @@
     $("fl-save").addEventListener("click", function () { save(false); });
     var submit = $("fl-submit");
     if (submit) submit.addEventListener("click", function () { save(true); });
+    // "Save & Return to Quote" (data-always-save) always saves first and only leaves when the
+    // save worked, so nothing typed is lost. Other return links save only unsaved changes.
     document.querySelectorAll("[data-return-link]").forEach(function (link) {
       link.addEventListener("click", function (event) {
-        if (!dirty) return;
+        var always = link.hasAttribute("data-always-save");
+        if (!dirty && !always) return;
         event.preventDefault();
-        save(false).then(function () { window.location.href = link.href; });
+        if (link.getAttribute("aria-busy") === "true") return;
+        link.setAttribute("aria-busy", "true");
+        (function attempt(tries) {
+          if (saving && tries < 40) { setTimeout(function () { attempt(tries + 1); }, 250); return; }
+          save(false).then(function (ok) {
+            if (ok) { window.location.href = link.href; return; }
+            link.removeAttribute("aria-busy");
+            if (always) alert("Sorry, we couldn't save your list. Please check your connection and try again.");
+          });
+        })(0);
       });
     });
     window.addEventListener("beforeunload", function (event) {

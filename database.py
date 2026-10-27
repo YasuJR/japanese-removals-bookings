@@ -275,6 +275,30 @@ def _ensure_furniture_list_tables(conn) -> None:
         "CREATE INDEX IF NOT EXISTS idx_furniture_list_photos_list "
         "ON furniture_list_photos(list_id)"
     )
+    # Website enquiry hand-off (flow A): when the website fetched the list PDF for an enquiry.
+    existing = db_backend.table_columns(conn, "furniture_lists")
+    for column, ddl in (
+        ("enquiry_received_at", "TEXT NOT NULL DEFAULT ''"),
+        ("enquiry_fetch_count", "INTEGER NOT NULL DEFAULT 0"),
+    ):
+        if column not in existing:
+            conn.execute("ALTER TABLE furniture_lists ADD COLUMN {0} {1}".format(column, ddl))
+    # Log of website → app PDF requests (/api/enquiry-list/<FL>.pdf), also used for rate limiting.
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS furniture_api_log (
+            id {pk},
+            created_at TEXT NOT NULL DEFAULT '',
+            ip TEXT NOT NULL DEFAULT '',
+            public_id TEXT NOT NULL DEFAULT '',
+            status_code INTEGER NOT NULL DEFAULT 0,
+            outcome TEXT NOT NULL DEFAULT ''
+        )
+        """.format(pk="SERIAL PRIMARY KEY" if pg else "INTEGER PRIMARY KEY AUTOINCREMENT")
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_furniture_api_log_ip ON furniture_api_log(ip, created_at)"
+    )
     # Admin overrides of the standard m³ per item (furniture_volumes.py) and their history.
     conn.execute(
         """

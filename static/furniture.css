@@ -312,3 +312,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(29, 92, 71, 
   .fl-office-actions { grid-template-columns: 1fr 1fr; }
   .fl-office-actions .fl-copy { grid-column: 1 / -1; }
 }
+
+/* Website quote flow (draft until the enquiry is sent) */
+.fl-flow-note { background: #f1f7f4; border-left: 4px solid #0f3b2e; padding: 10px 12px; border-radius: 8px; }
+#fl-return[aria-busy="true"] { opacity: .7; pointer-events: none; }
