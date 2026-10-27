@@ -3952,3 +3952,4 @@ button:disabled {
 .fv-field input[name="m3"] { width: 6.5rem; }
 .fv-note { flex: 1 1 12rem; }
 .fv-note input { width: 100%; }
+.furniture-changed-note { background: #fff3a3; border: 1px solid #e3b341; border-radius: 8px; padding: 0.45rem 0.7rem; margin: 0.5rem 0 0; font-weight: 600; }

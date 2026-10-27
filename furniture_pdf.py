@@ -15,6 +15,7 @@ import furniture_catalog as catalog
 
 FONT = "HeiseiKakuGo-W5"
 GREEN = "#0f3b2e"
+YELLOW = "#fff3a3"
 _font_ready = False
 
 
@@ -51,7 +52,9 @@ def render_list_pdf(row: Dict[str, Any], photo_count: int) -> bytes:
     def p(text: Any, style=base) -> Paragraph:
         return Paragraph(escape(str(text if text is not None else "")).replace("\n", "<br/>"), style)
 
-    summary = catalog.summarize(row["content"])
+    changes = row.get("changes") or catalog.compare_to_baseline(row["content"], row.get("baseline"))
+    summary = catalog.annotate_changes(catalog.summarize(row["content"]), changes)
+    has_changes = bool(changes.get("active") and changes.get("count"))
     public_id = row["public_id"]
     story: List[Any] = [
         p("家具リスト / Furniture List", title),
@@ -73,6 +76,13 @@ def render_list_pdf(row: Dict[str, Any], photo_count: int) -> bytes:
 
     estimate_line = "数量・体積は概算（推定値）です。 Quantities and volumes are approximate estimates, not a quote."
     story.append(p(estimate_line, small))
+    if has_changes:
+        legend = Table(
+            [[p("黄色 = 初回提出後に変更（{0}件） / Yellow = changed after the first submission ({0})".format(changes["count"]))]],
+            colWidths=[170 * mm],
+        )
+        legend.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(YELLOW)), ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#e3b341"))]))
+        story += [Spacer(1, 2 * mm), legend]
     story.append(Spacer(1, 2 * mm))
 
     widths = [96 * mm, 16 * mm, 28 * mm, 30 * mm]
@@ -93,19 +103,29 @@ def render_list_pdf(row: Dict[str, Any], photo_count: int) -> bytes:
     for room in summary["rooms"]:
         room_total = sum(line["m3"] for line in room["lines"])
         story.append(p("{0} — approx. {1} m³".format(room["label"], _m3(room_total)), h2))
-        data = [head] + [
-            [p(line["label"]), p(line["qty"]), p(_m3(line["unit_m3"])), p(_m3(line["m3"]))]
-            for line in room["lines"]
-        ]
+        data = [head]
+        marks = []
+        for line in room["lines"]:
+            label = line["label"]
+            if line.get("changed"):
+                label += "  (was × {0})".format(line["before_qty"]) if line.get("before_qty") else "  (added / 追加)"
+                marks.append(len(data))
+            data.append([p(label), p(line["qty"]), p(_m3(line["unit_m3"])), p(_m3(line["m3"]))])
         table = Table(data, colWidths=widths, repeatRows=1)
         table.setStyle(header_style)
+        for index in marks:
+            table.setStyle(TableStyle([("BACKGROUND", (0, index), (-1, index), colors.HexColor(YELLOW))]))
         story.append(table)
 
     if summary["custom_items"]:
         story.append(p("Other items / その他の荷物", h2))
         data = [[p("Item / 品目", small), p("Qty / 数量", small), p("Size / 寸法", small), p("m³ / 小計", small)]]
+        custom_marks = []
         for item in summary["custom_items"]:
             name = item["name"] + (" ({0})".format(item["room"]) if item["room"] else "")
+            if item.get("changed"):
+                name += "  (added / 追加)" if item["changed"] == "new" else "  (changed / 変更)"
+                custom_marks.append(len(data))
             if item["note"]:
                 name += "\n" + item["note"]
             data.append(
@@ -118,9 +138,20 @@ def render_list_pdf(row: Dict[str, Any], photo_count: int) -> bytes:
             )
         table = Table(data, colWidths=widths, repeatRows=1)
         table.setStyle(header_style)
+        for index in custom_marks:
+            table.setStyle(TableStyle([("BACKGROUND", (0, index), (-1, index), colors.HexColor(YELLOW))]))
         story.append(table)
         if summary["unsized_custom_count"]:
             story.append(p("寸法のない荷物は合計m³に含まれていません。 Items without a size are not in the total.", small))
+
+    removed = [(r["room"], r["label"], r["qty"]) for r in changes.get("removed") or []]
+    removed += [("Other items", r["name"], r["qty"]) for r in changes.get("removed_custom") or []]
+    if removed:
+        story.append(p("Removed after first submission / 初回提出後に削除", h2))
+        data = [[p("{0} · {1}".format(room, label)), p("was × {0}".format(qty))] for room, label, qty in removed]
+        table = Table(data, colWidths=[140 * mm, 30 * mm])
+        table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(YELLOW)), ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor("#e3b341"))]))
+        story.append(table)
 
     story.append(Spacer(1, 4 * mm))
     total = Table(
@@ -151,8 +182,11 @@ def render_list_pdf(row: Dict[str, Any], photo_count: int) -> bytes:
     else:
         story.append(p("写真なし / no photos"))
 
-    story.append(p("Notes / メモ", h2))
-    story.append(p(summary["notes"] or "—"))
+    story.append(p("Notes / メモ" + ("  (changed / 変更あり)" if changes.get("notes_changed") else ""), h2))
+    notes = Table([[p(summary["notes"] or "—")]], colWidths=[170 * mm])
+    if changes.get("notes_changed"):
+        notes.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(YELLOW))]))
+    story.append(notes)
     story.append(Spacer(1, 4 * mm))
     story.append(p(estimate_line + " List ID: {0}".format(public_id), small))
 

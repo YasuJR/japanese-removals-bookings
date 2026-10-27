@@ -428,7 +428,9 @@ def summarize(content: Dict[str, Any], volumes: Optional[Dict[str, float]] = Non
                 {"key": key, "label": label, "qty": qty, "unit_m3": m3, "m3": round(m3 * qty, 2)}
             )
         lines.sort(key=lambda line: line["label"])
-        rooms_out.append({"label": room.get("label"), "type": room.get("type"), "lines": lines})
+        rooms_out.append(
+            {"id": room.get("id"), "label": room.get("label"), "type": room.get("type"), "lines": lines}
+        )
     custom_lines = []
     unsized = 0
     for item in content.get("custom_items") or []:
@@ -462,6 +464,99 @@ def summarize(content: Dict[str, Any], volumes: Optional[Dict[str, float]] = Non
         "custom_items": custom_lines,
         "notes": content.get("notes") or "",
     }
+
+
+def _custom_key(item: Dict[str, Any]) -> str:
+    return " ".join(str(item.get("name") or "").lower().split())
+
+
+def _custom_sig(item: Dict[str, Any]) -> Tuple[Any, ...]:
+    return (
+        int(item.get("qty") or 1),
+        item.get("length_cm"),
+        item.get("width_cm"),
+        item.get("height_cm"),
+        _clean_text(item.get("note")),
+        _clean_text(item.get("room"), 60),
+    )
+
+
+def compare_to_baseline(content: Dict[str, Any], baseline: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """What changed since the first submitted version (``baseline``).
+
+    Rooms are matched by id, items by key; "Other items" by name. Used to show
+    second-and-later updates in yellow (office, staff, PDF).
+    """
+    result: Dict[str, Any] = {
+        "active": baseline is not None,
+        "items": {},          # room id -> {item key: qty before (0 = newly added)}
+        "removed": [],        # {"room", "label", "qty"}
+        "custom": {},         # index in content["custom_items"] -> "new" | "changed"
+        "removed_custom": [],  # {"name", "qty"}
+        "notes_changed": False,
+        "count": 0,
+    }
+    if baseline is None:
+        return result
+    before_rooms = {room.get("id"): room for room in baseline.get("rooms") or []}
+    seen_ids = set()
+    for room in content.get("rooms") or []:
+        room_id = room.get("id")
+        seen_ids.add(room_id)
+        before_items = (before_rooms.get(room_id) or {}).get("items") or {}
+        changed = {}
+        for key, qty in (room.get("items") or {}).items():
+            if before_items.get(key, 0) != qty:
+                changed[key] = before_items.get(key, 0)
+        for key, qty in before_items.items():
+            if key not in (room.get("items") or {}) and key in ITEMS:
+                result["removed"].append({"room": room.get("label"), "label": ITEMS[key][0], "qty": qty})
+        if changed:
+            result["items"][room_id] = changed
+    for room_id, room in before_rooms.items():
+        if room_id in seen_ids:
+            continue
+        for key, qty in (room.get("items") or {}).items():
+            if key in ITEMS:
+                result["removed"].append({"room": room.get("label"), "label": ITEMS[key][0], "qty": qty})
+    before_custom: Dict[str, List[Dict[str, Any]]] = {}
+    for item in baseline.get("custom_items") or []:
+        before_custom.setdefault(_custom_key(item), []).append(item)
+    for index, item in enumerate(content.get("custom_items") or []):
+        matches = before_custom.get(_custom_key(item)) or []
+        if not matches:
+            result["custom"][index] = "new"
+            continue
+        previous = matches.pop(0)
+        if _custom_sig(previous) != _custom_sig(item):
+            result["custom"][index] = "changed"
+    for leftovers in before_custom.values():
+        for item in leftovers:
+            result["removed_custom"].append({"name": item.get("name"), "qty": int(item.get("qty") or 1)})
+    result["notes_changed"] = (baseline.get("notes") or "").strip() != (content.get("notes") or "").strip()
+    result["count"] = (
+        sum(len(v) for v in result["items"].values())
+        + len(result["removed"])
+        + len(result["custom"])
+        + len(result["removed_custom"])
+        + (1 if result["notes_changed"] else 0)
+    )
+    return result
+
+
+def annotate_changes(summary: Dict[str, Any], changes: Dict[str, Any]) -> Dict[str, Any]:
+    """Mark summary lines changed since the first submission (for yellow highlighting)."""
+    summary["changes"] = changes
+    for room in summary.get("rooms") or []:
+        room_changes = (changes.get("items") or {}).get(room.get("id")) or {}
+        for line in room["lines"]:
+            if line["key"] in room_changes:
+                line["changed"] = True
+                line["before_qty"] = room_changes[line["key"]]
+    for index, item in enumerate(summary.get("custom_items") or []):
+        if index in (changes.get("custom") or {}):
+            item["changed"] = changes["custom"][index]
+    return summary
 
 
 def has_content(content: Dict[str, Any]) -> bool:

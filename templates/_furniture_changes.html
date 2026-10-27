@@ -1,0 +1,23 @@
+{# Changes since the first submitted version (yellow). Needs `summary` annotated by furniture_catalog.annotate_changes and `row`. #}
+{% set changes = summary.changes %}
+{% if changes and changes.active and changes.count %}
+<section class="fl-card fl-changes" aria-labelledby="fl-changes-title">
+  <h2 id="fl-changes-title">Updated after first submission <span class="fl-changes-count">{{ changes.count }} change{{ '' if changes.count == 1 else 's' }}</span></h2>
+  <p class="fl-muted">黄色 = 初回提出後に変更 / Yellow = changed after the first submission{% if row.baseline_display %} ({{ row.baseline_display }}){% endif %}.</p>
+  <ul class="fl-changes-list">
+    {% for room in summary.rooms %}{% for line in room.lines if line.changed %}
+    <li class="fl-hl">{{ room.label }} · {{ line.label }}: {% if line.before_qty %}{{ line.before_qty }} → {{ line.qty }}{% else %}added × {{ line.qty }}{% endif %}</li>
+    {% endfor %}{% endfor %}
+    {% for item in changes.removed %}
+    <li class="fl-hl fl-hl-removed">{{ item.room }} · {{ item.label }}: removed (was × {{ item.qty }})</li>
+    {% endfor %}
+    {% for item in summary.custom_items if item.changed %}
+    <li class="fl-hl">Other item · {{ item.name }}: {{ 'added' if item.changed == 'new' else 'changed' }} (× {{ item.qty }})</li>
+    {% endfor %}
+    {% for item in changes.removed_custom %}
+    <li class="fl-hl fl-hl-removed">Other item · {{ item.name }}: removed (was × {{ item.qty }})</li>
+    {% endfor %}
+    {% if changes.notes_changed %}<li class="fl-hl">Notes changed</li>{% endif %}
+  </ul>
+</section>
+{% endif %}

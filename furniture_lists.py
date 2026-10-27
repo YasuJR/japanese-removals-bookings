@@ -60,7 +60,7 @@ _LIST_COLUMNS = (
     "id, public_id, access_token, booking_id, source, status, contact_name, "
     "contact_email, contact_phone, contact_move_date, return_url, content_json, "
     "estimated_m3, item_count, photo_count, created_at, updated_at, submitted_at, "
-    "last_edited_by, enquiry_received_at, enquiry_fetch_count"
+    "last_edited_by, enquiry_received_at, enquiry_fetch_count, baseline_json, baseline_at"
 )
 
 
@@ -100,6 +100,14 @@ def _row_dict(row: Any) -> Optional[Dict[str, Any]]:
     item["updated_display"] = format_perth(item.get("updated_at"))
     item["submitted_display"] = format_perth(item.get("submitted_at"))
     item["enquiry_display"] = format_perth(item.get("enquiry_received_at"))
+    item["baseline"] = None
+    if item.get("baseline_json"):
+        try:
+            item["baseline"] = catalog.sanitize_content(json.loads(item["baseline_json"]), keep_units=True)
+        except (TypeError, ValueError):
+            item["baseline"] = None
+    item["baseline_display"] = format_perth(item.get("baseline_at"))
+    item["changes"] = catalog.compare_to_baseline(item["content"], item["baseline"])
     item["estimated_m3"] = float(item.get("estimated_m3") or 0)
     item["quote_flow"] = is_quote_flow(item)
     return item
@@ -352,7 +360,14 @@ def save_content(
         status = STATUS_IN_PROGRESS
     now = now_iso()
     submitted_at = now if submit else (row.get("submitted_at") or "")
-    fields = {
+    fields = {}
+    if status == STATUS_SUBMITTED and not row.get("baseline_json"):
+        # Freeze the first submitted version. A list submitted before baselines existed uses the
+        # version it had before this edit, so this edit already shows as a change.
+        first = row.get("content") if row.get("status") == STATUS_SUBMITTED else content
+        fields["baseline_json"] = json.dumps(first, ensure_ascii=False)
+        fields["baseline_at"] = row.get("submitted_at") or now
+    fields.update({
         "content_json": json.dumps(content, ensure_ascii=False),
         "estimated_m3": summary["estimated_m3"],
         "item_count": summary["item_count"],
@@ -360,7 +375,7 @@ def save_content(
         "updated_at": now,
         "submitted_at": submitted_at,
         "last_edited_by": editor[:40],
-    }
+    })
     if contact and row.get("source") == SOURCE_WEBSITE:
         fields.update(contact)
     assignments = ", ".join("{0} = ?".format(k) for k in fields)
@@ -381,8 +396,20 @@ def set_status(row: Dict[str, Any], status: str, editor: str) -> Dict[str, Any]:
             "UPDATE furniture_lists SET status = ?, updated_at = ?, last_edited_by = ? WHERE id = ?",
             (status, now_iso(), editor[:40], int(row["id"])),
         )
+        if status == STATUS_SUBMITTED:
+            freeze_baseline(conn, row)
         conn.commit()
     return get_by_id(row["id"])
+
+
+def freeze_baseline(conn, row: Dict[str, Any]) -> None:
+    """Keep the current list as the first submitted version, if none is kept yet."""
+    if row.get("baseline_json"):
+        return
+    conn.execute(
+        "UPDATE furniture_lists SET baseline_json = ?, baseline_at = ? WHERE id = ? AND baseline_json = ''",
+        (json.dumps(row.get("content") or {}, ensure_ascii=False), now_iso(), int(row["id"])),
+    )
 
 
 def link_to_booking(list_id: int, booking_id: int) -> Dict[str, Any]:

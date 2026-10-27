@@ -316,3 +316,15 @@ input:focus, select:focus, textarea:focus { outline: 2px solid rgba(29, 92, 71, 
 /* Website quote flow (draft until the enquiry is sent) */
 .fl-flow-note { background: #f1f7f4; border-left: 4px solid #0f3b2e; padding: 10px 12px; border-radius: 8px; }
 #fl-return[aria-busy="true"] { opacity: .7; pointer-events: none; }
+
+/* Changes after the first submission (yellow) */
+.fl-changes { border: 2px solid #e3b341; background: #fffbea; }
+.fl-changes h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.fl-changes-count { font-size: .8rem; font-weight: 800; background: #ffe58f; color: #5c4300; border-radius: 999px; padding: 2px 10px; }
+.fl-changes-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.fl-hl { background: #fff3a3; border-radius: 6px; padding: 4px 8px; }
+.fl-hl-removed { text-decoration: line-through; text-decoration-color: #8a6d00; }
+.fl-ro-list li.fl-hl { margin: 2px -8px; }
+.fl-item.fl-item-changed { background: #fff3a3; border-radius: 8px; }
+.fl-was { display: block; font-size: .78rem; color: #6b5300; font-weight: 700; }
+.fl-notes-text.fl-hl { display: block; }

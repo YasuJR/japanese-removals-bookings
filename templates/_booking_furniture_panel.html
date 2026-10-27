@@ -7,8 +7,11 @@
     <div><dt>Last updated</dt><dd>{{ f.updated_display or '—' }}</dd></div>
     <div><dt>Approx. volume</dt><dd>{{ '%.1f'|format(f.estimated_m3) }} m³ <span class="muted">(estimate)</span></dd></div>
     <div><dt>Items / photos</dt><dd>{{ f.item_count }} item{{ '' if f.item_count == 1 else 's' }} · {{ f.photo_count }} photo{{ '' if f.photo_count == 1 else 's' }}</dd></div>
-    <div><dt>Reference</dt><dd>{{ f.public_id }}</dd></div>
+    <div><dt>Reference</dt><dd>{{ f.public_id }} · <a href="{{ url_for('office_furniture_pdf', list_id=f.id) }}" target="_blank" rel="noopener">PDF</a></dd></div>
   </dl>
+  {% if f.changes and f.changes.active and f.changes.count %}
+  <p class="furniture-changed-note">Updated after first submission: {{ f.changes.count }} change{{ '' if f.changes.count == 1 else 's' }} (shown in yellow in the list and PDF).</p>
+  {% endif %}
   {% else %}
   <p class="hint">Status: <span class="furniture-status furniture-status-not_started">Not started</span>{% if f %} · link created ({{ f.public_id }}){% endif %}</p>
   {% endif %}

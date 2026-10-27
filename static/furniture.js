@@ -231,10 +231,14 @@
           otherStarted = true;
         }
         var qty = room.items[key] || 0;
-        var row = el("div", { class: "fl-item" + (qty ? " fl-item-on" : "") }, [
+        // Office: yellow = changed after the first submission (qty before, 0 = added).
+        var roomChanges = (cfg.changes || {})[room.id] || {};
+        var changed = Object.prototype.hasOwnProperty.call(roomChanges, key);
+        var row = el("div", { class: "fl-item" + (qty ? " fl-item-on" : "") + (changed ? " fl-item-changed" : "") }, [
           el("div", { class: "fl-item-text" }, [
             el("span", { class: "fl-item-label", text: info.label }),
             info.hint ? el("span", { class: "fl-item-hint", text: info.hint }) : null,
+            changed ? el("span", { class: "fl-was", text: roomChanges[key] ? "was × " + roomChanges[key] : "added after first submission" }) : null,
           ]),
           stepper(qty, function (n) {
             if (n > 0) room.items[key] = n;
@@ -242,7 +246,7 @@
               delete room.items[key];
               if (room.unit_m3) delete room.unit_m3[key];
             }
-            row.className = "fl-item" + (n ? " fl-item-on" : "");
+            row.className = "fl-item" + (n ? " fl-item-on" : "") + (changed ? " fl-item-changed" : "");
             refreshCount();
             markDirty();
           }, info.label),

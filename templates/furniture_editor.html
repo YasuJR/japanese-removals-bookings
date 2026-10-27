@@ -34,6 +34,7 @@
         <a href="{{ url_for('view_booking', booking_id=row.booking_id) }}">← Booking #{{ row.booking_id }}</a>
         {% endif %}
         <a href="{{ url_for('furniture_lists_index') }}">All furniture lists</a>
+        <a href="{{ url_for('office_furniture_pdf', list_id=row.id) }}" target="_blank" rel="noopener">PDF</a>
         <a href="{{ url_for('dashboard') }}">Dashboard</a>
       </nav>
       <h1 class="fl-office-title">{{ row.public_id }} <span class="fl-chip fl-chip-{{ row.status }}">{{ row.status_label }}</span></h1>
@@ -84,6 +85,7 @@
         </form>
       </div>
       <p class="fl-office-note">You are editing as office staff. Changes save to the same list the customer sees.</p>
+      {% if summary %}{% include '_furniture_changes.html' %}{% endif %}
     </div>
   </section>
   {% endif %}
@@ -213,7 +215,8 @@
     "public_id": row.public_id,
     "own_url": customer_url if mode != 'office' else '',
     "return_link": return_link,
-    "quote_flow": quote_flow
+    "quote_flow": quote_flow,
+    "changes": (row.changes["items"] if mode == 'office' and row.changes and row.changes.active else {})
   }|tojson }}</script>
   <script src="{{ url_for('static', filename='furniture.js') }}"></script>
 </body>

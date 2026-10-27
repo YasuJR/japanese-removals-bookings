@@ -280,6 +280,9 @@ def _ensure_furniture_list_tables(conn) -> None:
     for column, ddl in (
         ("enquiry_received_at", "TEXT NOT NULL DEFAULT ''"),
         ("enquiry_fetch_count", "INTEGER NOT NULL DEFAULT 0"),
+        # First submitted version; later changes are shown in yellow (office, staff, PDF).
+        ("baseline_json", "TEXT NOT NULL DEFAULT ''"),
+        ("baseline_at", "TEXT NOT NULL DEFAULT ''"),
     ):
         if column not in existing:
             conn.execute("ALTER TABLE furniture_lists ADD COLUMN {0} {1}".format(column, ddl))

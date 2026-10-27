@@ -108,4 +108,5 @@ def mark_received(row: Dict[str, Any]) -> None:
                 "status = ?, submitted_at = ?, last_edited_by = ? WHERE id = ?",
                 (now, furniture_lists.STATUS_SUBMITTED, row.get("submitted_at") or now, EDITOR, int(row["id"])),
             )
+            furniture_lists.freeze_baseline(conn, row)
         conn.commit()

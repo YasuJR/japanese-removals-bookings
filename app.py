@@ -2822,7 +2822,27 @@ def office_furniture_list(list_id):
         row,
         "office",
         status_labels=furniture_lists.STATUS_LABELS,
+        summary=furniture_catalog.annotate_changes(
+            furniture_catalog.summarize(row["content"]), row["changes"]
+        ),
     )
+
+
+def _furniture_pdf_download(row):
+    pdf = furniture_pdf.render_list_pdf(row, photo_count=int(row.get("photo_count") or 0))
+    response = app.make_response(pdf)
+    response.headers["Content-Type"] = "application/pdf"
+    response.headers["Content-Disposition"] = 'inline; filename="furniture-list-{0}.pdf"'.format(row["public_id"])
+    return _furniture_private(response)
+
+
+@app.route("/furniture-lists/<int:list_id>/list.pdf", endpoint="office_furniture_pdf")
+@auth.login_required
+def office_furniture_pdf(list_id):
+    row = furniture_lists.get_by_id(list_id)
+    if not row:
+        abort(404)
+    return _furniture_pdf_download(row)
 
 
 @app.route("/furniture-lists/<int:list_id>/save", methods=["POST"], endpoint="office_furniture_save")
@@ -2925,11 +2945,22 @@ def staff_furniture_list(token):
             row=row,
             booking=booking,
             move_date=_furniture_date_text(booking.get("move_date")),
-            summary=furniture_catalog.summarize(row["content"]),
+            summary=furniture_catalog.annotate_changes(
+                furniture_catalog.summarize(row["content"]), row["changes"]
+            ),
             photos=furniture_lists.list_photos(row["id"]),
         )
     )
     return _furniture_private(response)
+
+
+@app.route("/staff/furniture/<token>/list.pdf", endpoint="staff_furniture_pdf")
+@staff_auth.staff_login_required
+def staff_furniture_pdf(token):
+    _booking, row = _staff_furniture_row(token)
+    if not row:
+        return _furniture_not_found()
+    return _furniture_pdf_download(row)
 
 
 @app.route("/staff/furniture/<token>/photos/<int:photo_id>", endpoint="staff_furniture_photo")

@@ -657,8 +657,123 @@ def test_empty_website_list_pdf_still_valid():
     return True
 
 
+def _has_yellow(pdf_bytes):
+    import pymupdf
+
+    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    for page in doc:
+        for drawing in page.get_drawings():
+            fill = drawing.get("fill")
+            if fill and abs(fill[0] - 1) < 0.02 and abs(fill[1] - 0xF3 / 255) < 0.02 and abs(fill[2] - 0xA3 / 255) < 0.02:
+                return True
+    return False
+
+
+def test_changes_after_first_submission_are_yellow():
+    office = _office_client()
+    booking_id = _booking("Yellow Changes {0}".format(_tag()), crew="")
+    link = office.post("/bookings/{0}/furniture/link".format(booking_id)).get_json()
+    token = _token_from_url(link["url"])
+    customer = _public_client("10.9.40.1")
+    first = {
+        "rooms": [{"id": "r1", "type": "bedroom", "label": "Bedroom 1", "items": {"bed_queen": 1, "bedside_table": 2}}],
+        "custom_items": [{"name": "Fish tank", "qty": 1}, {"name": "Old clock", "qty": 1}],
+        "notes": "Stairs at pickup",
+    }
+    # Edits before the first submission are not highlighted.
+    customer.post("/furniture/{0}/save".format(token), json={"content": first})
+    row = furniture_lists.get_for_booking(booking_id)
+    assert not row["changes"]["active"] and not row["baseline_json"]
+    customer.post("/furniture/{0}/save".format(token), json={"content": first, "submit": True})
+    row = furniture_lists.get_for_booking(booking_id)
+    assert row["baseline_json"] and row["changes"]["active"] and row["changes"]["count"] == 0
+    page = office.get("/furniture-lists/{0}".format(row["id"])).get_data(as_text=True)
+    assert "Updated after first submission" not in page
+    assert not _has_yellow(office.get("/furniture-lists/{0}/list.pdf".format(row["id"])).data)
+
+    # Second update: qty change, new item, removed item, new + removed other item, notes.
+    second = json.loads(json.dumps(first))
+    second["rooms"][0]["items"] = {"bed_queen": 2, "washing_machine": 1}
+    second["rooms"].append({"id": "r2", "type": "living", "label": "Living", "items": {"sofa_3": 1}})
+    second["custom_items"] = [{"name": "Fish tank", "qty": 1}, {"name": "Surfboard", "qty": 2}]
+    second["notes"] = "Stairs at pickup and delivery"
+    res = customer.post("/furniture/{0}/save".format(token), json={"content": second, "submit": True}).get_json()
+    assert res["status"] == "submitted"
+    row = furniture_lists.get_for_booking(booking_id)
+    ch = row["changes"]
+    assert ch["items"] == {"r1": {"bed_queen": 1, "washing_machine": 0}, "r2": {"sofa_3": 0}}, ch["items"]
+    assert [r["label"] for r in ch["removed"]] == ["Bedside table"]
+    assert ch["custom"] == {1: "new"} and ch["removed_custom"] == [{"name": "Old clock", "qty": 1}]
+    assert ch["notes_changed"] and ch["count"] == 7, ch["count"]
+
+    # Office list page: yellow summary card + rows flagged for the editor.
+    page = office.get("/furniture-lists/{0}".format(row["id"])).get_data(as_text=True)
+    assert "Updated after first submission" in page and "7 changes" in page and 'class="fl-hl"' in page
+    assert "Bedroom 1 · Queen bed + mattress: 1 → 2" in page and "removed (was × 2)" in page
+    data = json.loads(re.search(r'id="fl-data">(.*?)</script>', page, re.S).group(1))
+    assert data["changes"] == {"r1": {"bed_queen": 1, "washing_machine": 0}, "r2": {"sofa_3": 0}}
+    # Customer never sees the highlight.
+    cpage = customer.get("/furniture/{0}".format(token)).get_data(as_text=True)
+    assert "Updated after first submission" not in cpage and '"changes": {}' in cpage
+    # Booking panel note.
+    assert "Updated after first submission: 7 changes" in office.get("/bookings/{0}".format(booking_id)).get_data(as_text=True)
+    # Staff view.
+    staff_html = app.test_client().get("/staff/furniture/{0}".format(furniture_lists.staff_link_token(booking_id))).get_data(as_text=True)
+    assert "Updated after first submission" in staff_html and staff_html.count('class="fl-hl"') >= 5, staff_html.count('class="fl-hl"')
+    assert "was × 1" in staff_html
+    # PDF (office and staff) with yellow fill and the change notes.
+    pdf = office.get("/furniture-lists/{0}/list.pdf".format(row["id"]))
+    assert pdf.status_code == 200 and pdf.data[:4] == b"%PDF" and _has_yellow(pdf.data)
+    text = _pdf_text(pdf.data)
+    for needle in ("Yellow = changed after the first submission (7)", "was × 1", "Removed after first submission",
+                   "Bedside table", "Old clock", "Surfboard", "changed / 変更あり"):
+        assert needle in text, (needle, text[:600])
+    spdf = app.test_client().get("/staff/furniture/{0}/list.pdf".format(furniture_lists.staff_link_token(booking_id)))
+    assert spdf.status_code == 200 and _has_yellow(spdf.data)
+    assert app.test_client().get("/furniture-lists/{0}/list.pdf".format(row["id"])).status_code == 302, "office PDF needs login"
+    # Further updates keep comparing with the FIRST submitted version.
+    customer.post("/furniture/{0}/save".format(token), json={"content": first})
+    assert furniture_lists.get_for_booking(booking_id)["changes"]["count"] == 0
+    return True
+
+
+def test_baseline_for_older_submitted_list_and_website_enquiry():
+    # A list submitted before baselines existed: the next edit is compared with what it had before.
+    office = _office_client()
+    booking_id = _booking("Old Submitted {0}".format(_tag()))
+    link = office.post("/bookings/{0}/furniture/link".format(booking_id)).get_json()
+    row = furniture_lists.get_for_booking(booking_id)
+    old = {"rooms": [{"id": "r1", "type": "living", "label": "Living", "items": {"sofa_2": 1}}], "custom_items": [], "notes": ""}
+    _set_legacy_content(row["id"], old, 1.2)
+    edited = {"rooms": [{"id": "r1", "type": "living", "label": "Living", "items": {"sofa_2": 1, "coffee_table": 1}}], "custom_items": [], "notes": ""}
+    _public_client("10.9.41.1").post("/furniture/{0}/save".format(_token_from_url(link["url"])), json={"content": edited})
+    assert furniture_lists.get_for_booking(booking_id)["changes"]["items"] == {"r1": {"coffee_table": 0}}
+
+    # Website list: the enquiry fetch freezes the version the business received.
+    key = "test-enquiry-key-yellow"
+    os.environ["FURNITURE_ENQUIRY_KEY"] = key
+    try:
+        customer = _public_client("10.9.42.1")
+        token, wrow = _website_list(customer, old)
+        api = app.test_client()
+        api.environ_base["REMOTE_ADDR"] = "10.9.43.1"
+        assert api.get("/api/enquiry-list/{0}.pdf".format(wrow["public_id"]), headers={"X-JR-Enquiry-Key": key}).status_code == 200
+        received = furniture_lists.get_by_token(token)
+        assert received["baseline_json"] and received["changes"]["count"] == 0
+        customer.post("/furniture/{0}/save".format(token), json={"content": edited})
+        after = furniture_lists.get_by_token(token)
+        assert after["changes"]["items"] == {"r1": {"coffee_table": 0}} and after["status"] == "submitted"
+        pdf = api.get("/api/enquiry-list/{0}.pdf".format(wrow["public_id"]), headers={"X-JR-Enquiry-Key": key})
+        assert pdf.status_code == 200 and _has_yellow(pdf.data)
+    finally:
+        os.environ.pop("FURNITURE_ENQUIRY_KEY", None)
+    return True
+
+
 def main():
     tests = [
+        test_changes_after_first_submission_are_yellow,
+        test_baseline_for_older_submitted_list_and_website_enquiry,
         test_quote_flow_list_is_a_draft_with_save_and_return,
         test_enquiry_pdf_api_security_receipt_and_dedupe,
         test_empty_website_list_pdf_still_valid,
