@@ -3432,6 +3432,7 @@ def _booking_overlay_for_invoice_preview(booking: dict, data: dict) -> dict:
         "duration_hours",
         "hourly_rate",
         "callout_fee",
+        "callout_minutes",
         "gst_enabled",
         "payment_status",
         "invoice_status",

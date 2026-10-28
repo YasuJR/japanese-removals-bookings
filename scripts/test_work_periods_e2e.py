@@ -226,6 +226,11 @@ def test_case_d_callout_once():
     callout_items = [i for i in doc["line_items"] if "allout" in i["description_html"]]
     assert len(callout_items) == 1 and "45 min" in callout_items[0]["description_html"]
     assert callout_items[0]["amount"] == invoice.format_aud(callout)
+    # Unsaved preview (Preview Invoice button) shows the minutes typed in the form.
+    preview = client.post(
+        "/bookings/{0}/invoice/preview".format(bid), data=_form(bid, callout_minutes="60", **_period_two_form())
+    ).get_data(as_text=True)
+    assert "Callout fee (60 min)" in preview and preview.count("Callout fee") == 1, "callout once, with form minutes"
     return True
 
 
