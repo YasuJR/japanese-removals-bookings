@@ -5,6 +5,8 @@
 ) %}
 {% set crew_active_endpoints = ('crew_schedule', 'crew_management') %}
 {% set driver_active_endpoints = ('driver', 'driver_run_sheet_pdf') %}
+{% set furniture_active_endpoints = ('furniture_lists_index', 'office_furniture_list', 'office_furniture_pdf', 'furniture_volumes_admin') %}
+{% set furniture_active = request.endpoint in furniture_active_endpoints %}
 
 <nav class="main-nav main-nav-desktop" aria-label="Main">
   <a href="{{ url_for('ceo_dashboard') }}" class="{% if request.endpoint == 'ceo_dashboard' %}active{% endif %}">Home</a>
@@ -13,9 +15,17 @@
   <a href="{{ url_for('new_booking') }}" class="nav-new {% if request.endpoint == 'new_booking' %}active{% endif %}">New</a>
   <a href="{{ url_for('crew_schedule') }}" class="{% if request.endpoint in crew_active_endpoints %}active{% endif %}">Crew</a>
   <a href="{{ url_for('search_bookings') }}" class="{% if request.endpoint == 'search_bookings' %}active{% endif %}">Search</a>
+  {% if is_admin %}
+  <a href="{{ url_for('furniture_lists_index') }}" class="{% if furniture_active %}active{% endif %}"{% if furniture_active %} aria-current="page"{% endif %}>Furniture Lists</a>
+  {% endif %}
   <a href="{{ url_for('settings') }}" class="{% if request.endpoint in settings_active_endpoints %}active{% endif %}">Settings</a>
   <a href="{{ url_for('logout') }}" class="nav-logout">Log out{% if g.user %} ({{ g.user.username }}){% endif %}</a>
 </nav>
+
+{% if is_admin %}
+{# Mobile: one-tap access at the top of the screen, without opening More. #}
+<a href="{{ url_for('furniture_lists_index') }}" class="mobile-top-action{% if furniture_active %} active{% endif %}"{% if furniture_active %} aria-current="page"{% endif %}>Furniture Lists</a>
+{% endif %}
 
 <nav class="mobile-bottom-nav" aria-label="Primary mobile">
   <a href="{{ url_for('dashboard') }}" class="mobile-bottom-link{% if request.endpoint == 'dashboard' %} active{% endif %}">
@@ -52,7 +62,9 @@
       <a href="{{ url_for('leads') }}" class="{% if request.endpoint == 'leads' %}active{% endif %}">Leads</a>
       <a href="{{ url_for('upcoming') }}" class="{% if request.endpoint == 'upcoming' %}active{% endif %}">Upcoming</a>
       <a href="{{ url_for('all_bookings') }}" class="{% if request.endpoint == 'all_bookings' %}active{% endif %}">All bookings</a>
-      <a href="{{ url_for('furniture_lists_index') }}" class="{% if request.endpoint in ('furniture_lists_index', 'office_furniture_list', 'furniture_volumes_admin') %}active{% endif %}">Furniture lists</a>
+      {% if not is_admin %}
+      <a href="{{ url_for('furniture_lists_index') }}" class="{% if furniture_active %}active{% endif %}">Furniture lists</a>
+      {% endif %}
       <a href="{{ url_for('export_csv') }}">Export CSV</a>
       <a href="{{ url_for('logout') }}" class="nav-logout">Log out{% if g.user %} ({{ g.user.username }}){% endif %}</a>
     </div>

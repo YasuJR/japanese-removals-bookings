@@ -129,6 +129,11 @@ span.brand-mark {
   color: #fff;
 }
 
+/* Mobile-only shortcut in the header (shown by mobile.css). */
+.mobile-top-action {
+  display: none;
+}
+
 .main-nav-desktop .nav-new {
   background: rgba(188, 0, 45, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.25);
@@ -173,6 +178,20 @@ span.brand-mark {
   .main-nav-desktop a {
     padding: 0.45rem 0.75rem;
     font-size: 0.9rem;
+  }
+}
+
+/* Tablet / small laptop: the menu doesn't fit beside the logo, so it gets its own row. */
+@media (min-width: 768px) and (max-width: 1239px) {
+  .header-inner {
+    flex-wrap: wrap;
+  }
+
+  .main-nav-desktop {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 0.3rem;
   }
 }
 

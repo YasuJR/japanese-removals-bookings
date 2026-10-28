@@ -788,6 +788,7 @@ def main():
         test_staff_portal_link_only_for_assigned_jobs,
         test_website_list_rate_limit,
         test_booking_view_without_list_and_invoice_page_still_work,
+        test_top_navigation_link_for_admins_only,
     ]
     passed = 0
     for test in tests:
@@ -804,6 +805,27 @@ def main():
             print("FAIL:", test.__name__, "—", repr(exc))
     print("\n{0}/{1} passed".format(passed, len(tests)))
     return 0 if passed == len(tests) else 1
+
+
+def test_top_navigation_link_for_admins_only():
+    admin = _office_client(admin=True)
+    html = admin.get("/dashboard").get_data(as_text=True)
+    assert '<a href="/furniture-lists" class="">Furniture Lists</a>' in html  # PC top menu, not selected
+    assert 'class="mobile-top-action">Furniture Lists</a>' in html  # mobile header button
+    assert html.count(">Furniture lists</a>") == 0  # not duplicated in More
+    for path in ("/furniture-lists", "/furniture-lists/volumes"):
+        html = admin.get(path).get_data(as_text=True)
+        assert 'class="active" aria-current="page">Furniture Lists</a>' in html, path
+        assert 'class="mobile-top-action active" aria-current="page">Furniture Lists</a>' in html, path
+
+    staff = _office_client()
+    html = staff.get("/dashboard").get_data(as_text=True)
+    assert "Furniture Lists</a>" not in html and "mobile-top-action" not in html
+    assert ">Furniture lists</a>" in html  # existing More entry kept for non-admin office users
+
+    customer = _public_client("10.9.0.77").get("/furniture").get_data(as_text=True)
+    assert "mobile-top-action" not in customer and "main-nav-desktop" not in customer
+    return True
 
 
 if __name__ == "__main__":

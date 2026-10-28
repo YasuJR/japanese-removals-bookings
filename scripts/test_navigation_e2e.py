@@ -23,6 +23,7 @@ DESKTOP_PRIMARY = [
     "New",
     "Crew",
     "Search",
+    "Furniture Lists",  # admins only (the test client is an admin)
     "Settings",
     "Log out",
 ]
