@@ -82,6 +82,7 @@ import furniture_pdf
 import furniture_volume_refs
 import furniture_volumes
 import job_status
+import work_periods
 from crew_schedule_data import RANGE_OPTIONS, build_crew_schedule
 from ceo_dashboard_data import build_ceo_dashboard
 from daily_checklist_data import build_daily_checklist
@@ -457,16 +458,29 @@ def _create_booking_from_data(data):
     return booking_id
 
 
-def _apply_actual_times_from_form(data, form):
-    start, finish, minutes, actual_errors = staff_job_times.parse_actual_times_from_form(
-        form
-    )
-    data["actual_start_time"] = start
-    data["actual_finish_time"] = finish
-    data["actual_duration_label"] = (
-        staff_job_times.format_worked_duration(minutes) if minutes else ""
-    )
-    return start, finish, minutes, actual_errors
+def _legacy_actual_label(booking):
+    """Booking-level actual times saved before they left Booking Edit (Staff Paid Hours only)."""
+    start = staff_job_times.parse_actual_clock(booking.get("actual_start_time"))
+    finish = staff_job_times.parse_actual_clock(booking.get("actual_finish_time"))
+    if start and finish:
+        return "{0} – {1}".format(format_time_12h(start), format_time_12h(finish))
+    minutes = booking.get("actual_duration")
+    if minutes not in (None, "", 0):
+        return staff_job_times.format_worked_duration(minutes)
+    return ""
+
+
+def _work_period_2_form_values(booking):
+    second = work_periods.period_two(booking)
+    if not second:
+        return {"work_period_2_enabled": "0"}
+    return {
+        "work_period_2_enabled": "1",
+        "work_period_2_start": second["start"],
+        "work_period_2_finish": second["finish"],
+        "work_period_2_movers": second["movers"],
+        "work_period_2_rate": "{0:.2f}".format(second["rate"]),
+    }
 
 
 def _update_booking_from_form(booking_id, form):
@@ -475,8 +489,9 @@ def _update_booking_from_form(booking_id, form):
     if existing_row:
         existing_crew = existing_row["crew"] or ""
     data, errors = parse_booking_form(form, existing_crew_csv=existing_crew)
-    start, finish, minutes, actual_errors = _apply_actual_times_from_form(data, form)
-    errors.extend(actual_errors)
+    # Actual start/finish are no longer edited here (Booking Edit uses work periods).
+    # Saved booking-level actual times are left untouched for Staff Paid Hours;
+    # the owner changes them in the Staff Portal.
     if errors:
         return False, errors, data
     ok = db.update_booking(
@@ -504,7 +519,8 @@ def _update_booking_from_form(booking_id, form):
     if ok:
         services._persist_booking_extras(booking_id, data)
         _save_job_costs_from_form(booking_id, form, previous=existing_row)
-        db.save_booking_actual_times(booking_id, start, finish, minutes)
+        if data.get("work_period_2_present"):
+            db.save_booking_work_period_2(booking_id, data)
     return ok, errors, data
 
 
@@ -3222,15 +3238,7 @@ def edit_booking(booking_id):
         "finish_time": normalize_time_input(row["finish_time"])
         or effective_finish_hm(_row_to_dict(row)),
         "duration_hours": _form_duration_from_row(row),
-        "actual_start_time": staff_job_times.parse_actual_clock(
-            _row_to_dict(row).get("actual_start_time")
-        ),
-        "actual_finish_time": staff_job_times.parse_actual_clock(
-            _row_to_dict(row).get("actual_finish_time")
-        ),
-        "actual_duration_label": staff_job_times.format_worked_duration(
-            _row_to_dict(row).get("actual_duration")
-        ),
+        "legacy_actual_label": _legacy_actual_label(_row_to_dict(row)),
         "crew": crew_from_storage(_row_to_dict(row).get("crew")),
         "num_movers": row["num_movers"],
         "notes": row["notes"] or "",
@@ -3259,6 +3267,7 @@ def edit_booking(booking_id):
             invoice.resolve_booking_invoice(services.booking_to_dict(row))
         )
     )
+    form.update(_work_period_2_form_values(_row_to_dict(row)))
     return render_template(
         "edit_booking.html",
         booking=row,
@@ -3268,6 +3277,23 @@ def edit_booking(booking_id):
         pricing_panel_mode=True,
         **_edit_booking_extras(row),
     )
+
+
+def _labour_lines_json(data, totals):
+    # The textarea holds the old automatic text until the browser refreshes it, so
+    # only a description the user actually edited counts as custom here.
+    booking = dict(data, invoice_description=invoice.stored_description_for_save(data))
+    return [
+        {
+            "period": line["period"],
+            "description": line["description"],
+            "hours": line["quantity"],
+            "rate": line["unit_amount"],
+            "amount": line["amount"],
+            "amount_display": invoice.format_aud(line["amount"]),
+        }
+        for line in invoice.invoice_labour_lines(booking, totals)
+    ]
 
 
 @app.route("/bookings/invoice/preview-calculate", methods=["POST"])
@@ -3284,6 +3310,8 @@ def invoice_preview_calculate():
             "hours": totals["hours"],
             "callout_fee": totals["callout_fee"],
             "labour_gross": totals["labour_gross"],
+            "labour_total": totals["labour_amount"],
+            "labour_lines": _labour_lines_json(data, totals),
             "extras_total": totals["extras_total"],
             "net_sales": totals["net_sales"],
             "gst_amount": totals["gst_amount"],
@@ -3309,12 +3337,10 @@ def invoice_calculate(booking_id):
         services.booking_to_dict(row),
         base_total=totals["total"],
     )
-    labour_only = round(
-        float(totals["hourly_rate"]) * float(totals["hours"]), 2
-    )
     return jsonify(
         {
-            "labour_total": labour_only,
+            "labour_total": totals["labour_amount"],
+            "labour_lines": _labour_lines_json(data, totals),
             "labour_gross": totals["labour_gross"],
             "extras_total": totals["extras_total"],
             "net_sales": totals["net_sales"],
@@ -3418,6 +3444,9 @@ def _booking_overlay_for_invoice_preview(booking: dict, data: dict) -> dict:
     ):
         if key in data:
             overlay[key] = data[key]
+    if data.get("work_period_2_present"):
+        for key in work_periods.FIELDS:
+            overlay[key] = data.get(key)
     overlay["extra_charges"] = list(data.get("extra_charges") or [])
     if data.get("crew_csv") is not None:
         overlay["crew"] = data["crew_csv"]

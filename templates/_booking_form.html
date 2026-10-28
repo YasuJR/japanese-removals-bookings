@@ -73,32 +73,54 @@
            value="{{ form.get('finish_time', '') }}">
   </label>
   {% endif %}
-  {% if not new_booking_mode %}
-  <label>
-    {{ bl('Actual start time', '実際の開始時間') }}
-    <input type="time" name="actual_start_time" id="actual_start_time"
-           value="{{ form.get('actual_start_time', '') }}">
-    <span class="field-hint">Actual work start. Does not change scheduled or invoice times.</span>
-  </label>
-  <label>
-    {{ bl('Actual finish time', '実際の終了時間') }}
-    <input type="time" name="actual_finish_time" id="actual_finish_time"
-           value="{{ form.get('actual_finish_time', '') }}">
-    <span class="field-hint">Actual work finish. Separate from scheduled finish time.</span>
-  </label>
-  <div class="finish-live-box">
-    <span class="finish-live-label">{{ bl('Actual duration', '実際の作業時間') }}</span>
-    <p class="finish-live" aria-live="polite">
-      <strong>{{ form.get('actual_duration_label') or '—' }}</strong>
-    </p>
-    <span class="field-hint">Calculated on save from actual start and finish</span>
-  </div>
-  {% endif %}
   <label>
     {{ bl('Number of movers *', '作業人数') }}
     <input type="number" name="num_movers" id="num_movers" min="1" max="20" required
            value="{{ form.get('num_movers', '2') }}">
+    {% if not new_booking_mode %}<span class="field-hint">Start, Finish and Movers above are Work Period 1 on the invoice.</span>{% endif %}
   </label>
+  {% if not new_booking_mode %}
+  {% set wp2_on = form.get('work_period_2_enabled') == '1' %}
+  <div class="full-width work-period-2-wrap">
+    <input type="hidden" name="work_period_2_enabled" id="work_period_2_enabled" value="{{ '1' if wp2_on else '0' }}">
+    <button type="button" class="btn-secondary btn-sm" id="work-period-2-add" {% if wp2_on %}hidden{% endif %}>
+      + Add another work period · <span lang="ja">作業時間を追加</span>
+    </button>
+    <fieldset class="work-period-2" id="work-period-2" {% if not wp2_on %}hidden{% endif %}>
+      <legend>{{ bl('Additional Work Period', '追加作業時間') }}</legend>
+      <p class="field-hint">Use only when the number of movers changed during the job. It is a separate line on the invoice, charged at the rate for that number of movers. The call out fee is charged once.</p>
+      <div class="work-period-2-grid">
+        <label>
+          {{ bl('Start time', '開始時間') }}
+          <input type="time" name="work_period_2_start" id="work_period_2_start"
+                 value="{{ form.get('work_period_2_start', '') or '' }}">
+        </label>
+        <label>
+          {{ bl('Finish time', '終了時間') }}
+          <input type="time" name="work_period_2_finish" id="work_period_2_finish"
+                 value="{{ form.get('work_period_2_finish', '') or '' }}">
+        </label>
+        <label>
+          {{ bl('Number of movers', '作業人数') }}
+          <input type="number" name="work_period_2_movers" id="work_period_2_movers" min="1" max="20"
+                 value="{{ form.get('work_period_2_movers', '') or '' }}">
+        </label>
+        <label>
+          {{ bl('Hourly rate ($)', '時間単価') }}
+          <input type="number" name="work_period_2_rate" id="work_period_2_rate" min="0" step="0.01"
+                 value="{{ form.get('work_period_2_rate', '') or '' }}">
+          <span class="field-hint">Filled in from the movers' standard rate.</span>
+        </label>
+      </div>
+      <button type="button" class="btn-secondary btn-sm" id="work-period-2-remove">Remove this work period · <span lang="ja">削除</span></button>
+    </fieldset>
+  </div>
+  {% if form.get('legacy_actual_label') %}
+  <p class="full-width field-hint legacy-actual-note">
+    Recorded actual time {{ form.get('legacy_actual_label') }} is still used for Staff Paid Hours only (not the invoice). Change or clear it in the Staff Portal (✎ Edit → All Staff).
+  </p>
+  {% endif %}
+  {% endif %}
   <fieldset class="full-width crew-fieldset">
     <legend>{{ bl('Crew', '担当スタッフ') }}</legend>
     <div class="crew-checkboxes">

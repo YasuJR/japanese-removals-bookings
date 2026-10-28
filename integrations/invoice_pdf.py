@@ -138,13 +138,15 @@ def _labour_description(booking: Dict[str, Any], totals: Dict[str, Any]) -> str:
 
 
 def _line_items(booking: Dict[str, Any], totals: Dict[str, Any]) -> List[Dict[str, Any]]:
+    # One Moving Labour line per work period (Period 2 is optional).
     items = [
         {
-            "description_html": _labour_description(booking, totals),
-            "quantity": "{0:.2f}".format(totals["hours"]),
-            "unit_price": invoice.format_aud(totals["hourly_rate"]),
-            "amount": invoice.format_aud(totals["hourly_rate"] * totals["hours"]),
+            "description_html": invoice.plain_text_to_invoice_markup(line["description"]),
+            "quantity": "{0:.2f}".format(line["quantity"]),
+            "unit_price": invoice.format_aud(line["unit_amount"]),
+            "amount": invoice.format_aud(line["amount"]),
         }
+        for line in invoice.invoice_labour_lines(booking, totals)
     ]
     callout_line = invoice.callout_line_parts(booking, totals)
     if callout_line:

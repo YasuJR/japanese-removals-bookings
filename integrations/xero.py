@@ -396,20 +396,23 @@ def _line_items_for_invoice(
 
 
 def _build_line_items(booking: Dict[str, Any], totals: Dict[str, Any]) -> List[Dict]:
-    hours = totals["hours"]
-    hourly_rate = totals["hourly_rate"]
-    callout_fee = totals["callout_fee"]
     gst_enabled = totals["gst_enabled"]
     tax_type = TAX_TYPE_GST if gst_enabled else "NONE"
 
+    # One labour line per work period. Period 1 keeps the existing automatic
+    # "Moving Labour — …" text; Period 2, if any, shows its own movers and rate.
+    labour = invoice.invoice_labour_lines(booking, totals)
     items = [
         {
-            "Description": _build_labour_description(booking, totals),
-            "Quantity": hours,
-            "UnitAmount": hourly_rate,
+            "Description": (
+                _build_labour_description(booking, totals) if index == 0 else line["description"]
+            ),
+            "Quantity": line["quantity"],
+            "UnitAmount": line["unit_amount"],
             "AccountCode": INVOICE_ACCOUNT_CODE,
             "TaxType": tax_type,
         }
+        for index, line in enumerate(labour)
     ]
 
     callout_line = invoice.callout_line_parts(booking, totals)

@@ -8,6 +8,7 @@ import config
 import database as db
 import booking_profit
 import invoice_numbering
+import work_periods
 from booking_times import (
     effective_duration_hours,
     format_time_12h,
@@ -77,7 +78,15 @@ def calculate_invoice_totals(booking: Dict[str, Any]) -> Dict[str, Any]:
     gst_enabled = bool(int(booking.get("gst_enabled") or 0))
     extra_items: List[Dict[str, Any]] = list(booking.get("extra_charges") or [])
     extras_gross = charges_gross_total(extra_items)
-    labour_gross = _money((hourly_rate * hours) + callout_fee)
+    # One labour line per work period (Period 2 is optional). The call-out fee is
+    # added once for the whole job. A single-period booking is calculated exactly
+    # as before (rate × hours + call-out), so existing invoices don't change.
+    labour_lines = work_periods.labour_lines(booking, hourly_rate=hourly_rate, hours=hours)
+    if len(labour_lines) == 1:
+        labour_amount = hourly_rate * hours
+    else:
+        labour_amount = sum(line["amount"] for line in labour_lines)
+    labour_gross = _money(labour_amount + callout_fee)
     gross = _money(labour_gross + extras_gross)
 
     if gst_enabled and company_config.gst_pricing_inclusive():
@@ -101,6 +110,9 @@ def calculate_invoice_totals(booking: Dict[str, Any]) -> Dict[str, Any]:
         "extra_charges": extra_items,
         "extras_total": extras_gross,
         "labour_gross": labour_gross,
+        "labour_lines": labour_lines,
+        "labour_amount": _money(labour_amount),
+        "labour_hours_total": round(sum(line["hours"] for line in labour_lines), 2),
         "subtotal": subtotal,
         "net_sales": subtotal,
         "gst_amount": gst_amount,
@@ -196,7 +208,10 @@ def calculate_from_form_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "finish_time": data.get("finish_time", ""),
         "gst_enabled": data.get("gst_enabled", 0),
         "extra_charges": data.get("extra_charges") or [],
+        "num_movers": data.get("num_movers"),
     }
+    for key in work_periods.FIELDS:
+        booking[key] = data.get(key)
     return calculate_invoice_totals(booking)
 
 
@@ -227,6 +242,10 @@ def format_moving_labour_description(
 
     Uses stored start/finish times when both are set — never derives finish from duration.
     """
+    lines = totals.get("labour_lines") or []
+    if len(lines) > 1:
+        # Two work periods: say how many movers worked in each period.
+        return format_work_period_description(lines[0])
     hours_text = _format_labour_hours(totals["hours"])
     rate = format_aud(totals["hourly_rate"])
     start = normalize_time_input(booking.get("start_time"))
@@ -237,6 +256,56 @@ def format_moving_labour_description(
             time_range, hours_text, rate
         )
     return "Moving Labour — {0} hrs @ {1}/hr".format(hours_text, rate)
+
+
+def format_work_period_description(line: Dict[str, Any]) -> str:
+    """e.g. "Moving Labour — 12:00 PM - 3:00 PM — 3 hrs × 2 movers @ $180.00/hr"."""
+    parts = ["Moving Labour"]
+    if line.get("start") and line.get("finish"):
+        parts.append("{0} - {1}".format(format_time_12h(line["start"]), format_time_12h(line["finish"])))
+    hours_text = "{0} hrs".format(_format_labour_hours(line["hours"]))
+    movers = line.get("movers")
+    if movers:
+        hours_text += " × {0} mover{1}".format(movers, "" if movers == 1 else "s")
+    parts.append("{0} @ {1}/hr".format(hours_text, format_aud(line["rate"])))
+    return " — ".join(parts)
+
+
+def invoice_labour_lines(
+    booking: Dict[str, Any], totals: Optional[Dict[str, Any]] = None
+) -> List[Dict[str, Any]]:
+    """
+    Labour lines for the invoice preview, PDF and Xero: one per work period.
+
+    Period 1 keeps the saved custom Invoice Description when there is one;
+    Period 2 always uses the automatic text.
+    """
+    if totals is None:
+        totals = calculate_invoice_totals(booking)
+    lines = totals.get("labour_lines") or []
+    out = []
+    for index, line in enumerate(lines):
+        if index == 0:
+            description = resolve_labour_description(booking, totals)
+            amount = (
+                _money(line["rate"] * line["hours"])
+                if len(lines) > 1
+                else _money(totals["hourly_rate"] * totals["hours"])
+            )
+        else:
+            description = format_work_period_description(line)
+            amount = line["amount"]
+        out.append(
+            {
+                "period": line["period"],
+                "description": description,
+                "quantity": line["hours"],
+                "unit_amount": line["rate"],
+                "amount": amount,
+                "movers": line.get("movers"),
+            }
+        )
+    return out
 
 
 def normalize_invoice_description(value: Any) -> str:

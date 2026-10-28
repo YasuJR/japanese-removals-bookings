@@ -3,6 +3,7 @@
 from typing import Any, Dict, List, Tuple
 
 import job_status
+import work_periods
 from booking_times import normalize_time_input, validate_times
 from callout_pricing import parse_callout_minutes_form, resolve_callout_fee
 from crew import crew_storage_value, merge_crew_for_edit, parse_crew_from_form
@@ -129,9 +130,16 @@ def parse_booking_form(
         "extra_charges": extra_charges,
         "truck_assigned": (form.get("truck_assigned") or "").strip(),
         "status": status or job_status.DEFAULT_STATUS,
-        "actual_start_time": normalize_time_input(form.get("actual_start_time")),
-        "actual_finish_time": normalize_time_input(form.get("actual_finish_time")),
     }
+    # Optional second billing period (Booking Edit only). None = the form had no
+    # work-period section, so the saved Period 2 is left as it is.
+    work_period_2, period_errors = work_periods.parse_form(
+        form, start_time=start_norm, finish_time=finish_norm
+    )
+    errors.extend(period_errors)
+    data["work_period_2_present"] = work_period_2 is not None
+    data[work_periods.FORM_FLAG] = "1" if str(form.get(work_periods.FORM_FLAG) or "") == "1" else "0"
+    data.update(work_period_2 or work_periods.empty_fields())
     if hourly_rate is not None and callout_fee is not None:
         import invoice as invoice_mod
 

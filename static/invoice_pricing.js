@@ -127,6 +127,27 @@
     return (n < 0 ? "-$" : "$") + abs;
   }
 
+  function renderLabourLines(lines) {
+    var list = document.getElementById("live-labour-lines");
+    if (!list) return;
+    list.innerHTML = "";
+    list.hidden = lines.length < 2;
+    if (lines.length < 2) return;
+    lines.forEach(function (line) {
+      var li = document.createElement("li");
+      var label = document.createElement("span");
+      label.className = "labour-line-period";
+      label.textContent = "Period " + line.period;
+      var text = document.createTextNode(" " + line.description + " ");
+      var amount = document.createElement("strong");
+      amount.textContent = line.amount_display;
+      li.appendChild(label);
+      li.appendChild(text);
+      li.appendChild(amount);
+      list.appendChild(li);
+    });
+  }
+
   function recalculate() {
     if (lastTimeEditSource === "duration") {
       syncDurationToFinishTime();
@@ -148,6 +169,7 @@
       })
       .then(function (data) {
         setText("live-labour-total", formatAud(data.labour_total));
+        renderLabourLines(data.labour_lines || []);
         setText("live-extras-total", formatAud(data.extras_total));
         setText("live-net-sales", formatAud(data.net_sales));
         setText("live-gst-amount", formatAud(data.gst_amount));
@@ -264,7 +286,13 @@
     var breakBtn = document.getElementById("extra-adjust-break");
     if (breakBtn) {
       breakBtn.addEventListener("click", function () {
-        var rateEl = pricingInput("pricing_hourly_rate");
+        // With two work periods the break is priced at the rate of the period it was taken in.
+        var periodEl = document.getElementById("extra-break-period");
+        var periodOn = document.getElementById("work_period_2_enabled");
+        var inPeriod2 = !!(periodEl && periodOn && periodOn.value === "1" && periodEl.value === "2");
+        var rateEl = inPeriod2
+          ? document.getElementById("work_period_2_rate")
+          : pricingInput("pricing_hourly_rate");
         var minutesEl = document.getElementById("extra-break-minutes");
         var rate = parseFloat(rateEl && rateEl.value ? rateEl.value : "0");
         var minutes = parseFloat(minutesEl && minutesEl.value ? minutesEl.value : "30");
@@ -274,7 +302,12 @@
           unit = Math.round(rate * (minutes / 60) * -1 * 100) / 100;
         }
         var minuteLabel = Number.isInteger(minutes) ? String(minutes) : String(minutes);
-        addChargeRow(minuteLabel + " min break deduction", "1", String(unit.toFixed(2)), unit === 0);
+        addChargeRow(
+          minuteLabel + " min break deduction" + (inPeriod2 ? " (Period 2)" : ""),
+          "1",
+          String(unit.toFixed(2)),
+          unit === 0
+        );
       });
     }
 
@@ -323,6 +356,7 @@
 
   bindSteppers();
   bindExtraCharges();
+  window.invoicePricingRecalc = scheduleRecalc;
 
   var invoiceDescEl = document.getElementById("invoice_description");
   var invoiceDescCustomEl = document.getElementById("invoice_description_custom");

@@ -858,6 +858,8 @@ def _edit_form(booking_id, **overrides):
 
 
 def test_admin_saves_actual_times_without_changing_scheduled_times():
+    """Actual times left Booking Edit (2026-10-28, work periods). The owner sets them
+    from the Staff Portal; Booking Edit saves keep them and never change them."""
     import staff_job_times
 
     today = perth_today().isoformat()
@@ -867,35 +869,36 @@ def test_admin_saves_actual_times_without_changing_scheduled_times():
     )
     client = _admin_client()
     html = client.get("/bookings/{0}/edit".format(booking_id)).get_data(as_text=True)
-    assert 'name="actual_start_time"' in html
-    assert 'name="actual_finish_time"' in html
-    assert "Actual start time" in html
-    assert "Actual finish time" in html
-    assert "Actual duration" in html
+    assert 'name="actual_start_time"' not in html
+    assert 'name="actual_finish_time"' not in html
+    assert "Actual duration" not in html
 
     resp = client.post(
-        "/bookings/{0}/edit".format(booking_id),
-        data=_edit_form(
-            booking_id,
-            actual_start_time="08:10",
-            actual_finish_time="11:45",
-        ),
+        "/bookings/{0}/actual-times".format(booking_id),
+        data={"actual_start_time": "08:10", "actual_finish_time": "11:45"},
         follow_redirects=False,
     )
     assert resp.status_code in (302, 303)
     row = dict(db.get_booking(booking_id))
     assert row["start_time"] in ("08:00", "8:00")
     assert row["finish_time"] in ("12:00",)
-    assert row["duration_hours"] == "4"
     assert staff_job_times.parse_actual_clock(row["actual_start_time"]) == "08:10"
     assert staff_job_times.parse_actual_clock(row["actual_finish_time"]) == "11:45"
     assert int(row["actual_duration"]) == 215
-    assert staff_job_times.format_worked_duration(row["actual_duration"]) == "3hr 35min"
+
+    # A Booking Edit save (no actual fields any more) keeps the recorded actual times.
+    resp = client.post(
+        "/bookings/{0}/edit".format(booking_id),
+        data=_edit_form(booking_id),
+        follow_redirects=False,
+    )
+    assert resp.status_code in (302, 303)
+    row = dict(db.get_booking(booking_id))
+    assert (row["actual_start_time"], row["actual_finish_time"], int(row["actual_duration"])) == ("08:10", "11:45", 215)
+    assert row["duration_hours"] == "4"
 
     follow = client.get("/bookings/{0}/edit".format(booking_id)).get_data(as_text=True)
-    assert 'value="08:10"' in follow
-    assert 'value="11:45"' in follow
-    assert "3hr 35min" in follow
+    assert "Recorded actual time 8:10 AM – 11:45 AM" in follow
     details = client.get("/bookings/{0}".format(booking_id)).get_data(as_text=True)
     assert "Actual start" in details
     assert "8:10 AM" in details

@@ -92,6 +92,11 @@ BOOKING_EXTRA_COLUMNS = [
     ("actual_start_time", "TEXT"),
     ("actual_finish_time", "TEXT"),
     ("actual_duration", "INTEGER"),
+    # Optional second billing period (work_periods.py). Empty = Period 1 only.
+    ("work_period_2_start", "TEXT"),
+    ("work_period_2_finish", "TEXT"),
+    ("work_period_2_movers", "INTEGER"),
+    ("work_period_2_rate", "REAL"),
 ]
 
 STAFF_EXTRA_COLUMNS = [
@@ -1415,6 +1420,29 @@ def save_booking_actual_times(
             WHERE id = ?
             """,
             (start_value, finish_value, duration_value, booking_id),
+        )
+        conn.commit()
+
+
+def save_booking_work_period_2(booking_id: int, fields: Dict[str, Any]) -> None:
+    """Save (or clear, with empty values) the optional second billing work period."""
+    movers = fields.get("work_period_2_movers")
+    rate = fields.get("work_period_2_rate")
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE bookings
+            SET work_period_2_start = ?, work_period_2_finish = ?,
+                work_period_2_movers = ?, work_period_2_rate = ?
+            WHERE id = ?
+            """,
+            (
+                str(fields.get("work_period_2_start") or ""),
+                str(fields.get("work_period_2_finish") or ""),
+                int(movers) if movers else None,
+                float(rate) if rate is not None else None,
+                booking_id,
+            ),
         )
         conn.commit()
 

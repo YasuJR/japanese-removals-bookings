@@ -42,8 +42,13 @@
 
     <div class="pricing-row pricing-row-readonly">
       <span class="pricing-label">Labour</span>
-      <span class="pricing-value" id="live-labour-total">{{ (invoice_summary.hourly_rate * invoice_summary.hours)|format_aud }}</span>
+      <span class="pricing-value" id="live-labour-total">{{ invoice_summary.labour_amount|format_aud }}</span>
     </div>
+    <ul class="labour-lines" id="live-labour-lines" {% if invoice_summary.labour_lines|length < 2 %}hidden{% endif %}>
+      {% for line in invoice_summary.labour_lines %}
+      <li><span class="labour-line-period">Period {{ line.period }}</span> {{ line.hours }} hrs × {{ line.movers or '?' }} movers @ {{ line.rate|format_aud }}/hr <strong>{{ line.amount|format_aud }}</strong></li>
+      {% endfor %}
+    </ul>
 
     <div class="pricing-row pricing-row-full">
       {% set pricing_callout_fee_id = 'pricing_callout_fee' %}
@@ -85,8 +90,14 @@
           <label class="extra-charge-break-mins">Break (min)
             <input type="number" id="extra-break-minutes" min="1" step="1" value="30">
           </label>
+          <label class="extra-charge-break-mins" id="extra-break-period-wrap" {% if form.get('work_period_2_enabled') != '1' %}hidden{% endif %}>From
+            <select id="extra-break-period">
+              <option value="1">Period 1</option>
+              <option value="2">Period 2</option>
+            </select>
+          </label>
         </div>
-        <p class="hint muted extra-charge-hint">Unit ($) can be negative for break deductions, discounts, and credits. Breaks do not change Start Time, Finish Time, or Duration.</p>
+        <p class="hint muted extra-charge-hint">Unit ($) can be negative for break deductions, discounts, and credits. Breaks do not change Start Time, Finish Time, or Duration. With two work periods, a break is priced at the rate of the period it was taken in.</p>
         <span class="pricing-value" id="live-extras-total">{{ invoice_summary.extras_total|format_aud }}</span>
       </div>
     </div>
@@ -183,4 +194,5 @@
 
 <script src="{{ url_for('static', filename='mover_pricing.js') }}"></script>
 <script src="{{ url_for('static', filename='invoice_pricing.js') }}"></script>
+<script src="{{ url_for('static', filename='work_periods.js') }}"></script>
 <script src="{{ url_for('static', filename='invoice_share.js') }}"></script>

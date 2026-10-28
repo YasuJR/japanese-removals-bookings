@@ -109,4 +109,9 @@
   }
 
   window.moverPricingApply = applyPricingFromMovers;
+  // Same standard rate table for the optional second work period (work_periods.js).
+  window.moverHourlyRateFor = function (count) {
+    var n = parseInt(count, 10);
+    return Object.prototype.hasOwnProperty.call(HOURLY_RATES, n) ? HOURLY_RATES[n] : null;
+  };
 })();
