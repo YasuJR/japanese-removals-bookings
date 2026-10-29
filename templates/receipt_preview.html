@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Receipt {{ rct.receipt_number }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='invoice.css') }}">
+</head>
+<body class="invoice-preview-page receipt-preview-page">
+  <div class="invoice-preview-toolbar">
+    <a class="btn-secondary btn-sm" href="{{ url_for('edit_booking', booking_id=booking_id) }}#receipt">← Back to booking</a>
+    <button type="button" class="btn-primary btn-sm"
+            data-download-invoice-pdf="{{ url_for('receipt_pdf', booking_id=booking_id) }}">Download Receipt PDF</button>
+    <button type="button" class="btn-secondary btn-sm js-share-invoice-pdf"
+            data-share-invoice-pdf="{{ url_for('receipt_pdf', booking_id=booking_id) }}">Share PDF</button>
+    <button type="button" class="btn-secondary btn-sm" onclick="window.print()">Print</button>
+  </div>
+
+  <article class="invoice-sheet">
+    <header class="invoice-brand">
+      {% if rct.logo_url %}
+      <img class="invoice-logo" src="{{ rct.logo_url }}" alt="Japanese Removals">
+      {% endif %}
+      <div class="invoice-brand-text">
+        {% for line in rct.company_contact_lines %}
+        <p class="invoice-contact-line">{{ line }}</p>
+        {% endfor %}
+      </div>
+    </header>
+
+    <hr class="invoice-accent-line">
+
+    <div class="invoice-title-block">
+      <div class="invoice-title-wrap">
+        <h2 class="invoice-title">RECEIPT</h2>
+        <hr class="invoice-title-rule">
+        <p class="receipt-paid-stamp">{{ rct.paid_status_label }}</p>
+      </div>
+      <table class="invoice-meta-right">
+        <tr><td>Receipt Number</td><td>{{ rct.receipt_number }}</td></tr>
+        <tr><td>Invoice Number</td><td>{{ rct.invoice_number }}</td></tr>
+        <tr><td>Booking Number</td><td>{{ rct.booking_number }}</td></tr>
+        <tr><td>Payment Date</td><td>{{ rct.payment_date }}</td></tr>
+        <tr><td>ABN</td><td>{{ rct.company_abn }}</td></tr>
+      </table>
+    </div>
+
+    <section class="invoice-bill-section">
+      <h3 class="invoice-section-title">RECEIVED FROM</h3>
+      <p class="invoice-bill-to">{{ rct.customer_name }}</p>
+      <p class="invoice-bill-detail">{{ rct.pickup_line }}</p>
+      <p class="invoice-bill-detail">{{ rct.dropoff_line }}</p>
+    </section>
+
+    <table class="invoice-lines">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th class="num">Qty</th>
+          <th class="num">Unit price</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in rct.line_items %}
+        <tr>
+          <td class="invoice-line-desc">{{ item.description_html|safe }}</td>
+          <td class="num">{{ item.quantity }}</td>
+          <td class="num{% if item.unit_price.startswith('-') %} invoice-amount-negative{% endif %}">{{ item.unit_price }}</td>
+          <td class="num{% if item.amount.startswith('-') %} invoice-amount-negative{% endif %}">{{ item.amount }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <hr class="invoice-accent-line invoice-accent-line-subtle invoice-table-divider">
+
+    <div class="invoice-bottom">
+      <table class="invoice-totals">
+        {% if rct.totals.gst_enabled %}
+        <tr><td>Subtotal (ex GST)</td><td>{{ rct.totals.subtotal|format_aud }}</td></tr>
+        <tr><td>GST (10%)</td><td>{{ rct.totals.gst_amount|format_aud }}</td></tr>
+        {% else %}
+        <tr><td>Subtotal</td><td>{{ rct.totals.subtotal|format_aud }}</td></tr>
+        <tr><td>GST</td><td>Not charged</td></tr>
+        {% endif %}
+      </table>
+
+      <div class="invoice-total-bar">
+        <span class="invoice-total-bar-label">TOTAL PAID AUD{% if rct.gst_inclusive %} (incl. GST){% endif %}</span>
+        <span class="invoice-total-bar-amount">{{ rct.total_paid|format_aud }}</span>
+      </div>
+
+      <div class="invoice-bottom-split">
+        <section class="invoice-payment-box receipt-payment-box">
+          <h3>PAYMENT RECEIVED</h3>
+          <dl class="invoice-payment-grid">
+            <dt>Payment Method:</dt>
+            <dd>{{ rct.payment_method }}</dd>
+            <dt>Payment Date:</dt>
+            <dd>{{ rct.payment_date }}</dd>
+            <dt>Amount Paid:</dt>
+            <dd>{{ rct.total_paid|format_aud }}</dd>
+            <dt>Balance Due:</dt>
+            <dd>{{ rct.balance|format_aud }}</dd>
+            <dt>For Invoice:</dt>
+            <dd>{{ rct.invoice_number }}</dd>
+          </dl>
+        </section>
+      </div>
+      <p class="receipt-thank-you">{{ rct.thank_you }}</p>
+    </div>
+
+    <footer class="invoice-footer">
+      <hr class="invoice-accent-line invoice-accent-line-subtle">
+      <p>{{ rct.footer_tagline }}</p>
+    </footer>
+  </article>
+  <script src="{{ url_for('static', filename='invoice_share.js') }}"></script>
+</body>
+</html>

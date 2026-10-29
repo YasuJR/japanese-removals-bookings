@@ -406,11 +406,15 @@ def cancel_review_request(booking_id: int) -> Tuple[bool, str]:
     return review_automation.cancel_review_request_for_booking(booking_id)
 
 
-def mark_booking_paid(booking_id: int, paid: bool) -> Tuple[bool, str]:
+def mark_booking_paid(booking_id: int, paid: bool, payment_method: str = "") -> Tuple[bool, str]:
+    import receipts
+
     row = db.get_booking(booking_id)
     if not row:
         return False, "Booking not found."
-    ok, msg = invoice.set_payment_status(booking_id, paid)
+    ok, msg = invoice.set_payment_status(
+        booking_id, paid, payment_method=receipts.normalize_method(payment_method) if paid else ""
+    )
     if ok:
         booking_profit.recalculate_and_save(booking_id)
     return ok, msg

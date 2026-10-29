@@ -601,6 +601,60 @@ def _pay_now_button_table(
     return table
 
 
+def _line_items_table(doc_data: Dict[str, Any], styles: Dict[str, ParagraphStyle]) -> Table:
+    """Description / Qty / Unit price / Amount table (shared by the invoice and the receipt)."""
+    desc_w = CONTENT_WIDTH * 0.48
+    qty_w = CONTENT_WIDTH * 0.12
+    unit_w = CONTENT_WIDTH * 0.20
+    amt_w = CONTENT_WIDTH - desc_w - qty_w - unit_w
+
+    table_header = [
+        Paragraph("Description", styles["table_header"]),
+        Paragraph("Qty", styles["table_header"]),
+        Paragraph("Unit price", styles["table_header"]),
+        Paragraph("Amount", styles["table_header"]),
+    ]
+    rows = [table_header]
+    for item in doc_data["line_items"]:
+        rows.append(
+            [
+                Paragraph(item["description_html"], styles["line_desc"]),
+                Paragraph(item["quantity"], styles["line_desc"]),
+                Paragraph(item["unit_price"], styles["line_desc"]),
+                Paragraph(item["amount"], styles["line_desc"]),
+            ]
+        )
+
+    line_table = Table(
+        rows,
+        colWidths=[desc_w, qty_w, unit_w, amt_w],
+        repeatRows=1,
+    )
+    line_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), JR_GREEN_TABLE),
+                ("TEXTCOLOR", (0, 0), (-1, 0), JR_WHITE),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 10.5),
+                ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
+                ("TOPPADDING", (0, 0), (-1, 0), 10),
+                ("LINEBELOW", (0, 0), (-1, 0), 1, JR_GREEN_TABLE),
+                ("LINEBELOW", (0, 1), (-1, -2), 0.25, JR_BORDER_SUBTLE),
+                ("LINEBELOW", (0, -1), (-1, -1), 0.75, JR_GREEN_TABLE),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [JR_WHITE, JR_GREEN_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 1), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 1), (-1, -1), 8),
+                ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ]
+        )
+    )
+    return line_table
+
+
 def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
     """Build a branded customer invoice PDF (A4 portrait)."""
     doc_data = build_invoice_document(booking)
@@ -674,55 +728,7 @@ def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
     story.append(Spacer(1, BILL_GAP))
 
     # --- Line items (full content width) ---
-    desc_w = CONTENT_WIDTH * 0.48
-    qty_w = CONTENT_WIDTH * 0.12
-    unit_w = CONTENT_WIDTH * 0.20
-    amt_w = CONTENT_WIDTH - desc_w - qty_w - unit_w
-
-    table_header = [
-        Paragraph("Description", styles["table_header"]),
-        Paragraph("Qty", styles["table_header"]),
-        Paragraph("Unit price", styles["table_header"]),
-        Paragraph("Amount", styles["table_header"]),
-    ]
-    rows = [table_header]
-    for item in doc_data["line_items"]:
-        rows.append(
-            [
-                Paragraph(item["description_html"], styles["line_desc"]),
-                Paragraph(item["quantity"], styles["line_desc"]),
-                Paragraph(item["unit_price"], styles["line_desc"]),
-                Paragraph(item["amount"], styles["line_desc"]),
-            ]
-        )
-
-    line_table = Table(
-        rows,
-        colWidths=[desc_w, qty_w, unit_w, amt_w],
-        repeatRows=1,
-    )
-    line_table.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), JR_GREEN_TABLE),
-                ("TEXTCOLOR", (0, 0), (-1, 0), JR_WHITE),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, 0), 10.5),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
-                ("TOPPADDING", (0, 0), (-1, 0), 10),
-                ("LINEBELOW", (0, 0), (-1, 0), 1, JR_GREEN_TABLE),
-                ("LINEBELOW", (0, 1), (-1, -2), 0.25, JR_BORDER_SUBTLE),
-                ("LINEBELOW", (0, -1), (-1, -1), 0.75, JR_GREEN_TABLE),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [JR_WHITE, JR_GREEN_LIGHT]),
-                ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 1), (-1, -1), 8),
-                ("BOTTOMPADDING", (0, 1), (-1, -1), 8),
-                ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
-            ]
-        )
-    )
+    line_table = _line_items_table(doc_data, styles)
     story.append(line_table)
 
     # --- Totals, payment, footer — kept together when they fit on one page ---
@@ -852,5 +858,236 @@ def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
     )
     story.append(KeepTogether(bottom_story))
 
+    doc.build(story)
+    return buffer.getvalue()
+
+
+# ---------------------------------------------------------------------------- Receipt
+# Same branding and the same invoice numbers (build_invoice_document), never recalculated.
+
+RECEIPT_THANK_YOU = "Thank you for choosing Japanese Removals."
+
+
+def build_receipt_document(booking: Dict[str, Any]) -> Dict[str, Any]:
+    """Receipt layout data: the invoice document plus receipt / payment fields."""
+    import receipts
+
+    doc = build_invoice_document(booking)
+    totals = doc["totals"]
+    paid_on = receipts.payment_date(booking)
+    amount_paid = booking.get("amount_paid")
+    total_paid = totals["total"]
+    # Full payment only for now; amount_paid / balance are ready for part payments.
+    balance = 0.0
+    doc.update(
+        {
+            "receipt_number": str(booking.get("receipt_number") or "").strip() or "—",
+            "booking_number": "#{0}".format(booking.get("id")),
+            "payment_date": _format_display_date(paid_on.isoformat()) if paid_on else "—",
+            "payment_method": receipts.inferred_method(booking) or "—",
+            "total_paid": total_paid,
+            "amount_paid_recorded": float(amount_paid) if amount_paid not in (None, "") else None,
+            "balance": balance,
+            "paid_status_label": "PAID IN FULL" if balance <= 0.005 else "PAYMENT RECEIVED",
+            "thank_you": RECEIPT_THANK_YOU,
+        }
+    )
+    return doc
+
+
+def _receipt_meta_block(doc_data: Dict[str, Any], styles: Dict[str, ParagraphStyle]) -> Table:
+    rows = [
+        ("Receipt Number", doc_data["receipt_number"]),
+        ("Invoice Number", doc_data["invoice_number"]),
+        ("Booking Number", doc_data["booking_number"]),
+        ("Payment Date", doc_data["payment_date"]),
+        ("ABN", doc_data["company_abn"]),
+    ]
+    table = Table(
+        [[Paragraph(label, styles["meta_label"]), Paragraph(_pdf_markup(value), styles["meta_value"])] for label, value in rows],
+        colWidths=[32 * mm, 38 * mm],
+        hAlign="RIGHT",
+    )
+    table.setStyle(
+        TableStyle(
+            [
+                ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 1),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+            ]
+        )
+    )
+    return table
+
+
+def _paid_stamp(label: str, styles: Dict[str, ParagraphStyle]) -> Table:
+    stamp_style = ParagraphStyle(
+        "PaidStamp", parent=styles["total_bar_label"], textColor=JR_PRIMARY, alignment=TA_CENTER, fontSize=15, leading=18
+    )
+    stamp = Table([[Paragraph(label, stamp_style)]], colWidths=[62 * mm], hAlign="LEFT")
+    stamp.setStyle(
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 2, JR_PRIMARY),
+                ("BACKGROUND", (0, 0), (-1, -1), JR_GREEN_LIGHT),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    return stamp
+
+
+def _payment_received_table(doc_data: Dict[str, Any], styles: Dict[str, ParagraphStyle], box_width: float) -> Table:
+    label_w = box_width * 0.42
+    rows = [
+        [Paragraph("PAYMENT RECEIVED", styles["payment_title"]), ""],
+        [Paragraph("<b>Payment Method:</b>", styles["payment_label"]), Paragraph(_pdf_markup(doc_data["payment_method"]), styles["payment_value"])],
+        [Paragraph("<b>Payment Date:</b>", styles["payment_label"]), Paragraph(doc_data["payment_date"], styles["payment_value"])],
+        [Paragraph("<b>Amount Paid:</b>", styles["payment_label"]), Paragraph(invoice.format_aud(doc_data["total_paid"]), styles["payment_value"])],
+        [Paragraph("<b>Balance Due:</b>", styles["payment_label"]), Paragraph(invoice.format_aud(doc_data["balance"]), styles["payment_value"])],
+        [Paragraph("<b>For Invoice:</b>", styles["payment_label"]), Paragraph(doc_data["invoice_number"], styles["payment_value"])],
+    ]
+    table = Table(rows, colWidths=[label_w, box_width - label_w], hAlign="LEFT")
+    table.setStyle(
+        TableStyle(
+            [
+                ("SPAN", (0, 0), (1, 0)),
+                ("BACKGROUND", (0, 0), (-1, -1), JR_GREEN_LIGHT),
+                ("BOX", (0, 0), (-1, -1), 1, JR_GREEN_TABLE),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+                ("TOPPADDING", (0, 1), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (1, 0), 10),
+                ("BOTTOMPADDING", (0, 0), (1, 0), 6),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
+    table.splitByRow = 0
+    return table
+
+
+def generate_receipt_pdf(booking: Dict[str, Any]) -> bytes:
+    """Branded payment receipt PDF (A4 portrait), using the invoice's figures."""
+    doc_data = build_receipt_document(booking)
+    styles = _styles()
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=MARGIN_H,
+        rightMargin=MARGIN_H,
+        topMargin=MARGIN_V,
+        bottomMargin=MARGIN_V,
+        title="Receipt {0}".format(doc_data["receipt_number"]),
+        author=doc_data["company_name"],
+    )
+    story: List[Any] = []
+    logo = _logo_flowable(doc_data.get("logo_path"))
+    if logo:
+        story.append(logo)
+        story.append(Spacer(1, 2 * mm))
+    story.append(Paragraph(doc_data["company_contact_line"], styles["contact_line"]))
+    story.append(Spacer(1, SECTION_GAP))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=JR_BORDER_SUBTLE, spaceAfter=SECTION_GAP))
+
+    title_left = [
+        Paragraph("RECEIPT", styles["invoice_title"]),
+        Spacer(1, 2 * mm),
+        HRFlowable(width=62 * mm, thickness=0.5, color=JR_PRIMARY, spaceAfter=3 * mm),
+        _paid_stamp(doc_data["paid_status_label"], styles),
+    ]
+    title_row = Table(
+        [[title_left, _receipt_meta_block(doc_data, styles)]],
+        colWidths=[CONTENT_WIDTH * 0.52, CONTENT_WIDTH * 0.48],
+        hAlign="LEFT",
+    )
+    title_row.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
+    story.append(title_row)
+    story.append(Spacer(1, SECTION_GAP))
+
+    story.append(Paragraph("RECEIVED FROM", styles["section_heading"]))
+    story.append(Paragraph(_pdf_markup(doc_data.get("customer_name") or ""), styles["customer_name"]))
+    story.append(Paragraph(_pdf_markup(doc_data.get("pickup_line") or "Pickup:"), styles["customer_detail"]))
+    story.append(Paragraph(_pdf_markup(doc_data.get("dropoff_line") or "Drop-off:"), styles["customer_detail"]))
+    story.append(Spacer(1, BILL_GAP))
+    story.append(_line_items_table(doc_data, styles))
+
+    totals = doc_data["totals"]
+    bottom: List[Any] = [
+        Spacer(1, TOTALS_TOP_GAP),
+        HRFlowable(width="100%", thickness=0.5, color=JR_BORDER_SUBTLE, spaceAfter=TOTALS_TOP_GAP),
+    ]
+    if totals["gst_enabled"]:
+        subtotal_rows = [
+            ["Subtotal (ex GST)", invoice.format_aud(totals["subtotal"])],
+            ["GST (10%)", invoice.format_aud(totals["gst_amount"])],
+        ]
+    else:
+        subtotal_rows = [
+            ["Subtotal", invoice.format_aud(totals["subtotal"])],
+            ["GST", "Not charged"],
+        ]
+    subtotal_table = Table(
+        [[Paragraph(a, styles["subtotal_label"]), Paragraph(b, styles["subtotal_value"])] for a, b in subtotal_rows],
+        colWidths=[54 * mm, 44 * mm],
+        hAlign="RIGHT",
+    )
+    subtotal_table.setStyle(
+        TableStyle(
+            [
+                ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    bottom += [subtotal_table, Spacer(1, TOTAL_GAP)]
+    total_bar = Table(
+        [[
+            Paragraph("TOTAL PAID AUD" + (" (incl. GST)" if totals["gst_enabled"] else ""), styles["total_bar_label"]),
+            Paragraph(invoice.format_aud(doc_data["total_paid"]), styles["total_bar_amount"]),
+        ]],
+        colWidths=[CONTENT_WIDTH * 0.7, CONTENT_WIDTH * 0.3],
+        hAlign="LEFT",
+    )
+    total_bar.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), JR_GREEN_TABLE),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+            ]
+        )
+    )
+    bottom += [total_bar, Spacer(1, SECTION_GAP), _payment_received_table(doc_data, styles, SUBTOTAL_BLOCK_W)]
+    bottom += [
+        Spacer(1, SECTION_GAP),
+        Paragraph(doc_data["thank_you"], styles["body"]),
+        Spacer(1, SECTION_GAP),
+        HRFlowable(width="100%", thickness=0.4, color=JR_BORDER_SUBTLE, spaceAfter=SECTION_GAP),
+        Paragraph(doc_data["footer_tagline"], styles["footer"]),
+    ]
+    story.append(KeepTogether(bottom))
     doc.build(story)
     return buffer.getvalue()

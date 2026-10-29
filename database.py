@@ -97,6 +97,11 @@ BOOKING_EXTRA_COLUMNS = [
     ("work_period_2_finish", "TEXT"),
     ("work_period_2_movers", "INTEGER"),
     ("work_period_2_rate", "REAL"),
+    # Payment receipt (receipts.py). amount_paid = invoice total at issue (full payment).
+    ("payment_method", "TEXT"),
+    ("receipt_number", "TEXT"),
+    ("receipt_issued_at", "TEXT"),
+    ("amount_paid", "REAL"),
 ]
 
 STAFF_EXTRA_COLUMNS = [
@@ -1290,6 +1295,7 @@ def update_booking_invoice_fields(
         "stripe_total_charged",
         "xero_payment_id",
         "xero_invoice_automation_error",
+        "payment_method",
     }
     parts = []
     values = []
@@ -1303,6 +1309,18 @@ def update_booking_invoice_fields(
     sql = "UPDATE bookings SET " + ", ".join(parts) + " WHERE id = ?"
     with get_connection() as conn:
         conn.execute(sql, values)
+        conn.commit()
+
+
+def update_booking_receipt_fields(booking_id: int, fields: Dict[str, Any]) -> None:
+    """Receipt / payment-record fields only (receipts.py)."""
+    allowed = ("payment_method", "receipt_number", "receipt_issued_at", "amount_paid", "paid_at")
+    parts = [key for key in fields if key in allowed]
+    if not parts:
+        return
+    sql = "UPDATE bookings SET " + ", ".join("{0} = ?".format(key) for key in parts) + " WHERE id = ?"
+    with get_connection() as conn:
+        conn.execute(sql, [fields[key] for key in parts] + [booking_id])
         conn.commit()
 
 

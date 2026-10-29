@@ -82,6 +82,7 @@ import furniture_pdf
 import furniture_volume_refs
 import furniture_volumes
 import job_status
+import receipts
 import work_periods
 from crew_schedule_data import RANGE_OPTIONS, build_crew_schedule
 from ceo_dashboard_data import build_ceo_dashboard
@@ -328,6 +329,7 @@ def _edit_booking_extras(row) -> dict:
     review_row = db.get_review_request_for_booking(int(booking["id"]))
     invoice_status = (booking.get("invoice_status") or "").strip() if linked else ""
     return {
+        "receipt": receipts.state(booking),
         "invoice_summary": _invoice_summary_for_row(row),
         "xero_invoice_url": _xero_invoice_url_for_row(row),
         "xero_invoice_linked": linked,
@@ -2502,6 +2504,7 @@ def _view_booking_extras(row) -> dict:
     actual_times = staff_job_times.job_time_state(booking)
     return {
         "duration_label": format_hours_label(booking_duration_hours(booking)),
+        "receipt": receipts.state(booking),
         "invoice_summary": _invoice_summary_for_row(row),
         "profit_summary": booking_profit.profit_summary_for_booking(booking),
         "actual_times": actual_times,
@@ -3065,7 +3068,9 @@ def edit_booking(booking_id):
                     )
             return redirect(url_for("edit_booking", booking_id=booking_id))
         if action == "mark_paid":
-            ok, msg = services.mark_booking_paid(booking_id, paid=True)
+            ok, msg = services.mark_booking_paid(
+                booking_id, paid=True, payment_method=request.form.get("payment_method", "")
+            )
             flash(msg, "success" if ok else "error")
             return redirect(url_for("edit_booking", booking_id=booking_id))
         if action == "mark_unpaid":
@@ -3499,6 +3504,70 @@ def invoice_pdf(booking_id):
         pdf_bytes,
         mimetype="application/pdf",
         headers={"Content-Disposition": "attachment; filename={0}".format(filename)},
+    )
+
+
+def _receipt_return(booking_id):
+    if request.values.get("return_to") == "view":
+        return redirect(url_for("view_booking", booking_id=booking_id) + "#receipt")
+    return redirect(url_for("edit_booking", booking_id=booking_id) + "#receipt")
+
+
+def _paid_booking_with_receipt(booking_id):
+    """Booking dict when a receipt can be shown, else (None, redirect)."""
+    row = db.get_booking(booking_id)
+    if row is None:
+        flash("Booking not found.", "error")
+        return None, redirect(url_for("all_bookings"))
+    booking = services.booking_to_dict(row)
+    if not receipts.is_paid(booking):
+        flash("Receipt available after payment.", "error")
+        return None, _receipt_return(booking_id)
+    if not str(booking.get("receipt_number") or "").strip():
+        flash("Generate the receipt first (choose payment date and method).", "error")
+        return None, _receipt_return(booking_id)
+    return booking, None
+
+
+@app.route("/bookings/<int:booking_id>/receipt", methods=["POST"], endpoint="generate_receipt")
+@auth.login_required
+def generate_receipt(booking_id):
+    ok, msg = receipts.issue(
+        booking_id,
+        method=request.form.get("payment_method"),
+        paid_on=request.form.get("payment_date"),
+    )
+    flash(msg, "success" if ok else "error")
+    return _receipt_return(booking_id)
+
+
+@app.route("/bookings/<int:booking_id>/receipt/preview", endpoint="receipt_preview")
+@auth.login_required
+def receipt_preview(booking_id):
+    booking, response = _paid_booking_with_receipt(booking_id)
+    if response is not None:
+        return response
+    return render_template(
+        "receipt_preview.html",
+        booking_id=booking_id,
+        rct=invoice_pdf_service.build_receipt_document(booking),
+    )
+
+
+@app.route("/bookings/<int:booking_id>/receipt.pdf", endpoint="receipt_pdf")
+@auth.login_required
+def receipt_pdf(booking_id):
+    booking, response = _paid_booking_with_receipt(booking_id)
+    if response is not None:
+        return response
+    pdf_bytes = invoice_pdf_service.generate_receipt_pdf(booking)
+    number = str(booking.get("receipt_number") or "receipt").replace("/", "-")
+    # Served as an attachment like the invoice PDF, so iPhone Safari opens it in the
+    # PDF viewer / share sheet instead of a blank tab.
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=receipt-{0}.pdf".format(number)},
     )
 
 

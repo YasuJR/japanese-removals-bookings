@@ -145,6 +145,9 @@
     </form>
     <form method="post" class="inline-form">
       <input type="hidden" name="action" value="mark_paid">
+      <select name="payment_method" aria-label="Payment method" {% if invoice_summary.payment_status == 'Paid' %}disabled{% endif %}>
+        {% for method in receipt.methods %}<option value="{{ method }}">{{ method }}</option>{% endfor %}
+      </select>
       <button type="submit" class="btn-secondary btn-sm"
         {% if invoice_summary.payment_status == 'Paid' %}disabled{% endif %}>Mark as Paid</button>
     </form>
@@ -321,5 +324,6 @@
     {% include '_booking_form.html' %}
     {% include '_invoice_edit_panel.html' %}
   </form>
+  {% include '_receipt_panel.html' %}
 </section>
 {% endblock %}

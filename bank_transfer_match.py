@@ -282,8 +282,11 @@ def match_bank_transaction(parsed: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def apply_paid_if_matched(match: Dict[str, Any]) -> bool:
-    """Mark the linked booking Paid (and Completed) when this match is a new payment."""
+def apply_paid_if_matched(match: Dict[str, Any], transaction_date: str = "") -> bool:
+    """Mark the linked booking Paid (and Completed) when this match is a new payment.
+
+    The bank transaction date is recorded as the payment date (receipts use it).
+    """
     if match.get("match_status") != STATUS_PAID:
         return False
     booking_id = match.get("matched_booking_id")
@@ -295,8 +298,22 @@ def apply_paid_if_matched(match: Dict[str, Any]) -> bool:
     current = invoice.normalize_payment_status(row["payment_status"])
     if current == invoice.PAYMENT_STATUS_PAID:
         return False
-    invoice.apply_payment_status(int(booking_id), invoice.PAYMENT_STATUS_PAID)
+    invoice.apply_payment_status(
+        int(booking_id),
+        invoice.PAYMENT_STATUS_PAID,
+        paid_at=_iso_date_or_blank(transaction_date),
+        payment_method="Bank Transfer",
+    )
     return True
+
+
+def _iso_date_or_blank(value: Any) -> str:
+    text = str(value or "").strip()[:10]
+    try:
+        datetime.strptime(text, "%Y-%m-%d")
+    except ValueError:
+        return ""
+    return text
 
 
 def _match_fields(match: Dict[str, Any]) -> Dict[str, Any]:
@@ -312,7 +329,7 @@ def _match_fields(match: Dict[str, Any]) -> Dict[str, Any]:
 def _apply_and_store_existing(txn_id: int, parsed: Dict[str, Any]) -> Dict[str, Any]:
     """Re-match an existing unmatched row in place. Does not insert or delete."""
     match = match_bank_transaction(parsed)
-    marked_paid = apply_paid_if_matched(match)
+    marked_paid = apply_paid_if_matched(match, parsed.get("transaction_date") or "")
     db.update_bank_transaction(int(txn_id), _match_fields(match))
     return {**parsed, **match, "marked_paid": marked_paid, "id": int(txn_id)}
 
@@ -363,7 +380,7 @@ def import_bank_transactions(parsed_rows: List[Dict[str, Any]]) -> Dict[str, Any
                 )
             continue
         match = match_bank_transaction(parsed)
-        marked_paid = apply_paid_if_matched(match)
+        marked_paid = apply_paid_if_matched(match, parsed.get("transaction_date") or "")
         db.insert_bank_transaction(
             {
                 "fingerprint": fingerprint,

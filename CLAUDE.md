@@ -218,6 +218,13 @@ Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out 
   - Only `services.refresh_invoice_after_booking_save` assigns numbers. Preview, PDF and edit-render must not.
 - **Edit → Save unifies the invoice** (e124a0f): a successful `edit_booking` POST calls `services.refresh_invoice_after_booking_save`. That assigns a number if missing, prepares the pay link, recalculates profit, and syncs the Xero draft if one is linked and still DRAFT. The edit panel has no separate Update / Send / Preview buttons.
 - **PDF:** `integrations/invoice_pdf.build_invoice_document` (shared with the HTML preview), ReportLab. Due date = issue date + `INVOICE_DUE_DAYS` (7). Bank details: booking override → company settings. Payment reference = invoice number.
+- **Receipts** (`receipts.py`, 2026-10-30): a separate paper from the invoice, only for Payment Status **Paid**. The invoice is never replaced.
+  - Columns: `receipt_number`, `receipt_issued_at` (UTC ISO, first issue), `payment_method` (Bank Transfer / Card / Cash / Other), `amount_paid` (invoice total at issue; full payment only; a future Part Paid gives balance = total − amount_paid). Payment date = existing `paid_at`, read as a Perth date via `sales_dashboard.paid_on_perth`.
+  - **Number:** `RCT` + the invoice's number (`invoice_numbering.reference_number_for_booking`; INV138 → RCT138), fixed at first issue. If another booking already has it (a legacy duplicate invoice number), it becomes `RCT138-<booking id>`.
+  - **Issue** (`POST /bookings/<id>/receipt`, the panel on booking details and Edit): payment date (required, prefilled from `paid_at`, not in the future; if changed it is stored as a date-only `paid_at`) and method (prefilled from `payment_method`, Stripe → Card). Re-submitting updates method/date/amount and keeps the number.
+  - **Preview / PDF:** `/bookings/<id>/receipt/preview`, `/bookings/<id>/receipt.pdf` (attachment, like the invoice, for iPhone). Both refuse unless Paid and issued. `invoice_pdf.build_receipt_document` = `build_invoice_document` + receipt fields, so lines, Subtotal, GST and Total are the invoice's own numbers. Title RECEIPT, "PAID IN FULL" stamp, "PAYMENT RECEIVED" box, no bank "please pay" box.
+  - If the invoice total changes after the receipt was issued, the panel warns until "Update receipt" is pressed.
+  - Payment method is recorded by: Edit → "Mark as Paid" (method select), bank CSV match (Bank Transfer + the transaction date as `paid_at`), and Stripe (Card). Xero payment sync and the dashboard Paid toggle set the date only; the method is chosen when the receipt is generated.
 - **Bank transfer only:** `INVOICE_CARD_PAYMENTS_ENABLED` defaults to false. The Stripe card / Pay Now option is hidden and checkout refuses. The `/pay/<token>` page shows bank details.
 - **Xero:** a DRAFT invoice with AccountCode `200`, TaxType `OUTPUT` or `NONE`, `LineAmountTypes` Inclusive / Exclusive / NoTax. On update, line items are recreated. The cron `xero-payment-sync` marks bookings paid, and "paid" sets status Completed.
 - **Sending** (`integrations/invoice_send.py`): email with the PDF via SMTP, else SMS with the pay link. The company's own phone or email is rejected as a recipient.
@@ -380,6 +387,7 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 | Call out minutes / fee / paid hours | `test_callout_minutes_e2e.py` |
 | Finish time = source of truth | `test_finish_time_source_of_truth_e2e.py`, `test_edit_finish_time_e2e.py`, `test_invoice_duration_from_times_e2e.py` |
 | Work periods (Period 2, call-out once, break per period, actual fields removed) | `test_work_periods_e2e.py` (also passes on Postgres) |
+| Receipts (paid only, RCT numbers, payment date/method, totals = invoice, iPhone PDF) | `test_receipts_e2e.py` |
 | Invoice | `test_edit_booking_save_unifies_invoice_e2e.py`, `test_invoice_numbering_e2e.py`, `test_invoice_edit_e2e.py`, `test_invoice_negative_adjustments_e2e.py`, `test_invoice_pdf_layout_e2e.py` |
 | Double booking | `test_truck_double_booking_e2e.py`, `test_phase14_double_booking_e2e.py` |
 | Calendar / weekly | `test_calendar_data_e2e.py`, `test_weekly_schedule_e2e.py`, `test_daily_jobs_e2e.py` |

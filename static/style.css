@@ -4049,3 +4049,37 @@ button:disabled {
   font-weight: 700;
   color: var(--navy, #1a2744);
 }
+
+/* Receipt panel (booking details / edit) */
+.receipt-panel {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--success);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.receipt-panel h3 {
+  margin-top: 0;
+}
+
+.receipt-summary {
+  margin: 0 0 0.6rem;
+}
+
+.receipt-actions,
+.receipt-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+}
+
+.receipt-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+}

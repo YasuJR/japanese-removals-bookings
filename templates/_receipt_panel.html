@@ -1,0 +1,46 @@
+{# Payment receipt (separate from the invoice). Needs `receipt` (receipts.state) and `booking`. #}
+{% set return_to = receipt_return_to|default('edit') %}
+<section class="receipt-panel" id="receipt">
+  <h3>Receipt <span class="field-label-ja" lang="ja">領収書</span></h3>
+  {% if not receipt.paid %}
+  <p class="receipt-unavailable muted">Receipt available after payment. Mark the booking as Paid first.</p>
+  <button type="button" class="btn-secondary btn-sm" disabled>Generate Receipt</button>
+  {% else %}
+    {% if receipt.issued %}
+    <p class="receipt-summary">
+      <strong>{{ receipt.receipt_number }}</strong>
+      · Paid {{ receipt.payment_date or '—' }}
+      · {{ receipt.payment_method or 'Method not recorded' }}
+      · {{ receipt.total|format_aud }}
+    </p>
+    {% if receipt.invoice_changed %}
+    <p class="flash flash-warning receipt-warning">The invoice total ({{ receipt.total|format_aud }}) has changed since this receipt was issued for {{ receipt.amount_paid|format_aud }}. Check the invoice, then press “Update receipt”.</p>
+    {% endif %}
+    <div class="receipt-actions">
+      <a class="btn-primary btn-sm" href="{{ url_for('receipt_preview', booking_id=booking.id) }}" target="_blank" rel="noopener">Receipt Preview</a>
+      <button type="button" class="btn-secondary btn-sm"
+              data-download-invoice-pdf="{{ url_for('receipt_pdf', booking_id=booking.id) }}">Download Receipt PDF</button>
+    </div>
+    {% endif %}
+    <form method="post" action="{{ url_for('generate_receipt', booking_id=booking.id) }}" class="receipt-form">
+      <input type="hidden" name="return_to" value="{{ return_to }}">
+      <label>
+        Payment date
+        <input type="date" name="payment_date" required value="{{ receipt.payment_date }}">
+        {% if not receipt.payment_date_recorded %}<span class="field-hint">No payment date was recorded — enter the day the money was received.</span>{% endif %}
+      </label>
+      <label>
+        Payment method
+        <select name="payment_method" required>
+          <option value="" {% if not receipt.payment_method %}selected{% endif %} disabled>Choose…</option>
+          {% for method in receipt.methods %}
+          <option value="{{ method }}" {% if receipt.payment_method == method %}selected{% endif %}>{{ method }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit" class="btn-{{ 'secondary' if receipt.issued else 'primary' }} btn-sm">{{ 'Update receipt' if receipt.issued else 'Generate Receipt' }}</button>
+    </form>
+    <p class="hint muted">The receipt uses the invoice’s figures (Subtotal, GST, Total). The invoice stays as it is.</p>
+  {% endif %}
+</section>
+{% if return_to == 'view' %}<script src="{{ url_for('static', filename='invoice_share.js') }}"></script>{% endif %}

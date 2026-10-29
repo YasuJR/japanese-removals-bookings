@@ -90,6 +90,8 @@
     </dl>
   </section>
 
+  {% with receipt_return_to='view' %}{% include '_receipt_panel.html' %}{% endwith %}
+
   {% include '_job_costs_display.html' %}
 
   <div class="booking-details-footer-actions">

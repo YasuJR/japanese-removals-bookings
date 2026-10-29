@@ -413,12 +413,19 @@ def apply_payment_status(
     status: str,
     *,
     paid_at: str = "",
+    payment_method: str = "",
 ) -> Tuple[bool, str]:
-    """Set payment status from Xero sync or manual update."""
+    """Set payment status from Xero sync or manual update.
+
+    payment_method (Bank Transfer / Card / Cash / Other) is recorded for the receipt
+    when given; an empty value leaves any stored method unchanged.
+    """
     normalized = normalize_payment_status(status)
     fields: Dict[str, Any] = {"payment_status": normalized}
     if normalized == PAYMENT_STATUS_PAID:
         fields["paid_at"] = paid_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if payment_method:
+            fields["payment_method"] = payment_method
     else:
         fields["paid_at"] = paid_at if paid_at else ""
     db.update_booking_invoice_fields(booking_id, fields)
@@ -450,10 +457,10 @@ def complete_job_when_payment_paid(booking_id: int) -> bool:
     return True
 
 
-def set_payment_status(booking_id: int, paid: bool) -> Tuple[bool, str]:
+def set_payment_status(booking_id: int, paid: bool, payment_method: str = "") -> Tuple[bool, str]:
     status = PAYMENT_STATUS_PAID if paid else PAYMENT_STATUS_UNPAID
     paid_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S") if paid else ""
-    return apply_payment_status(booking_id, status, paid_at=paid_at)
+    return apply_payment_status(booking_id, status, paid_at=paid_at, payment_method=payment_method)
 
 
 def default_invoice_fields() -> Dict[str, Any]:

@@ -145,7 +145,7 @@
         element.disabled = true;
         handler(pdfUrl)
           .catch(function () {
-            window.alert("Could not prepare the invoice PDF. Try again.");
+            window.alert("Could not prepare the PDF. Try again.");
           })
           .then(function () {
             element.disabled = false;

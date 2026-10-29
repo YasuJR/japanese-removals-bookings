@@ -296,6 +296,7 @@ def _apply_local_stripe_payment(
             "stripe_checkout_session_id": session_id,
             "stripe_payment_intent_id": payment_intent_id,
             "stripe_payment_status": "paid",
+            "payment_method": "Card",
             "stripe_surcharge_amount": surcharge,
             "stripe_total_charged": card_total,
         },
