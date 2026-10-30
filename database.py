@@ -387,6 +387,84 @@ def _ensure_star_point_history_table(conn) -> None:
         "CREATE INDEX IF NOT EXISTS idx_star_events_crew_id "
         "ON crew_star_point_events(crew_id)"
     )
+    if "big_stars_after" not in db_backend.table_columns(conn, "crew_star_point_events"):
+        conn.execute("ALTER TABLE crew_star_point_events ADD COLUMN big_stars_after INTEGER")
+    _ensure_big_stars_table(conn)
+    _migrate_star_points_to_big_stars(conn)
+
+
+def _ensure_big_stars_table(conn) -> None:
+    """One row per Big Star (10 Small Stars), for future bonus payments.
+
+    A Big Star is never deleted: removing one (owner action or Reset All) sets
+    revoked_at, so who earned what and when stays auditable.
+    """
+    if db_backend.is_postgres():
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS crew_big_stars (
+                id SERIAL PRIMARY KEY,
+                crew_id INTEGER NOT NULL,
+                earned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                awarded_by_user_id INTEGER,
+                reason TEXT NOT NULL DEFAULT '',
+                source TEXT NOT NULL DEFAULT 'milestone',
+                revoked_at TIMESTAMP,
+                revoked_by_user_id INTEGER,
+                revoke_reason TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+    else:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS crew_big_stars (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                crew_id INTEGER NOT NULL,
+                earned_at TEXT NOT NULL DEFAULT (datetime('now')),
+                awarded_by_user_id INTEGER,
+                reason TEXT NOT NULL DEFAULT '',
+                source TEXT NOT NULL DEFAULT 'milestone',
+                revoked_at TEXT,
+                revoked_by_user_id INTEGER,
+                revoke_reason TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_big_stars_crew_id ON crew_big_stars(crew_id)")
+
+
+def _migrate_star_points_to_big_stars(conn) -> None:
+    """Existing points ≥ 10 become Big Stars: 23 → 2 Big + 3 Small. Idempotent."""
+    import star_points
+
+    rows = conn.execute(
+        "SELECT id, star_points FROM crew_members WHERE star_points >= ?",
+        (star_points.SMALL_STARS_PER_BIG,),
+    ).fetchall()
+    for row in rows:
+        data = dict(row)
+        total = int(data["star_points"] or 0)
+        big, small = divmod(total, star_points.SMALL_STARS_PER_BIG)
+        crew_id = int(data["id"])
+        for _ in range(big):
+            conn.execute(
+                "INSERT INTO crew_big_stars (crew_id, reason, source) VALUES (?, ?, 'migration')",
+                (crew_id, "Converted from {0} existing Star Points".format(total)),
+            )
+        conn.execute("UPDATE crew_members SET star_points = ? WHERE id = ?", (small, crew_id))
+        _insert_star_point_event(
+            conn,
+            crew_id,
+            "migration",
+            small - total,
+            small,
+            "Converted {0} Star Points → {1} Big Star{2} + {3} Small".format(
+                total, big, "" if big == 1 else "s", small
+            ),
+            None,
+            big_stars_after=_active_big_stars(conn, crew_id),
+        )
 
 
 def _seed_crew_and_trucks(conn) -> None:
@@ -2400,7 +2478,7 @@ def update_crew_member(
 
 
 def get_crew_star_points(crew_id: int) -> int:
-    """Return persisted star points for a crew member (0–10)."""
+    """Small Stars (0–9) for a crew member."""
     import star_points
 
     member = get_crew_member(crew_id)
@@ -2410,7 +2488,48 @@ def get_crew_star_points(crew_id: int) -> int:
         raw = member["star_points"]
     except (KeyError, IndexError, TypeError):
         raw = 0
-    return star_points.clamp_star_points(raw)
+    return star_points.clamp_small_stars(raw)
+
+
+def _active_big_stars(conn, crew_id: int) -> int:
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM crew_big_stars WHERE crew_id = ? AND revoked_at IS NULL",
+        (crew_id,),
+    ).fetchone()
+    return int(dict(row)["n"] or 0)
+
+
+def get_crew_big_stars(crew_id: int) -> int:
+    """Big Stars currently held (earned and not revoked)."""
+    with get_connection() as conn:
+        return _active_big_stars(conn, crew_id)
+
+
+def get_all_crew_star_rewards() -> Dict[int, Dict[str, int]]:
+    """{crew_id: {"small": n, "big": n}} for every crew member (All Staff overview)."""
+    out: Dict[int, Dict[str, int]] = {}
+    with get_connection() as conn:
+        for row in conn.execute("SELECT id, star_points FROM crew_members").fetchall():
+            data = dict(row)
+            out[int(data["id"])] = {"small": int(data["star_points"] or 0), "big": 0}
+        for row in conn.execute(
+            "SELECT crew_id, COUNT(*) AS n FROM crew_big_stars WHERE revoked_at IS NULL GROUP BY crew_id"
+        ).fetchall():
+            data = dict(row)
+            out.setdefault(int(data["crew_id"]), {"small": 0, "big": 0})["big"] = int(data["n"] or 0)
+    return out
+
+
+def list_crew_big_stars(crew_id: int, include_revoked: bool = False) -> List[Dict[str, Any]]:
+    sql = (
+        "SELECT id, crew_id, earned_at, awarded_by_user_id, reason, source, revoked_at, "
+        "revoked_by_user_id, revoke_reason FROM crew_big_stars WHERE crew_id = ?"
+    )
+    if not include_revoked:
+        sql += " AND revoked_at IS NULL"
+    with get_connection() as conn:
+        rows = conn.execute(sql + " ORDER BY id", (crew_id,)).fetchall()
+    return [dict(row) for row in rows]
 
 
 def adjust_crew_star_points(
@@ -2419,65 +2538,130 @@ def adjust_crew_star_points(
     reason: str = "",
     user_id: Optional[int] = None,
 ) -> Optional[int]:
-    """Add or remove one star point. Returns new value, or None if crew missing."""
+    """Add or remove one Small Star. Returns the new Small Star count, or None if crew missing.
+
+    The 10th Small Star is converted in the same transaction: Big Stars +1 (recorded
+    with who gave the last star and why) and Small Stars back to 0. Removing a Small
+    Star never touches Big Stars and never goes below 0.
+    """
     import star_points
 
-    member = get_crew_member(crew_id)
-    if not member:
+    if not get_crew_member(crew_id):
         return None
     if delta not in (-1, 1):
         return get_crew_star_points(crew_id)
-    try:
-        raw = member["star_points"]
-    except (KeyError, IndexError, TypeError):
-        raw = 0
-    current = star_points.clamp_star_points(raw)
-    new_value = star_points.clamp_star_points(current + delta)
-    if new_value == current:
-        return new_value
-    change_type = "increment" if delta > 0 else "decrement"
+    per_big = star_points.SMALL_STARS_PER_BIG
+    for _ in range(5):  # compare-and-set, so two owners clicking at once can't lose a star
+        current = get_crew_star_points(crew_id)
+        target = current + delta
+        if target < 0:
+            return current
+        milestone = target >= per_big
+        stored = 0 if milestone else target
+        with get_connection() as conn:
+            cursor = conn.execute(
+                "UPDATE crew_members SET star_points = ? WHERE id = ? AND star_points = ?",
+                (stored, crew_id, current),
+            )
+            if int(cursor.rowcount or 0) != 1:
+                continue  # someone else changed it first: nothing was written, re-read and retry
+            if milestone:
+                conn.execute(
+                    "INSERT INTO crew_big_stars (crew_id, awarded_by_user_id, reason, source) "
+                    "VALUES (?, ?, ?, 'milestone')",
+                    (crew_id, user_id, str(reason or "").strip()[:500]),
+                )
+            big_after = _active_big_stars(conn, crew_id)
+            _insert_star_point_event(
+                conn,
+                crew_id,
+                "increment" if delta > 0 else "decrement",
+                delta,
+                target,
+                reason,
+                user_id,
+                big_stars_after=big_after - (1 if milestone else 0),
+            )
+            if milestone:
+                _insert_star_point_event(
+                    conn,
+                    crew_id,
+                    "milestone",
+                    -per_big,
+                    0,
+                    "Milestone reached: {0} Small Stars → 1 Big Star".format(per_big),
+                    user_id,
+                    big_stars_after=big_after,
+                )
+            conn.commit()
+        return stored
+    return get_crew_star_points(crew_id)
+
+
+def remove_crew_big_star(
+    crew_id: int,
+    reason: str = "",
+    user_id: Optional[int] = None,
+) -> Optional[int]:
+    """Owner-only: revoke the most recent Big Star. Returns Big Stars left, or None if none."""
     with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM crew_big_stars WHERE crew_id = ? AND revoked_at IS NULL ORDER BY id DESC LIMIT 1",
+            (crew_id,),
+        ).fetchone()
+        if not row:
+            return None
         conn.execute(
-            "UPDATE crew_members SET star_points = ? WHERE id = ?",
-            (new_value, crew_id),
+            "UPDATE crew_big_stars SET revoked_at = CURRENT_TIMESTAMP, revoked_by_user_id = ?, "
+            "revoke_reason = ? WHERE id = ?",
+            (user_id, str(reason or "").strip()[:500], int(dict(row)["id"])),
         )
+        left = _active_big_stars(conn, crew_id)
+        small = conn.execute("SELECT star_points FROM crew_members WHERE id = ?", (crew_id,)).fetchone()
         _insert_star_point_event(
             conn,
             crew_id,
-            change_type,
-            new_value - current,
-            new_value,
+            "big_star_removed",
+            0,
+            int(dict(small)["star_points"] or 0) if small else 0,
             reason,
             user_id,
+            big_stars_after=left,
         )
         conn.commit()
-    return new_value
+    return left
 
 
 def reset_crew_star_points(
     crew_id: int,
     reason: str = "",
     user_id: Optional[int] = None,
+    scope: str = "all",
 ) -> bool:
-    """Reset star points to zero for one crew member."""
+    """Reset Small Stars (scope "small") or Small and Big Stars (scope "all")."""
     member = get_crew_member(crew_id)
     if not member:
         return False
     current = get_crew_star_points(crew_id)
     with get_connection() as conn:
-        conn.execute(
-            "UPDATE crew_members SET star_points = 0 WHERE id = ?",
-            (crew_id,),
-        )
-        if current > 0:
+        big_before = _active_big_stars(conn, crew_id)
+        conn.execute("UPDATE crew_members SET star_points = 0 WHERE id = ?", (crew_id,))
+        if scope == "all" and big_before:
+            conn.execute(
+                "UPDATE crew_big_stars SET revoked_at = CURRENT_TIMESTAMP, revoked_by_user_id = ?, "
+                "revoke_reason = ? WHERE crew_id = ? AND revoked_at IS NULL",
+                (user_id, "Reset all star rewards" + (": " + str(reason).strip() if str(reason or "").strip() else ""), crew_id),
+            )
+        if current > 0 or (scope == "all" and big_before):
             _insert_star_point_event(
                 conn,
                 crew_id,
-                "reset",
+                "reset_all" if scope == "all" else "reset_small",
                 -current,
                 0,
                 reason,
                 user_id,
+                big_stars_after=0 if scope == "all" else big_before,
             )
         conn.commit()
     return True
@@ -2491,12 +2675,14 @@ def _insert_star_point_event(
     points_after: int,
     reason: str = "",
     user_id: Optional[int] = None,
+    big_stars_after: Optional[int] = None,
 ) -> None:
     conn.execute(
         """
         INSERT INTO crew_star_point_events (
-            crew_id, change_type, points_delta, points_after, reason, created_by_user_id
-        ) VALUES (?, ?, ?, ?, ?, ?)
+            crew_id, change_type, points_delta, points_after, reason, created_by_user_id,
+            big_stars_after
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
             crew_id,
@@ -2505,6 +2691,7 @@ def _insert_star_point_event(
             int(points_after),
             str(reason or "").strip()[:500],
             user_id,
+            big_stars_after,
         ),
     )
 
@@ -2514,7 +2701,7 @@ def list_crew_star_point_events(crew_id: int, limit: int = 50) -> List[Dict[str,
         rows = conn.execute(
             """
             SELECT id, crew_id, change_type, points_delta, points_after,
-                   reason, created_at, created_by_user_id
+                   reason, created_at, created_by_user_id, big_stars_after
             FROM crew_star_point_events
             WHERE crew_id = ?
             ORDER BY id DESC
@@ -2603,13 +2790,18 @@ def count_bookings_with_crew_name(name: str) -> int:
 
 
 def delete_crew_member(crew_id: int) -> bool:
+    """Delete a crew member (only allowed when no booking uses them) and their star records."""
     with get_connection() as conn:
         cursor = conn.execute(
             "DELETE FROM crew_members WHERE id = ?",
             (crew_id,),
         )
+        deleted = cursor.rowcount > 0
+        if deleted:
+            conn.execute("DELETE FROM crew_star_point_events WHERE crew_id = ?", (crew_id,))
+            conn.execute("DELETE FROM crew_big_stars WHERE crew_id = ?", (crew_id,))
         conn.commit()
-        return cursor.rowcount > 0
+        return deleted
 
 
 def list_trucks(active_only: bool = False) -> List[Dict[str, Any]]:

@@ -2096,13 +2096,44 @@ def staff_portal_adjust_star_points(crew_id: int):
     if delta == 0:
         flash("Invalid Star Points action.", "error")
     else:
+        big_before = db.get_crew_big_stars(crew_id)
         new_value = db.adjust_crew_star_points(
             crew_id, delta, reason=reason, user_id=user_id
         )
         if new_value is None:
             flash("Staff member not found.", "error")
         else:
-            flash("Star Points updated to {0} / 10.".format(new_value), "success")
+            big = db.get_crew_big_stars(crew_id)
+            if big > big_before:
+                flash(
+                    "🌟 Milestone reached: 10 Small Stars → 1 Big Star. Big Stars: {0} · Small Stars: {1} / 10.".format(big, new_value),
+                    "success",
+                )
+            else:
+                flash("Small Stars: {0} / 10 · Big Stars: {1}.".format(new_value, big), "success")
+    return redirect(url_for("staff_portal", **_staff_portal_form_nav_params()))
+
+
+@app.route(
+    "/staff/crew/<int:crew_id>/star-points/remove-big",
+    methods=["POST"],
+    endpoint="staff_portal_remove_big_star",
+)
+@staff_portal_owner.owner_required
+def staff_portal_remove_big_star(crew_id: int):
+    """Owner-only, explicit: Big Stars are never taken away by removing Small Stars."""
+    if (request.form.get("confirm") or "").strip() != "1":
+        flash("Big Star not removed.", "error")
+    else:
+        left = db.remove_crew_big_star(
+            crew_id,
+            reason=(request.form.get("reason") or "").strip(),
+            user_id=auth.get_current_user_id(),
+        )
+        if left is None:
+            flash("No Big Star to remove.", "error")
+        else:
+            flash("1 Big Star removed. Big Stars: {0}.".format(left), "success")
     return redirect(url_for("staff_portal", **_staff_portal_form_nav_params()))
 
 
@@ -2116,6 +2147,7 @@ def staff_portal_reset_star_points(crew_id: int):
     if (request.form.get("confirm") or "").strip() != "1":
         flash("Star Points reset cancelled.", "error")
         return redirect(url_for("staff_portal", **_staff_portal_form_nav_params()))
+    scope = "all" if (request.form.get("scope") or "").strip() == "all" else "small"
     member = db.get_crew_member(crew_id)
     if not member:
         flash("Staff member not found.", "error")
@@ -2123,8 +2155,13 @@ def staff_portal_reset_star_points(crew_id: int):
         crew_id,
         reason=(request.form.get("reason") or "").strip(),
         user_id=auth.get_current_user_id(),
+        scope=scope,
     ):
-        flash("Star Points reset to 0 / 10.", "success")
+        flash(
+            "All Star Rewards reset (Big Stars 0, Small Stars 0 / 10)." if scope == "all"
+            else "Small Stars reset to 0 / 10. Big Stars unchanged.",
+            "success",
+        )
     else:
         flash("Could not reset Star Points.", "error")
     return redirect(url_for("staff_portal", **_staff_portal_form_nav_params()))

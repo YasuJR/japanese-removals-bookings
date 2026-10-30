@@ -77,6 +77,22 @@
       </div>
       {% endif %}
 
+      {% if can_manage_staff_portal and portal.is_all_staff and portal.star_overview %}
+      <section class="staff-star-overview" aria-label="Star Rewards for all staff">
+        <p class="staff-star-admin-label">STAR REWARDS — ALL STAFF</p>
+        <ul class="staff-star-overview-list">
+          {% for row in portal.star_overview %}
+          <li>
+            <a class="staff-star-overview-name" href="{{ url_for('staff_portal', staff_id=row.id, range=portal.range) }}">{{ row.name }}</a>
+            <span class="staff-star-overview-big"><span aria-hidden="true">🌟</span>×{{ row.big }}</span>
+            <span class="staff-star-overview-progress" aria-hidden="true">{{ row.stars_display }}</span>
+            <span class="staff-star-overview-count">{{ row.count_display }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+
       <nav class="staff-portal-tabs" aria-label="Staff portal views">
         {% for key, label in portal.range_tabs %}
         {% if key == 'calendar' %}

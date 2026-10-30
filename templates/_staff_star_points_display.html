@@ -1,12 +1,22 @@
 {% if portal.star_points %}
-<div class="staff-star-points-header{% if portal.star_points.bonus_ready %} staff-star-points-bonus{% endif %}">
-  {% if portal.star_points.bonus_ready %}
-  <p class="staff-star-bonus-ready">⭐ BONUS READY</p>
-  {% endif %}
-  <p class="staff-star-kicker">⭐ STAR POINTS</p>
-  <p class="staff-star-row" aria-label="Star Points {{ portal.star_points.count_display }}">
-    <span class="staff-star-icons" aria-hidden="true">{{ portal.star_points.stars_display }}</span>
-    <span class="staff-star-count">{{ portal.star_points.count_display }}</span>
-  </p>
+{% set sp = portal.star_points %}
+<div class="staff-star-points-header{% if sp.big %} staff-star-points-bonus{% endif %}">
+  <p class="staff-star-kicker">⭐ STAR REWARDS</p>
+  <div class="staff-star-rewards">
+    <div class="staff-star-big-block" aria-label="Big Stars {{ sp.big }}">
+      <p class="staff-star-sub">BIG STARS</p>
+      <p class="staff-star-big-row">
+        {% if sp.big %}<span class="staff-star-big-icons" aria-hidden="true">{{ sp.big_icons }}</span>{% if sp.big_more %}<span class="staff-star-big-more" aria-hidden="true">…</span>{% endif %}{% else %}<span class="staff-star-big-empty" aria-hidden="true">🌟</span>{% endif %}
+        <span class="staff-star-big-count">{{ sp.big }}</span>
+      </p>
+    </div>
+    <div class="staff-star-progress-block">
+      <p class="staff-star-sub">PROGRESS TO NEXT STAR</p>
+      <p class="staff-star-row" aria-label="Small Stars {{ sp.count_display }}">
+        <span class="staff-star-icons" aria-hidden="true">{{ sp.stars_display }}</span>
+        <span class="staff-star-count">{{ sp.count_display }}</span>
+      </p>
+    </div>
+  </div>
 </div>
 {% endif %}

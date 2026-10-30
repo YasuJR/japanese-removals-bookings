@@ -319,13 +319,16 @@ Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out 
 
 ---
 
-## 10. Star Points
+## 10. Star Rewards (Star Points)
 
-- Stored in `crew_members.star_points` (0..10, `star_points.STAR_POINTS_MAX`, `clamp_star_points`). At 10 the display shows "⭐ BONUS READY".
-- `db.adjust_crew_star_points` only accepts a delta of ±1. At the bounds nothing changes and no event is written.
-- `db.reset_crew_star_points` → 0. It logs a `reset` event only if the value was > 0.
-- Events live in `crew_star_point_events`. History shows the latest 50; the reason is stored up to 500 chars (form max 200).
-- Routes `/staff/crew/<id>/star-points/adjust` (`action=increment|decrement`) and `/reset` (`confirm=1`) are **owner only**. The display and history are visible to any portal viewer.
+- **Small Stars** = `crew_members.star_points` (0–9). The owner's ＋ adds one; the **10th converts automatically in the same transaction** (`db.adjust_crew_star_points`, compare-and-set so two clicks can't lose a star): a **Big Star** row is added and Small Stars go back to 0. There is no Big Star limit.
+- **Big Stars** = rows in `crew_big_stars` (`earned_at`, `awarded_by_user_id` = who gave the 10th Small Star, `reason` = that star's reason, `source` `milestone`/`migration`). They are never deleted; removal sets `revoked_at`/`revoked_by_user_id`/`revoke_reason`. Count = rows with `revoked_at IS NULL` (`get_crew_big_stars`, `get_all_crew_star_rewards`). This is the basis for future bonus payments.
+- − on Small Stars stops at 0 and never touches Big Stars. Removing a Big Star is a separate owner action (`/staff/crew/<id>/star-points/remove-big`, confirm).
+- Reset (`/star-points/reset`, `confirm=1`): `scope=small` resets Small Stars only; `scope=all` resets Small and revokes all Big Stars. Both buttons have a confirm dialog. `db.reset_crew_star_points(..., scope="all")` is the function default (test baselines).
+- **History** `crew_star_point_events` (+ `big_stars_after`): `increment`/`decrement` (with reason), `milestone` ("Milestone reached: 10 Small Stars → 1 Big Star"), `big_star_removed`, `reset_small`, `reset_all`, `migration`, legacy `reset`. The portal shows the latest 50.
+- **Migration** (startup, idempotent `_migrate_star_points_to_big_stars`): any `star_points ≥ 10` becomes Big Stars + remainder (27 → 2 Big + 7 Small).
+- Display: individual header "⭐ STAR REWARDS" (Big Stars 🌟 large + "PROGRESS TO NEXT STAR ★★★☆… 7 / 10"); owner controls under the staff tabs; All Staff view shows an owner-only overview of everyone. Display and history are visible to any portal viewer; changes are **owner only**.
+- Deleting a crew member (only possible when no booking uses them) also deletes their star events and Big Stars.
 
 ---
 
@@ -392,6 +395,7 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 | Double booking | `test_truck_double_booking_e2e.py`, `test_phase14_double_booking_e2e.py` |
 | Calendar / weekly | `test_calendar_data_e2e.py`, `test_weekly_schedule_e2e.py`, `test_daily_jobs_e2e.py` |
 | Dashboard sections | `test_dashboard_payment_status_divider_e2e.py`, `test_dashboard_today_upcoming_divider_e2e.py`, `test_dashboard_wg_unpaid_e2e.py` (WG name matching, Regular vs WG split, no duplicates, oldest first, counts and totals, Paid leaves WG) |
+| Star Rewards (Cases A–G, migration, resets, Big Star removal, overview) | `test_star_rewards_e2e.py` (also passes on Postgres) |
 | Staff weekly PDF | `test_staff_weekly_pdf_e2e.py` (screen ↔ PDF job/paid match, sort, Sunday, overrides, break, 45-min call out, Extra Pay, no duplicates, long text/Japanese inside columns, year crossing, busy week) |
 | Postgres boot | `test_postgres_init_ddl_e2e.py`, `test_postgres_invoice_sequence_init.py` |
 | Furniture lists | `test_furniture_list_e2e.py` (m³ maths and no double count, volume sources/medians, legacy lists keep their m³, admin m³ change applies to new items only, admin page permissions/validation, save → re-edit → submit, photos and EXIF strip, cross-list isolation, office/staff access, website return link, auto-link from notes, rate limit). Passes on SQLite and Postgres |

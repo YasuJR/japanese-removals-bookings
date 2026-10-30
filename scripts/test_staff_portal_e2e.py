@@ -3080,30 +3080,25 @@ def test_star_points_adjust_bounds_and_isolation():
     assert db.get_crew_star_points(yasu_id) == 2
     assert db.get_crew_star_points(ken_id) == 0
 
-    for _ in range(8):
+    for _ in range(7):
         _post_star_adjust(owner, yasu_id, "increment")
-    assert db.get_crew_star_points(yasu_id) == 10
+    assert db.get_crew_star_points(yasu_id) == 9
+    # 10th Small Star → 1 Big Star, Small Stars back to 0 (Star Rewards, 2026-10-30)
     _post_star_adjust(owner, yasu_id, "increment")
-    assert db.get_crew_star_points(yasu_id) == 10
+    assert db.get_crew_star_points(yasu_id) == 0
+    assert db.get_crew_big_stars(yasu_id) == 1
 
     _post_star_adjust(owner, yasu_id, "decrement")
-    assert db.get_crew_star_points(yasu_id) == 9
-    for _ in range(9):
-        _post_star_adjust(owner, yasu_id, "decrement")
     assert db.get_crew_star_points(yasu_id) == 0
-    _post_star_adjust(owner, yasu_id, "decrement")
-    assert db.get_crew_star_points(yasu_id) == 0
+    assert db.get_crew_big_stars(yasu_id) == 1
 
     _post_star_adjust(owner, ken_id, "increment")
     assert db.get_crew_star_points(ken_id) == 1
     assert db.get_crew_star_points(yasu_id) == 0
 
     view = star_points.build_star_points_view(5)
-    assert view["stars_display"] == "⭐⭐⭐⭐⭐☆☆☆☆☆"
+    assert view["stars_display"] == "★★★★★☆☆☆☆☆"
     assert view["count_display"] == "5 / 10"
-    assert view["bonus_ready"] is False
-    bonus = star_points.build_star_points_view(10)
-    assert bonus["bonus_ready"] is True
 
     wednesday = perth_today()
     db.reset_crew_star_points(yasu_id)
@@ -3135,9 +3130,9 @@ def test_star_points_persist_after_reload_and_rename():
     html = owner.get(
         "/staff?staff_id={0}&range=week".format(crew_id)
     ).get_data(as_text=True)
-    assert "STAR POINTS" in html
+    assert "STAR REWARDS" in html
     assert "4 / 10" in html
-    assert "⭐⭐⭐⭐" in html
+    assert "★★★★☆" in html
 
     renamed = _unique("StarRenamed")
     assert db.rename_crew_member(crew_id, renamed) is True
@@ -3149,25 +3144,29 @@ def test_star_points_persist_after_reload_and_rename():
     _post_star_adjust(owner, crew_id, "increment")
     for _ in range(5):
         _post_star_adjust(owner, crew_id, "increment")
-    assert db.get_crew_star_points(crew_id) == 10
-    bonus_html = owner.get(
+    assert db.get_crew_star_points(crew_id) == 0
+    assert db.get_crew_big_stars(crew_id) == 1
+    big_html = owner.get(
         "/staff?staff_id={0}&range=week".format(crew_id)
     ).get_data(as_text=True)
-    assert "BONUS READY" in bonus_html
-    assert "10 / 10" in bonus_html
-    assert "data-reset-message" in bonus_html
+    assert "BIG STARS" in big_html and "staff-star-big-icons" in big_html
+    assert "0 / 10" in big_html
+    assert "data-reset-message" in big_html
 
+    _post_star_adjust(owner, crew_id, "increment")
+    _post_star_adjust(owner, crew_id, "increment")
     cancelled = _post_star_reset(owner, crew_id, confirm=False)
     assert cancelled.status_code == 200
-    assert db.get_crew_star_points(crew_id) == 10
+    assert db.get_crew_star_points(crew_id) == 2
 
-    _post_star_reset(owner, crew_id, confirm=True)
+    _post_star_reset(owner, crew_id, confirm=True)  # Reset Small Stars
     assert db.get_crew_star_points(crew_id) == 0
+    assert db.get_crew_big_stars(crew_id) == 1
     reset_html = owner.get(
         "/staff?staff_id={0}&range=week".format(crew_id)
     ).get_data(as_text=True)
     assert "0 / 10" in reset_html
-    assert "Reset Stars" in reset_html
+    assert "Reset Small Stars" in reset_html and "Reset All Star Rewards" in reset_html
     assert "disabled" in reset_html
     return True
 
@@ -3184,11 +3183,11 @@ def test_star_points_admin_only_and_viewer_sees_display():
     viewer_html = viewer.get(
         "/staff?staff_id={0}&range=week".format(yasu_id)
     ).get_data(as_text=True)
-    assert "STAR POINTS" in viewer_html
+    assert "STAR REWARDS" in viewer_html
     assert "3 / 10" in viewer_html
     assert "Edit name for" not in viewer_html
     assert "staff-star-admin-btn" not in viewer_html
-    assert "Reset Stars" not in viewer_html
+    assert "Reset Small Stars" not in viewer_html and "Remove 1 Big Star" not in viewer_html
 
     blocked = viewer.post(
         "/staff/crew/{0}/star-points/adjust".format(yasu_id),
@@ -3214,7 +3213,7 @@ def test_star_points_admin_only_and_viewer_sees_display():
     ).get_data(as_text=True)
     assert "Edit name for" in admin_html
     assert "staff-star-admin-btn" in admin_html
-    assert "Reset Stars" in admin_html
+    assert "Reset Small Stars" in admin_html and "Reset All Star Rewards" in admin_html
     assert admin_html.index("staff-star-admin") < admin_html.index("staff-portal-tabs")
     return True
 
@@ -3249,7 +3248,7 @@ def test_star_points_history_logs_reason_and_survives_reset():
     assert db.get_crew_star_points(yasu_id) == 0
     after_reset = db.list_crew_star_point_events(yasu_id)
     assert len(after_reset) >= 2
-    assert any(event["change_type"] == "reset" for event in after_reset)
+    assert any(event["change_type"] == "reset_small" for event in after_reset)
     return True
 
 

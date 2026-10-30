@@ -3,7 +3,7 @@
   <p class="staff-star-history-label">STAR POINTS HISTORY</p>
   <ul class="staff-star-history-list">
     {% for event in portal.star_points_history %}
-    <li class="staff-star-history-item">
+    <li class="staff-star-history-item{% if event.milestone %} staff-star-history-milestone{% endif %}">
       <p class="staff-star-history-date">{{ event.date_label }}</p>
       <p class="staff-star-history-change">{{ event.delta_label }}</p>
       {% if event.reason %}

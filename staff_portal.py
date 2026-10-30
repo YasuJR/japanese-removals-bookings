@@ -1510,15 +1510,31 @@ def build_staff_portal(
         except (TypeError, ValueError):
             crew_id = 0
         if crew_id:
-            star_points_view = star_points.build_star_points_view(
-                db.get_crew_star_points(crew_id)
+            star_points_view = star_points.build_star_rewards_view(
+                db.get_crew_star_points(crew_id), db.get_crew_big_stars(crew_id)
             )
             star_points_history = star_points.build_star_points_history_views(
                 db.list_crew_star_point_events(crew_id)
             )
 
+    star_overview: List[Dict[str, Any]] = []
+    if include_star_points and is_all_staff:
+        rewards = db.get_all_crew_star_rewards()
+        for member in roster:
+            try:
+                member_id = int(member.get("id"))
+            except (TypeError, ValueError):
+                continue
+            if not member_id:
+                continue
+            counts = rewards.get(member_id, {"small": 0, "big": 0})
+            star_overview.append(
+                {"name": member["name"], "id": member_id, **star_points.build_star_rewards_view(counts["small"], counts["big"])}
+            )
+
     return {
         "staff": staff,
+        "star_overview": star_overview,
         "staff_options": [member["name"] for member in roster],
         "staff_roster": roster,
         "selected_staff_id": selected_staff_id,

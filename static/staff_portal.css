@@ -2298,3 +2298,174 @@ a.staff-job-btn:active {
   border-color: #0f3b2e;
   grid-column: 1 / -1;
 }
+
+/* Star Rewards: Big Stars (10 Small Stars each) + progress to the next one */
+.staff-star-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin-top: 0.35rem;
+}
+
+.staff-star-sub {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.staff-star-big-row {
+  margin: 0.1rem 0 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.staff-star-big-icons,
+.staff-star-big-empty {
+  font-size: 1.9rem;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  filter: drop-shadow(0 0 4px rgba(255, 214, 76, 0.55));
+  word-break: break-all;
+}
+
+.staff-star-big-empty {
+  opacity: 0.25;
+  filter: grayscale(1);
+}
+
+.staff-star-big-more {
+  color: #ffd64c;
+  font-weight: 800;
+}
+
+.staff-star-big-count {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #ffd64c;
+  font-variant-numeric: tabular-nums;
+}
+
+.staff-star-admin-sub {
+  margin: 0.25rem 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.staff-star-admin-hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.staff-star-admin-big {
+  margin-top: 0.85rem;
+}
+
+.staff-star-admin-big-value {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.staff-star-reset-group {
+  margin-top: 0.85rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.staff-star-reset-all-btn {
+  border-color: rgba(188, 0, 45, 0.45);
+  color: #960024;
+}
+
+.staff-star-history-milestone {
+  background: rgba(255, 214, 76, 0.18);
+  border-radius: 6px;
+}
+
+.staff-star-overview {
+  margin: 0.85rem 0 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.staff-star-overview-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.staff-star-overview-list li {
+  display: grid;
+  grid-template-columns: minmax(4.5rem, 7rem) 3.6rem 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.staff-star-overview-name {
+  font-weight: 700;
+  color: var(--navy);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.staff-star-overview-big {
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.staff-star-overview-progress {
+  color: #e0a800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.staff-star-overview-count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Owner Small Star controls: fit phones (reason fields shrink, rows wrap) */
+.staff-star-admin-controls {
+  flex-wrap: wrap;
+}
+
+.staff-star-admin-form {
+  flex: 1 1 8.5rem;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.staff-star-admin-form .staff-star-reason-label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.staff-star-admin-form .staff-star-reason-label input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .staff-star-admin-value {
+    order: -1;
+    flex-basis: 100%;
+  }
+}

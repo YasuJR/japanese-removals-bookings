@@ -1,53 +1,69 @@
-<section class="staff-star-admin" aria-label="Star Points for {{ portal.staff }}">
-  <p class="staff-star-admin-label">STAR POINTS</p>
+{% set sp = portal.star_points %}
+<section class="staff-star-admin" aria-label="Star Rewards for {{ portal.staff }}">
+  <p class="staff-star-admin-label">STAR REWARDS</p>
+  <p class="staff-star-admin-sub">Small Stars</p>
   <div class="staff-star-admin-controls">
     <form id="staff-star-dec-form" class="staff-star-admin-form staff-star-admin-form-dec" method="post" action="{{ url_for('staff_portal_adjust_star_points', crew_id=portal.selected_staff_id) }}">
       <input type="hidden" name="action" value="decrement">
-      <input type="hidden" name="range" value="{{ portal.range }}">
-      <input type="hidden" name="week" value="{{ portal.week_offset }}">
-      <input type="hidden" name="staff_id" value="{{ portal.selected_staff_id }}">
-      {% if portal.calendar_year %}<input type="hidden" name="year" value="{{ portal.calendar_year }}">{% endif %}
-      {% if portal.calendar_month %}<input type="hidden" name="month" value="{{ portal.calendar_month }}">{% endif %}
-      {% if portal.calendar_day %}<input type="hidden" name="day" value="{{ portal.calendar_day }}">{% endif %}
+      {% include "_staff_star_nav_fields.html" %}
       <label class="staff-star-reason-label">
         Reason (optional)
-        <input type="text" name="reason" maxlength="200" placeholder="e.g. Great customer feedback">
+        <input type="text" name="reason" maxlength="200" placeholder="e.g. Correction">
       </label>
-      <button type="submit" class="staff-star-admin-btn"{% if portal.star_points.points <= 0 %} disabled{% endif %} aria-label="Remove one star">−</button>
+      <button type="submit" class="staff-star-admin-btn"{% if sp.small <= 0 %} disabled{% endif %} aria-label="Remove one Small Star">−</button>
     </form>
     <p class="staff-star-admin-value" aria-live="polite">
-      <span class="staff-star-admin-icons" aria-hidden="true">⭐</span>
-      {{ portal.star_points.points }} / {{ portal.star_points.max_points }}
+      <span class="staff-star-admin-icons" aria-hidden="true">★</span>
+      {{ sp.small }} / {{ sp.max_points }}
     </p>
     <form id="staff-star-inc-form" class="staff-star-admin-form staff-star-admin-form-inc" method="post" action="{{ url_for('staff_portal_adjust_star_points', crew_id=portal.selected_staff_id) }}">
       <input type="hidden" name="action" value="increment">
-      <input type="hidden" name="range" value="{{ portal.range }}">
-      <input type="hidden" name="week" value="{{ portal.week_offset }}">
-      <input type="hidden" name="staff_id" value="{{ portal.selected_staff_id }}">
-      {% if portal.calendar_year %}<input type="hidden" name="year" value="{{ portal.calendar_year }}">{% endif %}
-      {% if portal.calendar_month %}<input type="hidden" name="month" value="{{ portal.calendar_month }}">{% endif %}
-      {% if portal.calendar_day %}<input type="hidden" name="day" value="{{ portal.calendar_day }}">{% endif %}
+      {% include "_staff_star_nav_fields.html" %}
       <label class="staff-star-reason-label">
         Reason (optional)
         <input type="text" name="reason" maxlength="200" placeholder="e.g. Great customer feedback">
       </label>
-      <button type="submit" class="staff-star-admin-btn"{% if portal.star_points.points >= portal.star_points.max_points %} disabled{% endif %} aria-label="Add one star">＋</button>
+      <button type="submit" class="staff-star-admin-btn" aria-label="Add one Small Star">＋</button>
     </form>
   </div>
-  <form class="staff-star-reset-form" method="post" action="{{ url_for('staff_portal_reset_star_points', crew_id=portal.selected_staff_id) }}"
-        data-reset-message="Reset {{ portal.staff }}'s Star Points from {{ portal.star_points.points }} to 0?"
-        onsubmit="return confirm(this.dataset.resetMessage);">
-    <input type="hidden" name="confirm" value="1">
-    <input type="hidden" name="range" value="{{ portal.range }}">
-    <input type="hidden" name="week" value="{{ portal.week_offset }}">
-    <input type="hidden" name="staff_id" value="{{ portal.selected_staff_id }}">
-    {% if portal.calendar_year %}<input type="hidden" name="year" value="{{ portal.calendar_year }}">{% endif %}
-    {% if portal.calendar_month %}<input type="hidden" name="month" value="{{ portal.calendar_month }}">{% endif %}
-    {% if portal.calendar_day %}<input type="hidden" name="day" value="{{ portal.calendar_day }}">{% endif %}
-    <label class="staff-star-reason-label">
-      Reset reason (optional)
-      <input type="text" name="reason" maxlength="200">
-    </label>
-    <button type="submit" class="staff-star-reset-btn"{% if portal.star_points.points <= 0 %} disabled{% endif %}>Reset Stars</button>
-  </form>
+  {% if sp.small == sp.max_points - 1 %}<p class="staff-star-admin-hint">The next ＋ turns 10 Small Stars into 1 Big Star 🌟.</p>{% endif %}
+
+  <div class="staff-star-admin-big">
+    <p class="staff-star-admin-sub">Big Stars</p>
+    <p class="staff-star-admin-big-value"><span aria-hidden="true">🌟</span> × {{ sp.big }}</p>
+    <form class="staff-star-big-remove-form" method="post" action="{{ url_for('staff_portal_remove_big_star', crew_id=portal.selected_staff_id) }}"
+          data-confirm-message="Remove 1 Big Star from {{ portal.staff }}? ({{ sp.big }} → {{ sp.big - 1 if sp.big else 0 }})"
+          onsubmit="return confirm(this.dataset.confirmMessage);">
+      <input type="hidden" name="confirm" value="1">
+      {% include "_staff_star_nav_fields.html" %}
+      <label class="staff-star-reason-label">
+        Reason (optional)
+        <input type="text" name="reason" maxlength="200">
+      </label>
+      <button type="submit" class="staff-star-reset-btn"{% if not sp.big %} disabled{% endif %}>Remove 1 Big Star</button>
+    </form>
+  </div>
+
+  <div class="staff-star-reset-group">
+    <form class="staff-star-reset-form" method="post" action="{{ url_for('staff_portal_reset_star_points', crew_id=portal.selected_staff_id) }}"
+          data-reset-message="Reset {{ portal.staff }}'s Small Stars from {{ sp.small }} to 0? Big Stars ({{ sp.big }}) stay."
+          onsubmit="return confirm(this.dataset.resetMessage);">
+      <input type="hidden" name="confirm" value="1">
+      <input type="hidden" name="scope" value="small">
+      {% include "_staff_star_nav_fields.html" %}
+      <label class="staff-star-reason-label">
+        Reset reason (optional)
+        <input type="text" name="reason" maxlength="200">
+      </label>
+      <button type="submit" class="staff-star-reset-btn"{% if sp.small <= 0 %} disabled{% endif %}>Reset Small Stars</button>
+    </form>
+    <form class="staff-star-reset-form staff-star-reset-all-form" method="post" action="{{ url_for('staff_portal_reset_star_points', crew_id=portal.selected_staff_id) }}"
+          data-reset-message="Reset ALL Star Rewards for {{ portal.staff }}? Big Stars {{ sp.big }} → 0 and Small Stars {{ sp.small }} → 0. This cannot be undone from here."
+          onsubmit="return confirm(this.dataset.resetMessage);">
+      <input type="hidden" name="confirm" value="1">
+      <input type="hidden" name="scope" value="all">
+      {% include "_staff_star_nav_fields.html" %}
+      <button type="submit" class="staff-star-reset-btn staff-star-reset-all-btn"{% if sp.small <= 0 and not sp.big %} disabled{% endif %}>Reset All Star Rewards</button>
+    </form>
+  </div>
 </section>
