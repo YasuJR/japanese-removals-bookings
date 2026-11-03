@@ -1,0 +1,30 @@
+{# Staff Portal job card: furniture list summary (read only). `job` = portal job with `furniture` from furniture_lists.attach_staff_links. Item lines load on tap. #}
+{% if job.furniture is defined %}
+{% set fl = job.furniture %}
+<section class="staff-furniture{% if not fl %} staff-furniture-empty{% endif %}">
+  {% if fl %}
+  <p class="staff-furniture-head">
+    <span class="staff-furniture-kicker">Furniture</span>
+    <strong class="staff-furniture-count">{{ fl.item_count }} item{{ '' if fl.item_count == 1 else 's' }}</strong>
+    {% if fl.estimated_m3 %}<span class="staff-furniture-m3">~{{ '%.1f'|format(fl.estimated_m3) }} m³</span>{% endif %}
+    {% if fl.changes_count %}<span class="staff-furniture-updated">Updated</span>{% endif %}
+    {% if fl.status != 'submitted' %}<span class="staff-furniture-status">{{ fl.status_label }}</span>{% endif %}
+  </p>
+  {% if fl.categories %}
+  <ul class="staff-furniture-cats">
+    {% for label, qty in fl.categories %}<li>{{ label }}: <strong>{{ qty }}</strong></li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% if fl.has_notes %}<p class="staff-furniture-hasnote">Has furniture note</p>{% endif %}
+  <details class="staff-furniture-details" data-panel-url="{{ url_for('staff_furniture_panel', token=fl.token) }}">
+    <summary class="staff-job-btn staff-furniture-toggle"><span class="staff-furniture-open-label">View Furniture List</span><span class="staff-furniture-close-label">Hide Furniture List</span></summary>
+    <div class="staff-furniture-panel" aria-live="polite">
+      <p class="staff-furniture-loading">Loading… <a href="{{ url_for('staff_furniture_list', token=fl.token) }}">Open the list</a></p>
+    </div>
+  </details>
+  <a class="staff-job-btn staff-furniture-pdf" href="{{ url_for('staff_furniture_pdf', token=fl.token) }}" target="_blank" rel="noopener">View Furniture PDF</a>
+  {% else %}
+  <p class="staff-furniture-none"><span class="staff-furniture-kicker">Furniture List:</span> Not submitted</p>
+  {% endif %}
+</section>
+{% endif %}

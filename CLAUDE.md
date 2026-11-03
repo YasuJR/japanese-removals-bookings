@@ -70,7 +70,7 @@ Auth key: **P** public · **L** `login_required` (office) · **A** `admin_requir
 | Calendar (L) | `/calendar`, `/calendar/daily/<date_iso>`, `/calendar/weekly[/<date_iso>]`, `/calendar/weekly/<date_iso>/schedule.pdf` |
 | Bookings (L) | `/bookings/new`, `/bookings/search` (also matches `INV56`, `inv 56`, `56`, `INV-56`), `/bookings/export.csv`, `/bookings/upcoming`, `/bookings/all`, `/bookings/<id>`, `/bookings/<id>/edit`, `/bookings/<id>/payment` POST, `/bookings/<id>/status` POST, `/bookings/<id>/delete`, `/bookings/<id>/job-sheet.pdf`, `/bookings/<id>/actual-times` POST (**O**) |
 | Invoice (L) | `/bookings/invoice/preview-calculate` POST, `/bookings/<id>/invoice/calculate` POST, `/bookings/<id>/invoice/preview`, `/bookings/<id>/invoice.pdf` (served as attachment for iOS share), `/bookings/<id>/stripe/checkout` POST, `/bookings/<id>/stripe/success` |
-| Staff Portal | `/staff/login`, `/staff/logout` P · `/staff` S · `/staff/weekly/schedule.pdf` S · `/staff/crew/<id>/rename` O · `/staff/crew/<id>/star-points/adjust` O · `/staff/crew/<id>/star-points/reset` O · `/staff/bookings/<id>/edit` O |
+| Staff Portal | `/staff/login`, `/staff/logout` P · `/staff` S · `/staff/weekly/schedule.pdf` S · `/staff/furniture/<signed>[/panel|/list.pdf|/photos/<id>]` S · `/staff/crew/<id>/rename` O · `/staff/crew/<id>/star-points/adjust` O · `/staff/crew/<id>/star-points/reset` O · `/staff/bookings/<id>/edit` O |
 
 When adding a route: put it in `app.py` near its area, use the right decorator, and run `scripts/test_navigation_e2e.py`. `app.py __main__` asserts key endpoints exist.
 
@@ -254,6 +254,13 @@ Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out 
   - `public_id` is a reference only; only office users can open a list by it.
   - Office routes (`/furniture-lists…`, `/bookings/<id>/furniture…`) are `login_required`.
   - Staff open `/staff/furniture/<signed>`, a 30-day itsdangerous token per booking. It is added to Staff Portal job cards (`attach_staff_links`) only when the list has content.
+- **Staff Portal job cards (2026-11-03, read only):** every job card (Today, Weekly, Calendar month/week detail, History, Individual and All Staff, incl. the All Staff weekly grid) has a FURNITURE block (`_staff_furniture.html`).
+  - `furniture_lists.attach_staff_links(jobs)` loads all the page's lists in **one** query and gives each job `furniture` = `None` ("Furniture List: Not submitted": no list, not started or empty) or counts only: items, ~m³, `CARD_CATEGORIES` (Beds / Mattresses / Sofas / Fridges / Washers / TVs / Wardrobes / Boxes, grouped from catalogue keys), "Updated", "Has furniture note".
+  - Item lines are **not** in the page. "View Furniture List" (a `<details>`) fetches `/staff/furniture/<signed>/panel` (S, `no-store`) once via `static/staff_furniture.js`: LARGE ITEMS, rooms → "Item × qty", Other items, removed lines, FURNITURE NOTE (customer notes, separate from the job note), photo link. Changes after the first submission are yellow (`changes` from `baseline_json`).
+  - **Large items** use only size data already in the list: the stored per-item m³ ≥ `LARGE_ITEM_M3` (1.0), an "Other item" whose L×W×H gives ≥ 1.0 m³, or the catalogue's "Heavy item" hint (piano, treadmill). No separate large-item data.
+  - "View Furniture PDF" = the existing `/staff/furniture/<signed>/list.pdf` (inline), rendered only when tapped, never on portal page views.
+  - No edit controls (Customer/Admin flows unchanged). `furniture_lists.staff_can_view(booking, viewer_crew_name=None)` is the single hook the panel route checks: today everyone in the portal may view; with per-staff logins, pass the crew name to limit lists to that person's jobs.
+  - The office weekly schedule shares `_weekly_schedule_days.html` but its jobs have no `furniture` key, so it shows nothing.
   - Public pages send `no-store`, `noindex` and `no-referrer`.
 - **m³** is an *estimate* of truck load volume only. Beds come as "bed + mattress", "frame only" or "mattress only" (mutually exclusive), so nothing is counted twice. Custom items count only when L×W×H are all given. It never sets price or time.
 - **Standard m³ sources** (`furniture_volume_refs.py`, reviewed 2026-10-27):
@@ -398,6 +405,7 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 | Star Rewards (Cases A–G, migration, resets, Big Star removal, overview) | `test_star_rewards_e2e.py` (also passes on Postgres) |
 | Staff weekly PDF | `test_staff_weekly_pdf_e2e.py` (screen ↔ PDF job/paid match, sort, Sunday, overrides, break, 45-min call out, Extra Pay, no duplicates, long text/Japanese inside columns, year crossing, busy week) |
 | Postgres boot | `test_postgres_init_ddl_e2e.py`, `test_postgres_invoice_sequence_init.py` |
+| Staff Portal furniture (card summary, Not submitted, 50+ items, latest/yellow, Individual/All Staff views, PDF, read only, one query) | `test_staff_furniture_e2e.py` (also passes on Postgres) |
 | Furniture lists | `test_furniture_list_e2e.py` (m³ maths and no double count, volume sources/medians, legacy lists keep their m³, admin m³ change applies to new items only, admin page permissions/validation, save → re-edit → submit, photos and EXIF strip, cross-list isolation, office/staff access, website return link, auto-link from notes, rate limit). Passes on SQLite and Postgres |
 | Misc | `test_booking_cancel_e2e.py`, `test_mover_pricing_e2e.py`, `test_payment_sets_completed_e2e.py`, `test_navigation_e2e.py`, `test_search_invoice_number_e2e.py`, `test_job_note_display_e2e.py` |
 

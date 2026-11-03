@@ -2469,3 +2469,58 @@ a.staff-job-btn:active {
     flex-basis: 100%;
   }
 }
+
+/* ---- Furniture list on job cards (read only; panel loads on tap) ---- */
+.staff-furniture {
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #cfd9e6;
+  border-left: 3px solid #2f6f5e;
+  border-radius: 8px;
+  background: #f4f8f6;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.staff-furniture-empty { background: transparent; border-style: dashed; border-left-style: solid; padding: 0.5rem 0.8rem; }
+.staff-furniture-none { margin: 0; font-size: 0.95rem; color: #5b6676; }
+.staff-furniture-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.6rem; margin: 0; font-size: 1rem; }
+.staff-furniture-kicker { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #2f6f5e; }
+.staff-furniture-count { font-size: 1.05rem; color: var(--navy); }
+.staff-furniture-m3 { font-size: 0.9rem; color: #5b6676; }
+.staff-furniture-updated { font-size: 0.78rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 999px; background: #fff3a3; color: #6b5300; }
+.staff-furniture-status { font-size: 0.78rem; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 999px; background: #e7ecf3; color: #45556b; }
+.staff-furniture-cats { display: flex; flex-wrap: wrap; gap: 0.3rem 0.45rem; list-style: none; margin: 0.45rem 0 0; padding: 0; }
+.staff-furniture-cats li { font-size: 0.92rem; padding: 0.15rem 0.5rem; border-radius: 6px; background: #fff; border: 1px solid #dbe3ec; }
+.staff-furniture-hasnote { margin: 0.4rem 0 0; font-size: 0.88rem; font-weight: 700; color: #6a4a8c; }
+.staff-furniture-details { margin-top: 0.55rem; }
+.staff-furniture-details > summary { list-style: none; min-height: 44px; cursor: pointer; }
+.staff-furniture-details > summary::-webkit-details-marker { display: none; }
+.staff-furniture-close-label { display: none; }
+.staff-furniture-details[open] > summary .staff-furniture-open-label { display: none; }
+.staff-furniture-details[open] > summary .staff-furniture-close-label { display: inline; }
+.staff-furniture .staff-furniture-pdf { margin-top: 0.45rem; min-height: 44px; }
+.staff-furniture-panel { margin-top: 0.6rem; }
+.staff-furniture-loading, .staff-furniture-muted { font-size: 0.92rem; color: #5b6676; margin: 0.3rem 0; }
+.staff-furniture-body h4 { margin: 0.7rem 0 0.3rem; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--navy); }
+.staff-furniture-body h5 { margin: 0.55rem 0 0.2rem; font-size: 0.95rem; font-weight: 800; color: #2f6f5e; }
+.staff-furniture-body ul { list-style: none; margin: 0; padding: 0; }
+.staff-furniture-body li { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; padding: 0.3rem 0.4rem; font-size: 0.97rem; line-height: 1.35; border-bottom: 1px solid #e3e9ef; }
+.staff-furniture-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.staff-furniture-name small { color: #5b6676; }
+.staff-furniture-item-note { display: block; }
+.staff-furniture-qty { flex: 0 0 auto; font-weight: 800; white-space: nowrap; }
+.staff-furniture-large { padding: 0.15rem 0.5rem 0.4rem; border-radius: 8px; background: #fdecea; border: 1px solid #f3c7c1; }
+.staff-furniture-large h4 { color: #a3261b; }
+.staff-furniture-hl, .staff-furniture-body li.staff-furniture-hl { background: #fff3a3; }
+.staff-furniture-legend { margin: 0 0 0.3rem; font-size: 0.85rem; color: #5b6676; }
+.staff-furniture-legend .staff-furniture-hl { padding: 0 0.3rem; border-radius: 4px; color: #6b5300; font-weight: 700; }
+.staff-furniture-was { display: block; font-style: normal; font-size: 0.8rem; font-weight: 700; color: #6b5300; }
+.staff-furniture-removed .staff-furniture-name { text-decoration: line-through; text-decoration-color: #8a6d00; }
+.staff-furniture-note { margin-top: 0.7rem; padding: 0.15rem 0.7rem 0.55rem; border-radius: 8px; background: #f3eefa; border: 1px solid #ddd0ee; border-left: 3px solid #6a4a8c; }
+.staff-furniture-note h4 { color: #6a4a8c; }
+.staff-furniture-note p { margin: 0; font-size: 0.97rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.staff-furniture-photos { margin: 0.6rem 0 0; font-size: 0.92rem; }
+.weekly-job .staff-furniture { margin: 0.5rem 0.6rem 0.6rem; }

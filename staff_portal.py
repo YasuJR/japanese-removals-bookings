@@ -481,6 +481,7 @@ def _calendar_job_card(job: Dict[str, Any]) -> Dict[str, Any]:
         "delivery_map_url": job.get("delivery_map_url") or "",
         "furniture_token": job.get("furniture_token") or "",
         "furniture_status": job.get("furniture_status") or "",
+        "furniture": job.get("furniture"),
         "job": job,
     }
 
@@ -997,6 +998,7 @@ def _owner_weekly_job_from_portal(job: Dict[str, Any]) -> Dict[str, Any]:
         "extra_pay_hours_label": job.get("extra_pay_hours_label") or "",
         "paid_hours": job.get("paid_hours"),
         "paid_hours_display": job.get("paid_hours_display") or "—",
+        "furniture": job.get("furniture"),
     }
 
 

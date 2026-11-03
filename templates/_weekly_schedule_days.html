@@ -33,6 +33,7 @@
         {% else %}
         </div>
         {% endif %}
+        {% if job.furniture is defined %}{% include "_staff_furniture.html" %}{% endif %}
       </article>
       {% endfor %}
     </div>

@@ -617,16 +617,124 @@ def booking_id_from_staff_token(token: Any) -> Optional[int]:
         return None
 
 
+# Card summary categories (display grouping of existing catalogue keys, in this order).
+CARD_CATEGORIES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
+    ("Beds", ("bed_", "bunk_bed", "cot")),
+    ("Mattresses", ("mattress_",)),
+    ("Sofas", ("sofa_",)),
+    ("Fridges", ("fridge_", "bar_fridge", "freezer")),
+    ("Washers / dryers", ("washing_machine", "dryer")),
+    ("TVs", ("tv_small", "tv_large")),
+    ("Wardrobes", ("wardrobe_",)),
+    ("Boxes", ("box_",)),
+)
+# "Large items" uses only size data the list already has: the m³ stored per item
+# (or, for "Other items", the customer's L×W×H) at or above this, or the
+# catalogue's own "Heavy item" hint (piano, treadmill).
+LARGE_ITEM_M3 = 1.0
+
+
+def _category_for(key: str) -> Optional[str]:
+    for label, prefixes in CARD_CATEGORIES:
+        if any(key == p or key.startswith(p) for p in prefixes):
+            return label
+    return None
+
+
+def staff_can_view(booking: Any, viewer_crew_name: Optional[str] = None) -> bool:
+    """Who may see a booking's furniture list in the Staff Portal.
+
+    Today every portal viewer may (the portal itself shows every job). When staff
+    get individual logins, pass the logged-in crew name to limit it to their jobs.
+    """
+    if viewer_crew_name is None:
+        return True
+    crew = [name.strip().lower() for name in str(dict(booking or {}).get("crew") or "").split(",")]
+    return viewer_crew_name.strip().lower() in crew
+
+
+def staff_card_summary(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Short summary for a Staff Portal job card (counts only, no item lines)."""
+    summary = catalog.summarize(row["content"])
+    counts: Dict[str, int] = {}
+    for room in summary["rooms"]:
+        for line in room["lines"]:
+            label = _category_for(line["key"])
+            if label:
+                counts[label] = counts.get(label, 0) + line["qty"]
+    categories = [(label, counts[label]) for label, _p in CARD_CATEGORIES if counts.get(label)]
+    return {
+        "item_count": summary["item_count"],
+        "estimated_m3": summary["estimated_m3"],
+        "categories": categories,
+        "has_notes": bool(summary["notes"].strip()),
+        "changes_count": int((row.get("changes") or {}).get("count") or 0),
+        "photo_count": int(row.get("photo_count") or 0),
+    }
+
+
+def staff_detail(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Full read-only list for the Staff Portal: rooms, large items, notes, changes."""
+    summary = catalog.annotate_changes(catalog.summarize(row["content"]), row["changes"])
+    large: List[Dict[str, Any]] = []
+    for room in summary["rooms"]:
+        for line in room["lines"]:
+            heavy = "heavy" in catalog.ITEMS[line["key"]][2].lower()
+            if heavy or line["unit_m3"] >= LARGE_ITEM_M3:
+                large.append({"label": line["label"], "qty": line["qty"], "room": room["label"], "changed": line.get("changed")})
+    for item in summary["custom_items"]:
+        if item["m3"] is not None and item["m3"] / max(item["qty"], 1) >= LARGE_ITEM_M3:
+            large.append({"label": item["name"], "qty": item["qty"], "room": item["room"], "changed": item.get("changed")})
+    summary["large_items"] = large
+    return summary
+
+
 def attach_staff_links(jobs: List[Dict[str, Any]]) -> None:
-    """Add furniture_token / furniture_status to Staff Portal jobs that have a list."""
-    lists = map_for_bookings(job.get("id") for job in jobs)
+    """Add furniture data to Staff Portal jobs in ONE query for all of them.
+
+    Every job gets ``furniture`` (``None`` = not submitted, else a card summary);
+    jobs with a list also keep ``furniture_token`` / ``furniture_status`` /
+    ``furniture_m3``. Item lines are not built here: the card loads them on tap
+    (``/staff/furniture/<token>/panel``).
+    """
+    ids = sorted({int(job["id"]) for job in jobs if str(job.get("id") or "").isdigit()})
+    rows: Dict[int, Dict[str, Any]] = {}
+    if ids:
+        placeholders = ",".join("?" for _ in ids)
+        with db.get_connection() as conn:
+            found = conn.execute(
+                "SELECT {0} FROM furniture_lists WHERE booking_id IN ({1}) ORDER BY id".format(
+                    _LIST_COLUMNS, placeholders
+                ),
+                tuple(ids),
+            ).fetchall()
+        for raw in found:
+            bid = int(dict(raw)["booking_id"])
+            if bid not in rows:
+                rows[bid] = raw
+    tokens: Dict[int, str] = {}
     for job in jobs:
-        found = lists.get(int(job.get("id") or 0))
-        if not found or found.get("status") == STATUS_NOT_STARTED:
+        job["furniture"] = None
+        bid = int(job.get("id") or 0)
+        raw = rows.get(bid)
+        if raw is None:
             continue
-        job["furniture_token"] = staff_link_token(int(job["id"]))
-        job["furniture_status"] = found["status_label"]
-        job["furniture_m3"] = float(found.get("estimated_m3") or 0)
+        if isinstance(raw, dict) and "content" in raw:
+            row = raw
+        else:
+            row = _row_dict(raw)
+            rows[bid] = row
+        if row.get("status") == STATUS_NOT_STARTED or not catalog.has_content(row["content"]):
+            continue
+        if bid not in tokens:
+            tokens[bid] = staff_link_token(bid)
+        job["furniture_token"] = tokens[bid]
+        job["furniture_status"] = row["status_label"]
+        job["furniture_m3"] = float(row.get("estimated_m3") or 0)
+        card = staff_card_summary(row)
+        card.update({"token": tokens[bid], "status": row["status"], "status_label": row["status_label"],
+                     "updated_display": row["updated_display"]})
+        job["furniture"] = card
 
 
 # ---------------------------------------------------------------- view model

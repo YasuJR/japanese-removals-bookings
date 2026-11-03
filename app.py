@@ -3010,6 +3010,25 @@ def staff_furniture_list(token):
     return _furniture_private(response)
 
 
+@app.route("/staff/furniture/<token>/panel", endpoint="staff_furniture_panel")
+@staff_auth.staff_login_required
+def staff_furniture_panel(token):
+    """Read-only furniture list fragment, loaded when a job card's "View Furniture List" opens."""
+    booking, row = _staff_furniture_row(token)
+    if not row or not furniture_lists.staff_can_view(booking):
+        return _furniture_private(app.make_response(("Furniture list not found.", 404)))
+    response = app.make_response(
+        render_template(
+            "_staff_furniture_panel.html",
+            token=token,
+            row=row,
+            summary=furniture_lists.staff_detail(row),
+            photo_count=int(row.get("photo_count") or 0),
+        )
+    )
+    return _furniture_private(response)
+
+
 @app.route("/staff/furniture/<token>/list.pdf", endpoint="staff_furniture_pdf")
 @staff_auth.staff_login_required
 def staff_furniture_pdf(token):

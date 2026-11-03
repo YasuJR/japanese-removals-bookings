@@ -1,0 +1,66 @@
+{# Lazy-loaded furniture list for a Staff Portal job card. Read only. Needs `summary` (furniture_lists.staff_detail), `row`, `token`, `photo_count`. #}
+<div class="staff-furniture-body">
+  {% set changes = summary.changes %}
+  {% if changes and changes.active and changes.count %}
+  <p class="staff-furniture-legend"><span class="staff-furniture-hl">Yellow</span> = changed after the first submission{% if row.baseline_display %} ({{ row.baseline_display }}){% endif %}{% if row.updated_display %} · updated {{ row.updated_display }}{% endif %}</p>
+  {% endif %}
+
+  {% if summary.large_items %}
+  <div class="staff-furniture-block staff-furniture-large">
+    <h4>Large items</h4>
+    <ul>
+      {% for item in summary.large_items %}
+      <li{% if item.changed %} class="staff-furniture-hl"{% endif %}><span class="staff-furniture-name">{{ item.label }}</span><span class="staff-furniture-qty">× {{ item.qty }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <h4 class="staff-furniture-title">Furniture list</h4>
+  {% for room in summary.rooms %}
+  <div class="staff-furniture-block">
+    <h5>{{ room.label }}</h5>
+    <ul>
+      {% for line in room.lines %}
+      <li{% if line.changed %} class="staff-furniture-hl"{% endif %}><span class="staff-furniture-name">{{ line.label }}{% if line.changed %} <em class="staff-furniture-was">{% if line.before_qty %}was × {{ line.before_qty }}{% else %}added{% endif %}</em>{% endif %}</span><span class="staff-furniture-qty">× {{ line.qty }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+
+  {% if summary.custom_items %}
+  <div class="staff-furniture-block">
+    <h5>Other items</h5>
+    <ul>
+      {% for item in summary.custom_items %}
+      <li{% if item.changed %} class="staff-furniture-hl"{% endif %}><span class="staff-furniture-name">{{ item.name }}{% if item.room %} <small>· {{ item.room }}</small>{% endif %}{% if item.dims %} <small>· {{ item.dims }}</small>{% endif %}{% if item.note %}<small class="staff-furniture-item-note">{{ item.note }}</small>{% endif %}</span><span class="staff-furniture-qty">× {{ item.qty }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if not summary.rooms and not summary.custom_items %}
+  <p class="staff-furniture-muted">No items listed.</p>
+  {% endif %}
+
+  {% if changes and (changes.removed or changes.removed_custom) %}
+  <div class="staff-furniture-block">
+    <h5>Removed since first submission</h5>
+    <ul>
+      {% for item in changes.removed %}<li class="staff-furniture-hl staff-furniture-removed"><span class="staff-furniture-name">{{ item.label }} <small>· {{ item.room }}</small></span><span class="staff-furniture-qty">× {{ item.qty }}</span></li>{% endfor %}
+      {% for item in changes.removed_custom %}<li class="staff-furniture-hl staff-furniture-removed"><span class="staff-furniture-name">{{ item.name }}</span><span class="staff-furniture-qty">× {{ item.qty }}</span></li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if summary.notes %}
+  <div class="staff-furniture-note{% if changes and changes.notes_changed %} staff-furniture-hl{% endif %}">
+    <h4>Furniture note</h4>
+    <p>{{ summary.notes }}</p>
+  </div>
+  {% endif %}
+
+  {% if photo_count %}
+  <p class="staff-furniture-photos"><a href="{{ url_for('staff_furniture_list', token=token) }}">Customer photos ({{ photo_count }}) — open full list</a></p>
+  {% endif %}
+</div>
