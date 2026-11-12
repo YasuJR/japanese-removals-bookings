@@ -109,11 +109,9 @@ def parse_form(form: Any, *, start_time: str = "", finish_time: str = "") -> Tup
                 "Additional work period: there is no standard rate for {0} movers — enter the hourly rate.".format(movers)
             )
 
-    p1_finish = normalize_time_input(finish_time)
-    p1_start = normalize_time_input(start_time)
-    if start and p1_finish and p1_start and not errors:
-        if duration_hours_from_times(p1_start, p1_finish) is not None and duration_hours_from_times(start, p1_finish) is not None:
-            errors.append("Additional work period must start at or after the Period 1 finish time (no overlap).")
+    # Period 2 may overlap Period 1 (fully or partly): extra staff can join mid-job,
+    # or the same hours can be billed for a different crew size. Each period is still
+    # its own labour line; start_time/finish_time are kept for callers' signature.
 
     return {
         "work_period_2_start": start,

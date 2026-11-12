@@ -295,9 +295,8 @@ def test_forms_without_section_keep_period_two_and_validation():
     client.post("/bookings/{0}/edit".format(bid), data=form)
     assert dict(db.get_booking(bid))["work_period_2_start"] == "12:00", "Period 2 must not be cleared"
 
-    # Validation: overlap with Period 1, finish before start, missing rate for a non-standard size
+    # Validation: finish before start, missing rate for a non-standard size
     for bad, message in (
-        (_period_two_form(start="11:00"), "no overlap"),
         (_period_two_form(start="15:00", finish="13:00"), "finish time must be after start"),
         (_period_two_form(movers="5"), "no standard rate for 5 movers"),
     ):
@@ -306,6 +305,38 @@ def test_forms_without_section_keep_period_two_and_validation():
     # Non-standard size works with a typed rate
     _save(client, bid, **_period_two_form(movers="5", rate="400"))
     assert _totals(bid)["labour_amount"] == round(4 * RATE_3 + 3 * 400, 2)
+    return True
+
+
+def test_overlapping_periods_save_and_bill_separately():
+    """Cases A–E (2026-11-12): Period 2 may overlap Period 1; only finish > start is checked."""
+    import validators
+
+    client = _client()
+    for p2_start, p2_finish, p2_hours in (("08:15", "10:15", 2.0), ("08:00", "10:15", 2.25), ("09:00", "12:00", 3.0)):
+        bid = _booking(movers=1, start="08:00", finish="10:15", rate=55, callout_minutes=30)
+        form = _period_two_form(start=p2_start, finish=p2_finish, movers="1", rate="55")
+        _, errors = validators.parse_booking_form(_form(bid, callout_minutes="30", **form))
+        assert not errors, (p2_start, p2_finish, errors)
+        _save(client, bid, callout_minutes="30", **form)
+        row = dict(db.get_booking(bid))
+        assert (row["work_period_2_start"], row["work_period_2_finish"]) == (p2_start, p2_finish)
+        totals = _totals(bid)
+        assert [line["amount"] for line in totals["labour_lines"]] == [round(55 * 2.25, 2), round(55 * p2_hours, 2)]
+        assert totals["labour_amount"] == round(55 * 2.25 + 55 * p2_hours, 2)
+        assert totals["callout_fee"] == round(55 * 30 / 60, 2), "call-out fee once for the job"
+        assert totals["labour_gross"] == round(55 * 2.25 + 55 * p2_hours + 55 * 0.5, 2)
+
+    # Case D: Period 2 finish before start is still rejected
+    bid = _booking(movers=1, start="08:00", finish="10:15", rate=55)
+    _, errors = validators.parse_booking_form(_form(bid, **_period_two_form(start="10:15", finish="08:00", movers="1", rate="55")))
+    assert any("finish time must be after start" in e for e in errors), errors
+    assert not dict(db.get_booking(bid))["work_period_2_start"]
+
+    # Case E: no Period 2 — single labour line as before
+    _save(client, bid)
+    totals = _totals(bid)
+    assert len(totals["labour_lines"]) == 1 and totals["labour_amount"] == round(55 * 2.25, 2)
     return True
 
 
@@ -326,6 +357,7 @@ def main():
         test_case_e_break_priced_by_period,
         test_case_f_existing_booking_and_saved_actuals_untouched,
         test_forms_without_section_keep_period_two_and_validation,
+        test_overlapping_periods_save_and_bill_separately,
         test_period_two_helpers,
     ]
     passed = 0
