@@ -9,7 +9,7 @@ it as WG:
 - customer_name = "WG - <customer>", so the existing name-based WG checks
   (Dashboard WG OUTDOOR LIFE unpaid section) and every list show it as WG
 - wg_products (multi-line, kept as typed), wg_reference ("REX 3277"),
-  wg_payment_amount, wg_payment_type (COD / Confirmed / Invoice / Other)
+  wg_payment_amount, wg_payment_type (COD / Confirmed / Invoice / Other, or WG's own word such as "YASU")
 
 The payment amount is the invoice total: hourly_rate 0 plus one extra charge
 "WG Outdoor Life delivery — <reference>" (see invoice_labour_lines, which drops
@@ -40,7 +40,8 @@ SOURCE = wg_jobs.WG_ORDER_SOURCE
 NAME_PREFIX = "WG - "
 PICKUP_LABEL = "WG Outdoor Life"
 CHARGE_PREFIX = "WG Outdoor Life delivery"
-PAYMENT_TYPES = ("COD", "Confirmed", "Invoice", "Other")
+PAYMENT_TYPES = ("COD", "Confirmed", "Invoice", "Other")  # suggestions; WG also writes e.g. "YASU"
+PAYMENT_TYPE_MAX = 30
 DEFAULT_STATUS = "Confirmed"
 FORM_PREFIX = "orders"
 
@@ -103,6 +104,15 @@ def empty_order(move_date: str = "") -> Dict[str, Any]:
     return order
 
 
+def normalize_payment_type(value: Any) -> str:
+    """"cod" → "COD", "confirmed" → "Confirmed"; other words (e.g. "YASU") kept as written."""
+    text = " ".join(str(value or "").split())
+    for known in PAYMENT_TYPES:
+        if text.lower() == known.lower():
+            return known
+    return text
+
+
 def _float(value: Any) -> Optional[float]:
     text = str(value or "").replace("$", "").replace(",", "").strip()
     if not text:
@@ -129,7 +139,7 @@ def clean_order(raw: Dict[str, Any]) -> Dict[str, Any]:
         "phone": str(raw.get("phone") or "").strip(),
         "payment_amount": _float(raw.get("payment_amount")),
         "payment_amount_raw": str(raw.get("payment_amount") or "").strip(),
-        "payment_type": str(raw.get("payment_type") or "").strip(),
+        "payment_type": normalize_payment_type(raw.get("payment_type")),
         "reference": " ".join(str(raw.get("reference") or "").split()),
         "notes": str(raw.get("notes") or "").replace("\r\n", "\n").strip(),
         "crew": [name for name in crew if name in allowed],
@@ -195,8 +205,8 @@ def validate(order: Dict[str, Any]) -> List[str]:
         errors.append("Payment amount must be a number.")
     elif order["payment_amount"] is not None and order["payment_amount"] < 0:
         errors.append("Payment amount can't be negative.")
-    if order["payment_type"] and order["payment_type"] not in PAYMENT_TYPES:
-        errors.append("Payment type must be one of: {0}.".format(", ".join(PAYMENT_TYPES)))
+    if len(order["payment_type"]) > PAYMENT_TYPE_MAX:
+        errors.append("Payment type is too long (max {0} characters).".format(PAYMENT_TYPE_MAX))
     return errors
 
 

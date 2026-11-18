@@ -2805,7 +2805,7 @@ def _wg_date_arg(value):
         return perth_today().isoformat()
 
 
-def _render_wg_orders(day_iso, rows, *, edit_booking_id=None):
+def _render_wg_orders(day_iso, rows, *, edit_booking_id=None, import_result=None):
     day = date.fromisoformat(day_iso)
     return render_template(
         "wg_orders.html",
@@ -2820,6 +2820,7 @@ def _render_wg_orders(day_iso, rows, *, edit_booking_id=None):
         truck_options=active_truck_names(),
         payment_types=wg_orders.PAYMENT_TYPES,
         blank_row=wg_orders.empty_order(day_iso),
+        import_result=import_result,
     )
 
 
@@ -2852,6 +2853,56 @@ def wg_orders_page():
         return redirect(url_for("wg_orders", date=day_iso))
     day_iso = _wg_date_arg(request.args.get("date"))
     return _render_wg_orders(day_iso, [wg_orders.empty_order(day_iso)])
+
+
+@app.route("/wg-orders/import", methods=["POST"], endpoint="wg_orders_import")
+@auth.login_required
+def wg_orders_import():
+    """Analyse an uploaded WG photo / PDF into order cards. Saves nothing."""
+    import wg_import
+
+    day_iso = _wg_date_arg(request.form.get("day"))
+    if (request.content_length or 0) > wg_import.MAX_UPLOAD_BYTES + 64 * 1024:
+        flash("The file is too large (max {0} MB).".format(wg_import.MAX_UPLOAD_BYTES // (1024 * 1024)), "error")
+        return redirect(url_for("wg_orders", date=day_iso))
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        flash("Choose a JPG, PNG or PDF file first.", "error")
+        return redirect(url_for("wg_orders", date=day_iso))
+    data = upload.read(wg_import.MAX_UPLOAD_BYTES + 1)
+    try:
+        result = wg_import.analyse_upload(
+            upload.filename,
+            data,
+            crew_names=active_crew_names(),
+            truck_names=active_truck_names(),
+            today=perth_today(),
+            default_date=day_iso,
+        )
+    except wg_import.ImportError_ as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("wg_orders", date=day_iso))
+    finally:
+        del data
+    orders = result["orders"]
+    if not orders:
+        flash("No WG orders were found in {0}. Check the file or enter the orders by hand.".format(result["filename"]), "error")
+        return redirect(url_for("wg_orders", date=day_iso))
+    dates = sorted({o["move_date"] for o in orders if o.get("move_date")})
+    view_day = dates[0] if dates else day_iso
+    warning_count = sum(len(o.get("field_warnings") or {}) for o in orders)
+    flash("Analysed {0}: {1} WG order{2} found. Check them, then press Save All WG Orders.".format(
+        result["filename"], len(orders), "" if len(orders) == 1 else "s"), "success")
+    return _render_wg_orders(
+        view_day,
+        orders,
+        import_result={
+            "filename": result["filename"],
+            "count": len(orders),
+            "notices": result["notices"],
+            "warning_count": warning_count,
+        },
+    )
 
 
 @app.route("/wg-orders/<int:booking_id>/edit", methods=["GET", "POST"], endpoint="wg_order_edit")

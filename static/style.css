@@ -4204,7 +4204,7 @@ button:disabled {
   min-width: 0;
 }
 
-.wg-order-grid input,
+.wg-order-grid input:not([type="checkbox"]),
 .wg-order-grid select,
 .wg-order-grid textarea {
   width: 100%;
@@ -4254,4 +4254,123 @@ button:disabled {
 
 .wg-form-actions {
   flex-wrap: wrap;
+}
+
+/* WG Orders: crew — one label per person, checkbox and name side by side */
+.wg-crew {
+  margin: 0;
+  padding: 0.5rem 0.75rem 0.75rem;
+  border: 1px solid var(--border, #d8dee8);
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.wg-crew legend {
+  font-weight: 700;
+  padding: 0 0.3rem;
+}
+
+.wg-crew-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.4rem 0.75rem;
+}
+
+.wg-crew-option {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.wg-crew-option:hover {
+  background: #eef5f0;
+}
+
+.wg-crew-option input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+}
+
+.wg-crew-option span {
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .wg-crew-options {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.wg-order-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+#wg-order-rows > .wg-order:first-child [data-wg-copy-prev] {
+  display: none;
+}
+
+.wg-form-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+}
+
+.wg-order-count {
+  font-weight: 700;
+  color: #1f5f3a;
+}
+
+/* Import (photo / PDF → order cards) */
+.wg-import-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.wg-import-form input[type="file"] {
+  max-width: 100%;
+}
+
+.wg-import-result {
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: #eef5f0;
+}
+
+.wg-field-warn input,
+.wg-field-warn textarea,
+.wg-field-warn select {
+  background: #fff6c7;
+  border-color: #d9a400;
+}
+
+.wg-crew.wg-field-warn {
+  background: #fffbe3;
+  border-color: #d9a400;
+}
+
+.wg-warn-msg {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #7a5600;
+}
+
+.wg-order-imported {
+  border-left-color: #d9a400;
 }

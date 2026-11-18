@@ -2,10 +2,13 @@
 {% from '_bilingual_macros.html' import bl %}
 {% block title %}WG Orders{% endblock %}
 
+{% macro warn_class(o, field) %}{% if o.field_warnings and o.field_warnings.get(field) %} wg-field-warn{% endif %}{% endmacro %}
+{% macro warn_msgs(o, field) %}{% if o.field_warnings and o.field_warnings.get(field) %}{% for msg in o.field_warnings.get(field) %}<span class="wg-warn-msg">⚠ {{ msg }}</span>{% endfor %}{% endif %}{% endmacro %}
+
 {% macro order_fields(o, n) %}
 {% set p = 'orders-' ~ n ~ '-' %}
-<fieldset class="wg-order" data-wg-order>
-  <legend>{% if o.booking_id %}WG order · booking #{{ o.booking_id }}{% else %}WG order <span class="wg-order-number"></span>{% endif %}</legend>
+<fieldset class="wg-order{% if o.imported %} wg-order-imported{% endif %}" data-wg-order>
+  <legend>{% if o.booking_id %}WG Order · booking #{{ o.booking_id }}{% else %}WG Order <span class="wg-order-number"></span>{% endif %}</legend>
   {% if o.booking_id %}<input type="hidden" name="{{ p }}booking_id" value="{{ o.booking_id }}">{% endif %}
   {% if o.errors %}
   <ul class="wg-order-errors">
@@ -33,64 +36,104 @@
   </div>
   {% endif %}
   <div class="wg-order-grid">
-    <label class="wg-span-2">{{ bl('Customer name *', 'お客様名') }}
+    <label class="wg-span-2{{ warn_class(o, 'customer') }}">{{ bl('Customer name *', 'お客様名') }}
       <input type="text" name="{{ p }}customer" value="{{ o.customer or '' }}" autocomplete="off">
+      {{ warn_msgs(o, 'customer') }}
     </label>
-    <label>{{ bl('Date *', '日付') }}
+    <label class="{{ warn_class(o, 'move_date') }}">{{ bl('Date *', '日付') }}
       <input type="date" name="{{ p }}move_date" value="{{ o.move_date or '' }}" data-wg-date>
+      {{ warn_msgs(o, 'move_date') }}
     </label>
-    <label>{{ bl('Start time *', '開始時間') }}
+    <label class="{{ warn_class(o, 'start_time') }}">{{ bl('Start time *', '開始時間') }}
       <input type="time" name="{{ p }}start_time" value="{{ o.start_time or '' }}">
+      {{ warn_msgs(o, 'start_time') }}
     </label>
-    <label>{{ bl('Finish time', '終了時間') }}
+    <label class="{{ warn_class(o, 'finish_time') }}">{{ bl('Finish time', '終了時間') }}
       <input type="time" name="{{ p }}finish_time" value="{{ o.finish_time or '' }}">
+      {{ warn_msgs(o, 'finish_time') }}
     </label>
-    <label class="wg-span-full">{{ bl('Products', '商品') }}
-      <textarea name="{{ p }}products" rows="3" placeholder="1 x Litestone Harper Dining Table&#10;1 x Aqua Mix Sealer">{{ o.products or '' }}</textarea>
+    <label class="wg-span-full{{ warn_class(o, 'products') }}">{{ bl('Products', '商品') }}
+      <textarea name="{{ p }}products" rows="{{ [3, (o.products or '').count('\n') + 1]|max }}" placeholder="1 x Litestone Harper Dining Table&#10;1 x Aqua Mix Sealer">{{ o.products or '' }}</textarea>
+      {{ warn_msgs(o, 'products') }}
     </label>
-    <label class="wg-span-full">{{ bl('Address *', '配送先住所') }}
+    <label class="wg-span-full{{ warn_class(o, 'address') }}">{{ bl('Address *', '配送先住所') }}
       <input type="text" name="{{ p }}address" value="{{ o.address or '' }}" placeholder="15 Cassinia Rd, Duncraig">
+      {{ warn_msgs(o, 'address') }}
     </label>
-    <label>{{ bl('Phone', '電話番号') }}
+    <label class="{{ warn_class(o, 'phone') }}">{{ bl('Phone', '電話番号') }}
       <input type="tel" name="{{ p }}phone" value="{{ o.phone or '' }}">
+      {{ warn_msgs(o, 'phone') }}
     </label>
-    <label>{{ bl('Payment amount', '支払金額') }}
+    <label class="{{ warn_class(o, 'payment_amount') }}">{{ bl('Payment amount', '支払金額') }}
       <input type="text" inputmode="decimal" name="{{ p }}payment_amount" value="{{ o.payment_amount_raw if o.payment_amount_raw is defined else (o.payment_amount if o.payment_amount is not none else '') }}" placeholder="$320">
+      {{ warn_msgs(o, 'payment_amount') }}
     </label>
-    <label>{{ bl('Payment type', '支払方法') }}
-      <select name="{{ p }}payment_type">
-        <option value="">—</option>
-        {% for t in payment_types %}<option value="{{ t }}" {% if o.payment_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
-      </select>
+    <label class="{{ warn_class(o, 'payment_type') }}">{{ bl('Payment type', '支払方法') }}
+      <input type="text" name="{{ p }}payment_type" value="{{ o.payment_type or '' }}" list="wg-payment-types" maxlength="30" placeholder="COD / Confirmed / Invoice">
+      {{ warn_msgs(o, 'payment_type') }}
     </label>
-    <label>{{ bl('Ready / Reference', 'REX番号') }}
+    <label class="{{ warn_class(o, 'reference') }}">{{ bl('Ready / Reference', 'REX番号') }}
       <input type="text" name="{{ p }}reference" value="{{ o.reference or '' }}" placeholder="REX 3277">
+      {{ warn_msgs(o, 'reference') }}
     </label>
-    <label class="wg-span-full">{{ bl('Notes', '注意事項') }}
+    <label class="wg-span-full{{ warn_class(o, 'notes') }}">{{ bl('Notes', '注意事項') }}
       <textarea name="{{ p }}notes" rows="2">{{ o.notes or '' }}</textarea>
+      {{ warn_msgs(o, 'notes') }}
     </label>
-    <fieldset class="wg-span-full crew-fieldset">
+    <fieldset class="wg-span-full wg-crew{{ warn_class(o, 'crew') }}" data-wg-crew>
       <legend>{{ bl('Crew', '担当スタッフ') }}</legend>
-      <div class="crew-checkboxes">
+      <div class="wg-crew-options">
         {% for name in crew_options %}
-        <label class="crew-option"><input type="checkbox" name="{{ p }}crew" value="{{ name }}" {% if name in (o.crew or []) %}checked{% endif %}> {{ name }}</label>
+        {% set cid = p ~ 'crew-' ~ loop.index %}
+        <label class="wg-crew-option" for="{{ cid }}">
+          <input type="checkbox" id="{{ cid }}" name="{{ p }}crew" value="{{ name }}" {% if name in (o.crew or []) %}checked{% endif %}>
+          <span>{{ name }}</span>
+        </label>
         {% endfor %}
       </div>
+      {{ warn_msgs(o, 'crew') }}
     </fieldset>
-    <label>{{ bl('Truck', 'トラック') }}
-      <select name="{{ p }}truck">
+    <label class="{{ warn_class(o, 'truck') }}">{{ bl('Truck', 'トラック') }}
+      <select name="{{ p }}truck" data-wg-truck>
         <option value="">— No truck —</option>
         {% for truck in truck_options %}<option value="{{ truck }}" {% if o.truck == truck %}selected{% endif %}>{{ truck }}</option>{% endfor %}
       </select>
+      {{ warn_msgs(o, 'truck') }}
     </label>
   </div>
   {% if not o.booking_id %}
-  <button type="button" class="btn-secondary btn-sm wg-order-remove" data-wg-remove>Remove this order</button>
+  <div class="wg-order-tools">
+    <button type="button" class="btn-secondary btn-sm" data-wg-copy-prev>Copy previous crew &amp; truck</button>
+    <button type="button" class="btn-secondary btn-sm wg-order-remove" data-wg-remove>Remove Order · <span lang="ja">削除</span></button>
+  </div>
   {% endif %}
 </fieldset>
 {% endmacro %}
 
 {% block content %}
+<datalist id="wg-payment-types">
+  {% for t in payment_types %}<option value="{{ t }}">{% endfor %}
+</datalist>
+
+{% if not edit_booking_id %}
+<section class="panel wg-import">
+  <h3>WG Order Import · <span lang="ja">WG注文を取り込む</span></h3>
+  <p class="hint">Upload WG’s photo, screenshot or PDF (JPG, PNG or PDF, max 15 MB) and press Analyse. The orders found are put into the cards below for you to check — <strong>nothing is saved until you press Save All WG Orders</strong>. The file itself is not kept.</p>
+  <form method="post" action="{{ url_for('wg_orders_import') }}" enctype="multipart/form-data" class="wg-import-form">
+    <input type="hidden" name="day" value="{{ day_iso }}">
+    <input type="file" name="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required>
+    <button type="submit" class="btn-primary">Analyse</button>
+  </form>
+  {% if import_result %}
+  <div class="wg-import-result">
+    <p><strong>{{ import_result.count }} WG order{{ '' if import_result.count == 1 else 's' }}</strong> read from {{ import_result.filename }}{% if import_result.notices %} · {{ import_result.notices|join(' · ') }}{% endif %}.
+      {% if import_result.warning_count %}<span class="wg-warn-msg">⚠ {{ import_result.warning_count }} field{{ '' if import_result.warning_count == 1 else 's' }} need checking (yellow).</span>{% endif %}
+      Not saved yet.</p>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
 <section class="panel wg-orders-page">
   <div class="panel-head panel-head-wrap">
     <div class="panel-head-main">
@@ -127,7 +170,10 @@
 </section>
 
 <section class="panel">
-  <h3>{% if edit_booking_id %}Edit WG order #{{ edit_booking_id }}{% else %}Add WG orders · {{ day_heading }}{% endif %}</h3>
+  <div class="wg-form-head">
+    <h3>{% if edit_booking_id %}Edit WG Order #{{ edit_booking_id }}{% elif import_result %}Check the imported WG Orders{% else %}Add WG Orders · {{ day_heading }}{% endif %}</h3>
+    {% if not edit_booking_id %}<span class="wg-order-count" id="wg-order-count"></span>{% endif %}
+  </div>
   <form method="post" action="{{ url_for('wg_order_edit', booking_id=edit_booking_id) if edit_booking_id else url_for('wg_orders') }}" class="wg-orders-form" id="wg-orders-form">
     <input type="hidden" name="day" value="{{ day_iso }}">
     <div id="wg-order-rows" data-next-index="{{ rows|length }}">
@@ -137,7 +183,7 @@
       {% if not edit_booking_id %}
       <button type="button" class="btn-secondary" id="wg-order-add">+ Add WG Order</button>
       {% endif %}
-      <button type="submit" class="btn-primary">{% if edit_booking_id %}Save WG Order{% else %}Save All WG Orders{% endif %}</button>
+      <button type="submit" class="btn-primary" id="wg-save-all">{% if edit_booking_id %}Save WG Order{% else %}Save All WG Orders{% endif %}</button>
       {% if edit_booking_id %}<a class="btn-secondary" href="{{ url_for('wg_orders', date=day_iso) }}">Cancel</a>{% endif %}
     </div>
     {% if not edit_booking_id %}<p class="hint">Only filled-in orders are saved. Orders with a problem stay on the page so you can fix them; the others are saved straight away, so you can save part of a day and add more later.</p>{% endif %}
