@@ -1,5 +1,13 @@
-{# WG Outdoor Life order details (wg_orders.staff_fields). Normal bookings: nothing. #}
-{% if job.is_wg %}
+{# WG Outdoor Life: a WG Day (one job, its stops on the run sheet) or an older per-customer order. Normal bookings: nothing. #}
+{% if job.is_wg_day %}
+<div class="staff-wg-job staff-wg-day">
+  <p class="staff-wg-row">{{ job.wg_day_heading }} · {{ job.wg_truck }} · <span class="staff-wg-label">{{ job.wg_stops_label|upper }}</span></p>
+  <div class="staff-job-actions staff-wg-actions">
+    <a class="staff-job-btn staff-wg-run-btn" href="{{ job.wg_run_sheet_url }}">View WG Run Sheet</a>
+    <a class="staff-job-btn" href="{{ job.wg_run_sheet_pdf_url }}">Download WG Run Sheet PDF</a>
+  </div>
+</div>
+{% elif job.is_wg %}
 <div class="staff-wg-job">
   {% if job.wg_products %}
   <p class="staff-wg-row"><span class="staff-wg-label">Products:</span></p>

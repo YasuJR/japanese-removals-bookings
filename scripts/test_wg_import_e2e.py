@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""E2E — WG Orders: many order cards + photo / PDF import (wg_import.py).
+"""E2E — WG Day form + photo / PDF import (wg_import.py → one WG Day with stops).
 
-  A  one manual WG order → saved
-  B  four manual orders → Save All creates 4 bookings
-  C  ten orders → page and Save All handle them
-  D  crew: one <label for> per person, checkbox + name together, no full-width checkbox rule
-  E  image with 4 orders → Analyse gives 4 order cards (Claude vision mocked)
-  F  multi-page PDF with several orders per page → every order read (text PDF, no AI)
-  G  products keep their line breaks (import → card → booking)
+  A  one manual stop → one WG Day saved
+  B  four manual stops → one WG Day booking with 4 stops
+  C  ten stops → page and Save WG Day handle them (one booking)
+  D  crew: set once for the day; one <label for> per person, checkbox + name together
+  E  image with 4 orders → Analyse gives one WG Day: date, crew, 4 stops (Claude vision mocked)
+  F  multi-page PDF with several orders per page → every stop read (text PDF, no AI)
+  G  products keep their line breaks (import → form → stop)
   H  unclear fields → yellow warnings (time, address, phone, crew, payment, date)
   I  Analyse never creates a booking
-  J  Save All after Analyse → Calendar / Staff Portal / WG Outstanding
-Plus: upload checks (type, signature, size, executable), shared day heading → every
-order's date, "YASU $320" → 320 + YASU, REX lists kept, duplicate warning on import.
+  J  Save after Analyse → WG Day on Calendar / Staff Portal / WG Outstanding
+Plus: upload checks (type, signature, size, executable), shared day heading → the day's
+date, "YASU $320" → 320 + YASU, REX lists kept, duplicate warning on import.
 """
 
 import io
@@ -79,41 +79,40 @@ def _truck():
     return name
 
 
-def _future_day():
-    return perth_today() + timedelta(days=_rng.randint(400, 3000))
-
-
-def _near_day():
-    """Within the next few weeks, so a heading without a year ("Friday 20th November") is unambiguous."""
-    return perth_today() + timedelta(days=_rng.randint(1, 25))
-
-
 def _rex():
     return "REX {0}".format(_rng.randint(100000, 999999))
 
 
-def _bookings_named(prefix):
+def _wg_day_rows(day_iso):
+    return [dict(r) for r in db.list_by_date(day_iso) if wg_jobs.is_wg_day(dict(r))]
+
+
+def _stops_named(prefix):
     with db.get_connection() as conn:
-        rows = conn.execute("SELECT * FROM bookings WHERE customer_name LIKE ?", ("WG - " + prefix + "%",)).fetchall()
+        rows = conn.execute("SELECT * FROM wg_stops WHERE customer LIKE ?", (prefix + "%",)).fetchall()
     return [dict(r) for r in rows]
 
 
-def _post_rows(client, day_iso, rows, url="/wg-orders"):
-    payload = [("day", day_iso)]
-    for n, row in enumerate(rows):
-        for key, value in row.items():
-            if key == "crew":
-                payload.extend(("orders-{0}-crew".format(n), v) for v in value)
-            else:
-                payload.append(("orders-{0}-{1}".format(n, key), value))
-    return client.post(url, data=MultiDict(payload), follow_redirects=True)
+def _free_day(near=False):
+    """A date without a WG Day yet; near = within a few weeks (headings without a year)."""
+    while True:
+        day = perth_today() + timedelta(days=_rng.randint(1, 25) if near else _rng.randint(400, 4000))
+        if wg_orders.find_day(day.isoformat()) is None:
+            return day
 
 
-def _manual(name, day_iso, start, finish, truck):
-    return {"customer": name, "move_date": day_iso, "start_time": start, "finish_time": finish,
+def _post_day(client, day_iso, stops, crew=(), truck="", **extra):
+    payload = [("day", day_iso), ("move_date", day_iso), ("truck", truck)] + [("crew", c) for c in crew]
+    payload += list(extra.items())
+    for n, stop in enumerate(stops):
+        payload += [("stops-{0}-{1}".format(n, k), v) for k, v in stop.items()]
+    return client.post("/wg-orders", data=MultiDict(payload), follow_redirects=True)
+
+
+def _manual(name, start, finish):
+    return {"customer": name, "start_time": start, "finish_time": finish,
             "address": "{0} Test Rd, Duncraig".format(_rng.randint(1, 99999)), "phone": "0488 998 688",
-            "payment_amount": "320", "payment_type": "COD", "reference": _rex(), "products": "1 x Chair",
-            "notes": "", "truck": truck}
+            "payment_amount": "320", "payment_type": "COD", "reference": _rex(), "products": "1 x Chair", "notes": ""}
 
 
 def _wg_pdf(pages):
@@ -145,16 +144,31 @@ def _upload(client, filename, data, day_iso=""):
     )
 
 
-def _cards(html):
-    return re.findall(r'<fieldset class="wg-order[^"]*" data-wg-order>(.*?)</fieldset>\s*(?=<fieldset class="wg-order|</div>)', html, re.S)
+def _cards(html, imported_only=True):
+    cls = r"wg-order wg-stop wg-order-imported" if imported_only else r"wg-order wg-stop[^\"]*"
+    form = html.split('id="wg-stop-template"')[0]
+    return re.findall(r'<fieldset class="{0}" data-wg-stop>(.*?)</fieldset>'.format(cls), form, re.S)
 
 
 def _value(card, field):
-    m = re.search(r'name="orders-\d+-{0}"[^>]*value="([^"]*)"'.format(field), card)
+    m = re.search(r'name="stops-\d+-{0}"[^>]*value="([^"]*)"'.format(field), card)
     if m:
         return m.group(1)
-    m = re.search(r'name="orders-\d+-{0}"[^>]*>(.*?)</textarea>'.format(field), card, re.S)
+    m = re.search(r'name="stops-\d+-{0}"[^>]*>(.*?)</textarea>'.format(field), card, re.S)
     return m.group(1) if m else None
+
+
+def _day_value(html, field):
+    m = re.search(r'name="{0}" value="([^"]*)"'.format(field), html)
+    return m.group(1) if m else None
+
+
+def _checked_crew(html):
+    return re.findall(r'name="crew" value="([^"]+)" checked', html)
+
+
+STOP_FIELDS = ("customer", "start_time", "finish_time", "address", "phone", "payment_amount", "payment_type",
+               "reference", "products", "notes")
 
 
 class _FakeResponse:
@@ -196,52 +210,56 @@ _REAL_URLOPEN = _ur.urlopen
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 
 
-def test_case_a_one_manual_order():
+def test_case_a_one_manual_stop():
     client = _client()
-    day = _future_day().isoformat()
+    day = _free_day().isoformat()
     name = "ImpA " + _tag()
-    resp = _post_rows(client, day, [_manual(name, day, "10:00", "11:30", _truck())])
-    assert "Saved 1 WG order" in resp.get_data(as_text=True)
-    assert len(_bookings_named(name)) == 1
+    resp = _post_day(client, day, [_manual(name, "10:00", "11:30")], truck=_truck())
+    assert "Saved the WG Day" in resp.get_data(as_text=True)
+    assert len(_wg_day_rows(day)) == 1 and len(_stops_named(name)) == 1
     return True
 
 
-def test_case_b_four_manual_orders():
+def test_case_b_four_manual_stops_one_booking():
     client = _client()
-    day = _future_day().isoformat()
+    day = _free_day().isoformat()
     tag = _tag()
-    rows = [_manual("ImpB{0} {1}".format(i, tag), day, s, f, _truck())
-            for i, (s, f) in enumerate([("10:00", "11:30"), ("11:30", "13:30"), ("12:00", "13:30"), ("13:00", "15:00")], 1)]
-    resp = _post_rows(client, day, rows)
-    assert "Saved 4 WG orders" in resp.get_data(as_text=True)
-    assert len(_bookings_named("ImpB")) >= 4 and all(_bookings_named("ImpB{0} {1}".format(i, tag)) for i in range(1, 5))
+    stops = [_manual("ImpB{0} {1}".format(i, tag), s, f)
+             for i, (s, f) in enumerate([("10:00", "11:30"), ("11:30", "13:30"), ("12:00", "13:30"), ("13:00", "15:00")], 1)]
+    resp = _post_day(client, day, stops, truck=_truck())
+    assert "Saved the WG Day" in resp.get_data(as_text=True) and "4 stops" in resp.get_data(as_text=True)
+    rows = _wg_day_rows(day)
+    assert len(rows) == 1 and int(rows[0]["wg_stop_count"]) == 4
+    assert [s["customer"] for s in db.list_wg_stops(rows[0]["id"])] == ["ImpB{0} {1}".format(i, tag) for i in range(1, 5)]
     return True
 
 
-def test_case_c_ten_orders():
+def test_case_c_ten_stops():
     client = _client()
-    day = _future_day().isoformat()
+    day = _free_day().isoformat()
     tag = _tag()
-    rows = [_manual("ImpC{0:02d} {1}".format(i, tag), day, "{0:02d}:00".format(7 + i), "{0:02d}:30".format(7 + i), _truck()) for i in range(10)]
-    resp = _post_rows(client, day, rows)
-    assert "Saved 10 WG orders" in resp.get_data(as_text=True)
-    view = [d["customer"] for d in wg_orders.day_orders(day) if d["customer"].endswith(tag)]
-    assert view == ["ImpC{0:02d} {1}".format(i, tag) for i in range(10)]
-    # The page itself: add button, template for unlimited cards, count label
+    stops = [_manual("ImpC{0:02d} {1}".format(i, tag), "{0:02d}:00".format(7 + i), "{0:02d}:30".format(7 + i)) for i in range(10)]
+    resp = _post_day(client, day, stops, truck=_truck())
+    assert "10 stops" in resp.get_data(as_text=True)
+    rows = _wg_day_rows(day)
+    assert len(rows) == 1
+    assert [s["customer"] for s in db.list_wg_stops(rows[0]["id"])] == ["ImpC{0:02d} {1}".format(i, tag) for i in range(10)]
     page = client.get("/wg-orders?date=" + day).get_data(as_text=True)
-    assert 'id="wg-order-add"' in page and 'id="wg-order-template"' in page and 'id="wg-order-count"' in page
-    assert "Remove Order" in page and "Copy previous crew &amp; truck" in page
+    assert 'id="wg-stop-add"' in page and 'id="wg-stop-template"' in page and 'id="wg-stop-count"' in page
+    assert len(_cards(page, imported_only=False)) == 10
+    assert "Remove Order" not in page and "Copy previous" not in page
     return True
 
 
 def test_case_d_crew_labels():
     client = _client()
     _crew("Katsu")
-    html = client.get("/wg-orders").get_data(as_text=True)
-    options = re.findall(r'<label class="wg-crew-option" for="([^"]+)">\s*<input type="checkbox" id="([^"]+)" name="orders-0-crew" value="([^"]+)"[^>]*>\s*<span>([^<]+)</span>', html)
+    html = client.get("/wg-orders?date=" + _free_day().isoformat()).get_data(as_text=True)
+    options = re.findall(r'<label class="wg-crew-option" for="([^"]+)">\s*<input type="checkbox" id="([^"]+)" name="crew" value="([^"]+)"[^>]*>\s*<span>([^<]+)</span>', html)
     assert options, "crew options missing"
     for label_for, input_id, value, text in options:
         assert label_for == input_id and value == text
+    assert html.count('data-wg-crew') == 1, "one crew block for the whole day"
     css = (ROOT / "static" / "style.css").read_text()
     assert '.wg-order-grid input:not([type="checkbox"])' in css
     assert re.search(r"\.wg-crew-option \{[^}]*flex-direction: row;[^}]*align-items: center;", css, re.S)
@@ -251,7 +269,7 @@ def test_case_d_crew_labels():
 def test_case_e_image_four_orders_ai_mocked():
     client = _client()
     _, yasu = _crew("Yasu")
-    day = _near_day()
+    day = _free_day(near=True)
     heading = day.strftime("%A ") + str(day.day) + "th " + day.strftime("%B")
     tag = _tag()
     rex = [_rex() for _ in range(4)]
@@ -267,33 +285,34 @@ def test_case_e_image_four_orders_ai_mocked():
     ]
     captured = _mock_ai(orders, date_text=heading)
     try:
-        before = db.list_by_date(day.isoformat())
+        before = len(db.list_by_date(day.isoformat()))
         resp = _upload(client, "wg-run.png", PNG)
     finally:
         _unmock_ai()
     html = resp.get_data(as_text=True)
-    assert "4 WG orders found" in html, re.findall(r"WG order[^<]*", html)[:3]
+    assert "4 stops found" in html, re.findall(r"stops? found[^<]*|No WG[^<]*", html)[:3]
     assert captured and captured[0]["messages"][0]["content"][0]["type"] == "image"
     assert captured[0]["messages"][0]["content"][0]["source"]["media_type"] == "image/png"
+    # One WG Day: the heading's date, Yasu once for the day, 4 stops
+    assert _day_value(html, "move_date") == day.isoformat(), "day heading → the WG Day's date"
+    assert _checked_crew(html) == [yasu]
     cards = _cards(html)
     assert len(cards) == 4
     assert [_value(c, "customer") for c in cards] == [o["customer"] for o in orders]
-    assert [_value(c, "move_date") for c in cards] == [day.isoformat()] * 4, "day heading applies to every order"
     assert [(_value(c, "start_time"), _value(c, "finish_time")) for c in cards] == [
         ("10:00", "11:30"), ("11:30", "13:30"), ("12:00", "13:30"), ("13:00", "15:00")]
     assert [(_value(c, "payment_amount"), _value(c, "payment_type")) for c in cards] == [
         ("320", "YASU"), ("330", "Confirmed"), ("220", "COD"), ("440", "COD")]
     assert _value(cards[2], "reference") == rex[2] + " AND " + rex[3]
-    assert all('value="{0}" checked'.format(yasu) in c for c in cards), "Yasu ticked on every order"
     assert "Time read as PM" in cards[3]
-    assert len(db.list_by_date(day.isoformat())) == len(before), "Analyse never saves"
+    assert len(db.list_by_date(day.isoformat())) == before, "Analyse never saves"
     return True
 
 
 def test_case_f_multi_page_pdf_text():
     client = _client()
     _, yasu = _crew("Yasu")
-    day = _near_day()
+    day = _free_day(near=True)
     heading = day.strftime("%A ") + str(day.day) + "th " + day.strftime("%B")
     tag = _tag()
     page1 = [heading, yasu.upper(), ""]
@@ -305,34 +324,32 @@ def test_case_f_multi_page_pdf_text():
     os.environ.pop("ANTHROPIC_API_KEY", None)
     resp = _upload(client, "WG orders.pdf", _wg_pdf([page1, page2, page3]))
     html = resp.get_data(as_text=True)
-    assert "5 WG orders found" in html, re.findall(r"No WG orders[^<]*|WG orders? found[^<]*|not set up[^<]*", html)
+    assert "5 stops found" in html, re.findall(r"No WG[^<]*|stops? found[^<]*|not set up[^<]*", html)
     assert "3 pages" in html and "WG_orders.pdf" in html, "filename sanitised"
     cards = _cards(html)
-    names = [_value(c, "customer") for c in cards]
-    assert names == ["Pdf{0} {1}".format(w, tag) for w in ("One", "Two", "Three", "Four", "Five")]
-    assert all(_value(c, "move_date") == day.isoformat() for c in cards)
+    assert [_value(c, "customer") for c in cards] == ["Pdf{0} {1}".format(w, tag) for w in ("One", "Two", "Three", "Four", "Five")]
+    assert _day_value(html, "move_date") == day.isoformat() and _checked_crew(html) == [yasu]
     assert _value(cards[2], "reference") == "REX 1649 AND REX 2359"
     assert _value(cards[0], "products") == "\n".join(PRODUCTS)
-    assert all('value="{0}" checked'.format(yasu) in c for c in cards)
     return True
+
+
+def _form_stops(html):
+    return [{k: _value(c, k) or "" for k in STOP_FIELDS} for c in _cards(html, imported_only=False)]
 
 
 def test_case_g_products_line_breaks_through_save():
     client = _client()
-    day = _future_day()
+    day = _free_day()
     tag = _tag()
     lines = _order_lines("Order 1", "Lines " + tag, "9-10", "5 Line St, Perth", "0400 000 111", "$50 COD", _rex())
     lines = [day.strftime("%A ") + str(day.day) + " " + day.strftime("%B %Y")] + lines
     html = _upload(client, "lines.pdf", _wg_pdf([lines])).get_data(as_text=True)
-    card = _cards(html)[0]
-    assert _value(card, "products") == "\n".join(PRODUCTS)
-    row = {k: _value(card, k) or "" for k in ("customer", "move_date", "start_time", "finish_time", "address", "phone",
-                                              "payment_amount", "payment_type", "reference", "products", "notes")}
-    row["truck"] = _truck()
-    resp = _post_rows(client, day.isoformat(), [row])
-    assert "Saved 1 WG order" in resp.get_data(as_text=True)
-    saved = _bookings_named("Lines " + tag)[0]
-    assert saved["wg_products"] == "\n".join(PRODUCTS) and saved["wg_payment_type"] == "COD"
+    assert _value(_cards(html)[0], "products") == "\n".join(PRODUCTS)
+    resp = _post_day(client, _day_value(html, "move_date"), _form_stops(html), truck=_truck())
+    assert "Saved the WG Day" in resp.get_data(as_text=True)
+    saved = _stops_named("Lines " + tag)[0]
+    assert saved["products"] == "\n".join(PRODUCTS) and saved["payment_type"] == "COD"
     return True
 
 
@@ -341,17 +358,19 @@ def test_case_h_unclear_fields_warn():
     orders = [{"crew_hint": "Someone", "customer": "Blurry " + _tag(), "products": "1 x ???", "time": "about lunch",
                "address": "Duncraig", "phone": "0488 99", "payment": "COD", "reference": "", "notes": "",
                "uncertain": ["address", "products"]}]
+    day_iso = _free_day().isoformat()
     _mock_ai(orders, date_text="")
     try:
-        html = _upload(client, "photo.jpg", b"\xff\xd8\xff\xe0" + b"\x00" * 64, day_iso="2026-12-01").get_data(as_text=True)
+        html = _upload(client, "photo.jpg", b"\xff\xd8\xff\xe0" + b"\x00" * 64, day_iso=day_iso).get_data(as_text=True)
     finally:
         _unmock_ai()
     card = _cards(html)[0]
-    for msg in ("Time unclear", "Address may need review", "Phone number uncertain", "Payment unclear",
-                "Crew “Someone” not found", "Products may need review", "Date unclear"):
+    for msg in ("Time unclear", "Address may need review", "Phone number uncertain", "Payment unclear", "Products may need review"):
         assert msg in card, msg
-    assert card.count("wg-field-warn") >= 6
-    assert _value(card, "start_time") == "" and _value(card, "move_date") == "2026-12-01"
+    head = html.split('id="wg-stop-rows"')[0]
+    assert "Crew “Someone” not found" in head and "Date unclear" in head
+    assert card.count("wg-field-warn") >= 4
+    assert _value(card, "start_time") == "" and _day_value(html, "move_date") == day_iso
     assert "need checking (yellow)" in html
     return True
 
@@ -359,38 +378,37 @@ def test_case_h_unclear_fields_warn():
 def test_case_i_analyse_does_not_create_bookings():
     client = _client()
     tag = _tag()
-    before = len(_bookings_named("NoSave"))
+    before = len(_stops_named("NoSave"))
     pdf = _wg_pdf([_order_lines("Order 1", "NoSave " + tag, "9-10", "5 Save St, Perth", "0400 000 111", "$50 COD", _rex())])
-    html = _upload(client, "nosave.pdf", pdf).get_data(as_text=True)
+    html = _upload(client, "nosave.pdf", pdf, day_iso=_free_day().isoformat()).get_data(as_text=True)
     assert "NoSave " + tag in html and "Not saved yet" in html
-    assert len(_bookings_named("NoSave")) == before
+    assert len(_stops_named("NoSave")) == before
     return True
 
 
-def test_case_j_save_all_after_import_everywhere():
+def test_case_j_save_after_import_everywhere():
     client = _client()
     crew_id, yasu = _crew("Yasu")
-    today = perth_today()
+    day = _free_day()
     tag = _tag()
     truck = _truck()
-    pdf = _wg_pdf([[today.strftime("%A ") + str(today.day) + " " + today.strftime("%B %Y")]
+    pdf = _wg_pdf([[day.strftime("%A ") + str(day.day) + " " + day.strftime("%B %Y"), yasu.upper()]
                    + _order_lines(yasu + " 1", "Flow " + tag, "8-9", "{0} Flow St, Perth".format(_rng.randint(1, 99999)), "0400 000 111", "YASU $320", _rex())])
     html = _upload(client, "flow.pdf", pdf).get_data(as_text=True)
-    card = _cards(html)[0]
-    row = {k: _value(card, k) or "" for k in ("customer", "move_date", "start_time", "finish_time", "address", "phone",
-                                              "payment_amount", "payment_type", "reference", "products", "notes")}
-    row["crew"] = [yasu]
-    row["truck"] = truck
-    resp = _post_rows(client, today.isoformat(), [row])
-    assert "Saved 1 WG order" in resp.get_data(as_text=True)
-    saved = _bookings_named("Flow " + tag)[0]
-    assert wg_jobs.is_wg_order(saved) and saved["wg_payment_type"] == "YASU" and float(saved["wg_payment_amount"]) == 320
-    assert calendar_data.calendar_event(saved)["is_wg"]
-    staff = app.test_client().get("/staff?staff_id={0}&range=today".format(crew_id)).get_data(as_text=True)
-    assert "WG - Flow " + tag in staff and "$320 · YASU" in staff
+    resp = _post_day(client, _day_value(html, "move_date"), _form_stops(html), crew=_checked_crew(html), truck=truck)
+    assert "Saved the WG Day" in resp.get_data(as_text=True)
+    saved = _wg_day_rows(day.isoformat())[0]
+    stop = db.list_wg_stops(saved["id"])[0]
+    assert stop["payment_type"] == "YASU" and float(stop["payment_amount"]) == 320 and saved["crew"] == yasu
+    assert calendar_data.calendar_event(saved)["is_wg_day"]
+    url = "/staff?staff_id={0}&range=calendar&cal_view=month&year={1}&month={2}".format(crew_id, day.year, day.month)
+    staff = app.test_client().get(url).get_data(as_text=True)
+    assert '/staff/wg/{0}"'.format(saved["id"]) in staff and "Flow " + tag not in staff
+    sheet = app.test_client().get("/staff/wg/{0}".format(saved["id"])).get_data(as_text=True)
+    assert "Flow " + tag in sheet and "$320 · YASU" in sheet
     # WG Outstanding: once the date has passed and it is unpaid → WG section, not REGULAR UNPAID
-    tomorrow = (today + timedelta(days=1)).isoformat()
-    assert dashboard_data.dashboard_section_group(saved, tomorrow) == dashboard_data.SECTION_WG_UNPAID
+    after = (day + timedelta(days=1)).isoformat()
+    assert dashboard_data.dashboard_section_group(saved, after) == dashboard_data.SECTION_WG_UNPAID
     return True
 
 
@@ -416,32 +434,33 @@ def test_upload_checks_and_duplicates():
     os.environ.pop("ANTHROPIC_API_KEY", None)
     html = _upload(client, "photo.png", PNG).get_data(as_text=True)
     assert "not set up yet" in html
-    # Duplicate of an existing WG order → warning on the imported card
-    future = _future_day()
+    # A stop already on that date's WG Day → the imported copy is flagged; saved stops come first
+    future = _free_day()
     day = future.isoformat()
     rex = _rex()
-    existing = _manual("DupImp " + _tag(), day, "10:00", "11:00", _truck())
+    existing = _manual("DupImp " + _tag(), "10:00", "11:00")
     existing["reference"] = rex
-    _post_rows(client, day, [existing])
+    _post_day(client, day, [existing], truck=_truck())
     heading = future.strftime("%A ") + str(future.day) + future.strftime(" %B %Y")
     pdf = _wg_pdf([[heading] + _order_lines("Order 1", "Someone Else " + _tag(), "12-1", "1 Other St, Perth", "0400 000 111", "$50 COD", rex)])
     html = _upload(client, "dup.pdf", pdf).get_data(as_text=True)
-    assert "Possible duplicate" in html and "same REX" in html
+    assert "Possible duplicate" in html and "same REX" in html and "added after the 1 saved stop" in html
+    assert len(_cards(html, imported_only=False)) == 2 and _value(_cards(html, imported_only=False)[0], "customer") == existing["customer"]
     return True
 
 
 def main():
     tests = [
-        test_case_a_one_manual_order,
-        test_case_b_four_manual_orders,
-        test_case_c_ten_orders,
+        test_case_a_one_manual_stop,
+        test_case_b_four_manual_stops_one_booking,
+        test_case_c_ten_stops,
         test_case_d_crew_labels,
         test_case_e_image_four_orders_ai_mocked,
         test_case_f_multi_page_pdf_text,
         test_case_g_products_line_breaks_through_save,
         test_case_h_unclear_fields_warn,
         test_case_i_analyse_does_not_create_bookings,
-        test_case_j_save_all_after_import_everywhere,
+        test_case_j_save_after_import_everywhere,
         test_upload_checks_and_duplicates,
     ]
     passed = 0

@@ -1,21 +1,21 @@
-// WG Orders page: add as many order cards as needed, remove one, copy the previous
-// card's crew & truck. "+ Add WG Order" copies only the previous card's Date.
+// WG Orders page: one WG Day (date, crew, truck once) with as many stops as needed.
+// "+ Add Stop" adds a blank stop; the small "Delete stop" removes one.
 (function () {
-  var rows = document.getElementById("wg-order-rows");
-  var template = document.getElementById("wg-order-template");
-  var addBtn = document.getElementById("wg-order-add");
-  var countEl = document.getElementById("wg-order-count");
+  var rows = document.getElementById("wg-stop-rows");
+  var template = document.getElementById("wg-stop-template");
+  var addBtn = document.getElementById("wg-stop-add");
+  var countEl = document.getElementById("wg-stop-count");
   if (!rows) return;
 
-  function cards() {
-    return rows.querySelectorAll("[data-wg-order]");
+  function stops() {
+    return rows.querySelectorAll("[data-wg-stop]");
   }
 
   function renumber() {
-    var labels = rows.querySelectorAll(".wg-order-number");
+    var labels = rows.querySelectorAll(".wg-stop-number");
     for (var i = 0; i < labels.length; i++) labels[i].textContent = String(i + 1);
-    var n = cards().length;
-    if (countEl) countEl.textContent = n + (n === 1 ? " order" : " orders");
+    var n = stops().length;
+    if (countEl) countEl.textContent = n + (n === 1 ? " stop" : " stops");
   }
 
   function hasContent(box) {
@@ -26,39 +26,16 @@
     return false;
   }
 
-  function copyPrevious(box) {
-    var all = Array.prototype.slice.call(cards());
-    var index = all.indexOf(box);
-    if (index < 1) return;
-    var prev = all[index - 1];
-    var prevChecked = {};
-    prev.querySelectorAll("[data-wg-crew] input[type=checkbox]").forEach(function (cb) {
-      prevChecked[cb.value] = cb.checked;
-    });
-    box.querySelectorAll("[data-wg-crew] input[type=checkbox]").forEach(function (cb) {
-      cb.checked = !!prevChecked[cb.value];
-    });
-    var prevTruck = prev.querySelector("[data-wg-truck]");
-    var truck = box.querySelector("[data-wg-truck]");
-    if (prevTruck && truck) truck.value = prevTruck.value;
-  }
-
   rows.addEventListener("click", function (event) {
-    var copyBtn = event.target.closest("[data-wg-copy-prev]");
-    if (copyBtn) {
-      copyPrevious(copyBtn.closest("[data-wg-order]"));
-      return;
-    }
-    var btn = event.target.closest("[data-wg-remove]");
+    var btn = event.target.closest("[data-wg-delete-stop]");
     if (!btn) return;
-    var box = btn.closest("[data-wg-order]");
+    var box = btn.closest("[data-wg-stop]");
     if (!box) return;
-    if (hasContent(box) && !window.confirm("Remove this WG order? It hasn't been saved.")) return;
-    if (cards().length > 1) {
+    if (hasContent(box) && !window.confirm("Delete this stop? It is removed when you press Save WG Day.")) return;
+    if (stops().length > 1) {
       box.remove();
     } else {
       box.querySelectorAll("input[type=text], input[type=tel], input[type=time], textarea").forEach(function (el) { el.value = ""; });
-      box.querySelectorAll("input[type=checkbox]").forEach(function (el) { el.checked = false; });
     }
     renumber();
   });
@@ -70,11 +47,6 @@
       var wrap = document.createElement("div");
       wrap.innerHTML = template.innerHTML.replace(/__N__/g, String(n)).trim();
       var box = wrap.firstElementChild;
-      // Same day as the previous order; crew / truck only via "Copy previous".
-      var dates = rows.querySelectorAll("[data-wg-date]");
-      var last = dates.length ? dates[dates.length - 1].value : "";
-      var dateEl = box.querySelector("[data-wg-date]");
-      if (dateEl && last) dateEl.value = last;
       rows.appendChild(box);
       renumber();
       box.scrollIntoView({ behavior: "smooth", block: "start" });

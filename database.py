@@ -109,6 +109,8 @@ BOOKING_EXTRA_COLUMNS = [
     ("wg_reference", "TEXT"),
     ("wg_payment_amount", "REAL"),
     ("wg_payment_type", "TEXT"),
+    # WG Day (wg_orders.py): number of stops in wg_stops. NULL = not a WG Day.
+    ("wg_stop_count", "INTEGER"),
 ]
 
 STAFF_EXTRA_COLUMNS = [
@@ -229,6 +231,35 @@ def _ensure_booking_crew_hours_table(conn) -> None:
         "ON booking_crew_hours(booking_id)"
     )
     _ensure_booking_crew_hours_columns(conn)
+
+
+def _ensure_wg_stops_table(conn) -> None:
+    """WG Day delivery stops (wg_orders.py). One booking = one WG Day."""
+    pg = db_backend.is_postgres()
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS wg_stops (
+            id {pk},
+            booking_id INTEGER NOT NULL{booking_fk},
+            position INTEGER NOT NULL DEFAULT 0,
+            customer TEXT NOT NULL DEFAULT '',
+            products TEXT NOT NULL DEFAULT '',
+            start_time TEXT NOT NULL DEFAULT '',
+            finish_time TEXT NOT NULL DEFAULT '',
+            address TEXT NOT NULL DEFAULT '',
+            phone TEXT NOT NULL DEFAULT '',
+            payment_amount {real},
+            payment_type TEXT NOT NULL DEFAULT '',
+            reference TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT ''
+        )
+        """.format(
+            pk="SERIAL PRIMARY KEY" if pg else "INTEGER PRIMARY KEY AUTOINCREMENT",
+            booking_fk=" REFERENCES bookings(id) ON DELETE CASCADE" if pg else "",
+            real="DOUBLE PRECISION" if pg else "REAL",
+        )
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_wg_stops_booking ON wg_stops(booking_id)")
 
 
 def _ensure_furniture_list_tables(conn) -> None:
@@ -845,6 +876,7 @@ def init_db() -> None:
                 _ensure_star_point_history_table(conn)
                 _ensure_booking_crew_hours_table(conn)
                 _ensure_furniture_list_tables(conn)
+                _ensure_wg_stops_table(conn)
                 _ensure_invoice_sequence(conn)
                 _seed_crew_and_trucks(conn)
                 _ensure_indexes(conn)
@@ -1030,6 +1062,7 @@ def init_db() -> None:
         _ensure_star_point_history_table(conn)
         _ensure_booking_crew_hours_table(conn)
         _ensure_furniture_list_tables(conn)
+        _ensure_wg_stops_table(conn)
         _ensure_invoice_sequence(conn)
         _seed_crew_and_trucks(conn)
         _ensure_indexes(conn)
@@ -1550,6 +1583,47 @@ def save_booking_wg_fields(booking_id: int, fields: Dict[str, Any]) -> None:
         conn.commit()
 
 
+WG_STOP_FIELDS = (
+    "customer", "products", "start_time", "finish_time", "address", "phone",
+    "payment_amount", "payment_type", "reference", "notes",
+)
+
+
+def list_wg_stops(booking_id: int) -> List[Dict[str, Any]]:
+    """A WG Day's stops in saved order (wg_orders sorts them by start time on save)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM wg_stops WHERE booking_id = ? ORDER BY position ASC, id ASC",
+            (booking_id,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def replace_wg_stops(booking_id: int, stops: List[Dict[str, Any]]) -> None:
+    """Replace a WG Day's stops and keep bookings.wg_stop_count in step."""
+    with get_connection() as conn:
+        conn.execute("DELETE FROM wg_stops WHERE booking_id = ?", (booking_id,))
+        for index, stop in enumerate(stops):
+            amount = stop.get("payment_amount")
+            values = [booking_id, index]
+            for key in WG_STOP_FIELDS:
+                if key == "payment_amount":
+                    values.append(float(amount) if amount not in (None, "") else None)
+                else:
+                    values.append(str(stop.get(key) or ""))
+            conn.execute(
+                "INSERT INTO wg_stops (booking_id, position, {0}) VALUES (?, ?, {1})".format(
+                    ", ".join(WG_STOP_FIELDS), ", ".join("?" * len(WG_STOP_FIELDS))
+                ),
+                values,
+            )
+        conn.execute(
+            "UPDATE bookings SET source = ?, wg_stop_count = ? WHERE id = ?",
+            ("wg_outdoor_life", len(stops), booking_id),
+        )
+        conn.commit()
+
+
 def save_booking_pickup_address_2(booking_id: int, address: str) -> None:
     """Save (or clear, with "") the optional second pickup address."""
     with get_connection() as conn:
@@ -1941,6 +2015,7 @@ def mark_review_request_reviewed(request_id: int, reviewed_at: str) -> None:
 
 def delete_booking(booking_id: int) -> bool:
     with get_connection() as conn:
+        conn.execute("DELETE FROM wg_stops WHERE booking_id = ?", (booking_id,))
         cursor = conn.execute("DELETE FROM bookings WHERE id = ?", (booking_id,))
         conn.commit()
         return cursor.rowcount > 0
@@ -2201,7 +2276,12 @@ def search_bookings(query: str) -> List[sqlite3.Row]:
         "LOWER(notes) LIKE ?",
         "LOWER(CAST(id AS TEXT)) LIKE ?",
     ]
-    params = [pattern] * len(clauses)
+    # WG Day stops (customer, address, REX, products) find their WG Day booking.
+    clauses.append(
+        "id IN (SELECT booking_id FROM wg_stops WHERE LOWER(customer) LIKE ? OR LOWER(address) LIKE ?"
+        " OR LOWER(reference) LIKE ? OR LOWER(products) LIKE ? OR LOWER(phone) LIKE ?)"
+    )
+    params = [pattern] * (len(clauses) - 1) + [pattern] * 5
 
     inv_clauses, inv_params = invoice_numbering.invoice_search_sql_clauses(q)
     clauses.extend(inv_clauses)

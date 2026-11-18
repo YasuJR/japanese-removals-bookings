@@ -3,6 +3,7 @@
     <span class="staff-cal-week-job-time">{{ job.time_range_week }}</span>
     <strong class="staff-cal-week-job-name">{% if job.is_wg %}<span class="cal-wg-badge">WG</span> {% endif %}{{ job.customer_name }}</strong>
     <span class="staff-cal-week-job-crew">{{ job.crew_display }}</span>
+    {% if job.is_wg_day %}<span class="staff-cal-week-job-crew">{{ job.wg_stops_label }}</span>{% endif %}
     {% if job.pickup_address_2 %}<span class="staff-cal-week-job-crew">2 pickups</span>{% endif %}
     {% if job.status_display %}
     <span class="staff-cal-week-job-status">{{ job.status_display }}</span>
@@ -36,10 +37,12 @@
         <dd>{% if job.pickup_2_map_url %}<a href="{{ job.pickup_2_map_url }}" target="_blank" rel="noopener noreferrer">{{ job.pickup_address_2 }}</a>{% else %}{{ job.pickup_address_2 }}{% endif %}</dd>
       </div>
       {% endif %}
+      {% if not job.is_wg_day %}
       <div>
         <dt>{{ 'Address' if job.is_wg else 'Delivery' }}</dt>
         <dd>{{ job.delivery_address or "—" }}</dd>
       </div>
+      {% endif %}
       <div>
         <dt>Phone</dt>
         <dd>{{ job.phone or "—" }}</dd>

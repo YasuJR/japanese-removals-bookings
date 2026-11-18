@@ -482,10 +482,7 @@ def _calendar_job_card(job: Dict[str, Any]) -> Dict[str, Any]:
         "pickup_map_url": job.get("pickup_map_url") or "",
         "pickup_address_2": job.get("pickup_address_2") or "",
         "pickup_2_map_url": job.get("pickup_2_map_url") or "",
-        "is_wg": job.get("is_wg", False),
-        "wg_products": job.get("wg_products") or "",
-        "wg_reference": job.get("wg_reference") or "",
-        "wg_payment_display": job.get("wg_payment_display") or "",
+        **wg_orders.copy_staff_fields(job),
         "delivery_map_url": job.get("delivery_map_url") or "",
         "furniture_token": job.get("furniture_token") or "",
         "furniture_status": job.get("furniture_status") or "",
@@ -1009,10 +1006,7 @@ def _owner_weekly_job_from_portal(job: Dict[str, Any]) -> Dict[str, Any]:
         "extra_pay_hours_label": job.get("extra_pay_hours_label") or "",
         "paid_hours": job.get("paid_hours"),
         "paid_hours_display": job.get("paid_hours_display") or "—",
-        "is_wg": job.get("is_wg", False),
-        "wg_products": job.get("wg_products") or "",
-        "wg_reference": job.get("wg_reference") or "",
-        "wg_payment_display": job.get("wg_payment_display") or "",
+        **wg_orders.copy_staff_fields(job),
         "furniture": job.get("furniture"),
     }
 

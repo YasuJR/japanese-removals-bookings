@@ -84,6 +84,7 @@ import furniture_volumes
 import job_status
 import receipts
 import pickups
+import wg_jobs
 import wg_orders
 import work_periods
 from crew_schedule_data import RANGE_OPTIONS, build_crew_schedule
@@ -2569,6 +2570,7 @@ def view_booking(booking_id):
         "view_booking.html",
         booking=row,
         furniture=furniture,
+        wg_day=wg_orders.run_sheet(row) if wg_jobs.is_wg_day(dict(row)) else None,
         **_view_booking_extras(row),
     )
 
@@ -2805,60 +2807,72 @@ def _wg_date_arg(value):
         return perth_today().isoformat()
 
 
-def _render_wg_orders(day_iso, rows, *, edit_booking_id=None, import_result=None):
-    day = date.fromisoformat(day_iso)
+def _render_wg_orders(day_iso, day, *, import_result=None):
+    """The WG Orders page for one date: that day's WG Day (if saved) + the day form."""
+    when = date.fromisoformat(day_iso)
+    saved = wg_orders.find_day(day_iso)
     return render_template(
         "wg_orders.html",
         day_iso=day_iso,
-        day_heading=day.strftime("%A %-d %B %Y"),
-        prev_day=(day - timedelta(days=1)).isoformat(),
-        next_day=(day + timedelta(days=1)).isoformat(),
-        day_orders=wg_orders.day_orders(day_iso),
-        rows=rows,
-        edit_booking_id=edit_booking_id,
+        day_heading=when.strftime("%A %-d %B %Y"),
+        prev_day=(when - timedelta(days=1)).isoformat(),
+        next_day=(when + timedelta(days=1)).isoformat(),
+        saved_day=wg_orders.run_sheet(saved) if saved else None,
+        older_bookings=[
+            {
+                "id": int(b["id"]),
+                "customer_name": b.get("customer_name") or "",
+                "time_range": wg_orders.time_range_label(b.get("start_time"), b.get("finish_time")),
+                "crew": ", ".join(crew_from_storage(b.get("crew"))) or "Unassigned",
+                "truck": b.get("truck_assigned") or "No truck",
+                "is_order": wg_jobs.is_wg_order(b),
+            }
+            for b in wg_orders.older_wg_bookings(day_iso)
+        ],
+        day=day,
+        auto_times=wg_orders.auto_times(day["stops"]),
         crew_options=active_crew_names(),
         truck_options=active_truck_names(),
         payment_types=wg_orders.PAYMENT_TYPES,
-        blank_row=wg_orders.empty_order(day_iso),
+        blank_stop=wg_orders.empty_stop(),
         import_result=import_result,
     )
 
 
-def _wg_save_and_report(raw_rows):
-    """Save rows; flash the results. Returns the rows that still need attention."""
-    outcomes = wg_orders.save_orders(raw_rows)
-    saved = [o for o in outcomes if o["booking_id"]]
-    failed = [o for o in outcomes if not o["booking_id"]]
-    for o in saved:
-        for msg in o["warnings"]:
-            flash("{0}: {1}".format(o["order"]["customer"], msg), "warning")
-        _flash_integration_messages(o["messages"])
-    if saved:
-        flash("Saved {0} WG order{1}.".format(len(saved), "" if len(saved) == 1 else "s"), "success")
-    if failed:
-        flash("{0} WG order{1} not saved — see the messages below.".format(len(failed), "" if len(failed) == 1 else "s"), "error")
-    if not outcomes:
-        flash("Nothing to save — fill in at least one WG order.", "error")
-    return [dict(o["order"], errors=o["errors"], duplicates=o["duplicates"], conflicts=o["conflicts"]) for o in failed], saved
+def _wg_day_for_date(day_iso):
+    saved = wg_orders.find_day(day_iso)
+    return wg_orders.day_from_booking(saved) if saved else wg_orders.empty_day(day_iso)
 
 
 @app.route("/wg-orders", methods=["GET", "POST"], endpoint="wg_orders")
 @auth.login_required
 def wg_orders_page():
     if request.method == "POST":
-        day_iso = _wg_date_arg(request.form.get("day"))
-        failed, _saved = _wg_save_and_report(wg_orders.parse_form_rows(request.form))
-        if failed:
-            return _render_wg_orders(day_iso, failed)
+        raw = wg_orders.parse_day_form(request.form)
+        booking_id, result = wg_orders.save_day(raw)
+        day = result["day"]
+        day_iso = _wg_date_arg(day["move_date"] or request.form.get("day"))
+        if booking_id is None:
+            for msg in result["errors"]:
+                flash(msg, "error")
+            if not day["stops"]:
+                day["stops"] = [wg_orders.empty_stop()]
+            day["conflicts"] = result["conflicts"]
+            return _render_wg_orders(day_iso, day)
+        for msg in result["warnings"]:
+            flash(msg, "warning")
+        _flash_integration_messages(result["messages"])
+        flash("Saved the WG Day for {0}: {1}.".format(
+            date.fromisoformat(day_iso).strftime("%a %-d %b %Y"), wg_orders.stops_label(len(day["stops"]))), "success")
         return redirect(url_for("wg_orders", date=day_iso))
     day_iso = _wg_date_arg(request.args.get("date"))
-    return _render_wg_orders(day_iso, [wg_orders.empty_order(day_iso)])
+    return _render_wg_orders(day_iso, _wg_day_for_date(day_iso))
 
 
 @app.route("/wg-orders/import", methods=["POST"], endpoint="wg_orders_import")
 @auth.login_required
 def wg_orders_import():
-    """Analyse an uploaded WG photo / PDF into order cards. Saves nothing."""
+    """Analyse an uploaded WG photo / PDF into one WG Day form. Saves nothing."""
     import wg_import
 
     day_iso = _wg_date_arg(request.form.get("day"))
@@ -2884,45 +2898,96 @@ def wg_orders_import():
         return redirect(url_for("wg_orders", date=day_iso))
     finally:
         del data
-    orders = result["orders"]
-    if not orders:
-        flash("No WG orders were found in {0}. Check the file or enter the orders by hand.".format(result["filename"]), "error")
+    imported = result["day"]
+    if not imported or not imported["stops"]:
+        flash("No WG stops were found in {0}. Check the file or enter the stops by hand.".format(result["filename"]), "error")
         return redirect(url_for("wg_orders", date=day_iso))
-    dates = sorted({o["move_date"] for o in orders if o.get("move_date")})
-    view_day = dates[0] if dates else day_iso
-    warning_count = sum(len(o.get("field_warnings") or {}) for o in orders)
-    flash("Analysed {0}: {1} WG order{2} found. Check them, then press Save All WG Orders.".format(
-        result["filename"], len(orders), "" if len(orders) == 1 else "s"), "success")
+    view_day = _wg_date_arg(imported["move_date"] or day_iso)
+    day = _wg_day_for_date(view_day)
+    existing = [s for s in day["stops"] if not wg_orders.stop_is_blank(s)]
+    if day["booking_id"]:
+        # Adding to a saved WG Day: keep its crew / truck, append the new stops.
+        for field in ("crew", "truck"):
+            if not day[field]:
+                day[field] = imported[field]
+    else:
+        day["crew"], day["truck"] = imported["crew"], imported["truck"]
+    day["field_warnings"] = imported["field_warnings"] if not day["booking_id"] else {
+        k: v for k, v in imported["field_warnings"].items() if k == "move_date"}
+    day["stops"] = existing + [wg_orders.clean_stop(dict(s, imported=True)) for s in imported["stops"]]
+    wg_orders.annotate_duplicates(day)
+    warning_count = sum(len(s.get("field_warnings") or {}) for s in day["stops"]) + len(day["field_warnings"])
+    flash("Analysed {0}: {1} found. Check them, then press Save WG Day.".format(
+        result["filename"], wg_orders.stops_label(len(imported["stops"]))), "success")
     return _render_wg_orders(
         view_day,
-        orders,
+        day,
         import_result={
             "filename": result["filename"],
-            "count": len(orders),
+            "count": len(imported["stops"]),
+            "existing": len(existing),
             "notices": result["notices"],
             "warning_count": warning_count,
         },
     )
 
 
-@app.route("/wg-orders/<int:booking_id>/edit", methods=["GET", "POST"], endpoint="wg_order_edit")
+@app.route("/wg-orders/adopt/<int:booking_id>", methods=["POST"], endpoint="wg_orders_adopt")
 @auth.login_required
-def wg_order_edit(booking_id):
+def wg_orders_adopt(booking_id):
+    """Owner action: make a hand-made "WG" day booking the date's WG Day."""
+    ok, msg = wg_orders.adopt_booking_as_day(booking_id)
+    flash(msg, "success" if ok else "error")
     row = db.get_booking(booking_id)
-    if row is None:
-        flash("Booking not found.", "error")
-        return redirect(url_for("wg_orders"))
-    if request.method == "POST":
-        raw_rows = wg_orders.parse_form_rows(request.form)
-        for raw in raw_rows:
-            raw["booking_id"] = booking_id
-        failed, saved = _wg_save_and_report(raw_rows[:1])
-        if failed:
-            return _render_wg_orders(failed[0]["move_date"] or _wg_date_arg(row["move_date"]), failed, edit_booking_id=booking_id)
-        day_iso = _wg_date_arg(dict(db.get_booking(booking_id))["move_date"])
+    return redirect(url_for("wg_orders", date=_wg_date_arg(dict(row)["move_date"] if row else None)))
+
+
+@app.route("/wg-orders/move/<int:booking_id>", methods=["POST"], endpoint="wg_orders_move")
+@auth.login_required
+def wg_orders_move(booking_id):
+    """Owner action: move an older per-customer WG booking into its date's WG Day."""
+    row = db.get_booking(booking_id)
+    day_iso = _wg_date_arg(dict(row)["move_date"] if row else None)
+    if request.form.get("confirm") != "yes":
+        flash("Tick the box to confirm the move.", "error")
         return redirect(url_for("wg_orders", date=day_iso))
-    order = wg_orders.order_from_booking(row)
-    return _render_wg_orders(_wg_date_arg(order["move_date"]), [order], edit_booking_id=booking_id)
+    day_id, msg = wg_orders.move_order_into_day(booking_id)
+    flash(msg, "success" if day_id else "error")
+    return redirect(url_for("wg_orders", date=day_iso))
+
+
+def _wg_run_sheet_or_404(booking_id):
+    row = db.get_booking(booking_id)
+    if row is None or not wg_jobs.is_wg_day(dict(row)):
+        abort(404)
+    return wg_orders.run_sheet(row)
+
+
+@app.route("/staff/wg/<int:booking_id>", endpoint="staff_wg_run_sheet")
+@staff_auth.staff_login_required
+def staff_wg_run_sheet(booking_id):
+    """WG Run Sheet: every stop of one WG Day, in time order, with Map and Call."""
+    sheet = _wg_run_sheet_or_404(booking_id)
+    response = app.make_response(render_template("staff_wg_run_sheet.html", sheet=sheet))
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
+
+@app.route("/staff/wg/<int:booking_id>/run-sheet.pdf", endpoint="staff_wg_run_sheet_pdf")
+@staff_auth.staff_login_required
+def staff_wg_run_sheet_pdf(booking_id):
+    from integrations import wg_run_sheet_pdf
+
+    sheet = _wg_run_sheet_or_404(booking_id)
+    return Response(
+        wg_run_sheet_pdf.render_wg_run_sheet_pdf(sheet),
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": "attachment; filename=wg-run-sheet-{0}.pdf".format(sheet["move_date"]),
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @app.route("/furniture-lists", methods=["GET", "POST"], endpoint="furniture_lists_index")

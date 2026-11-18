@@ -364,3 +364,8 @@
     display: none;
   }
 }
+
+/* WG Day: "4 stops" stays visible even where the other meta lines are hidden (phones). */
+.cal-booking-meta.cal-wg-stops {
+  display: block;
+}

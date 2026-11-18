@@ -58,6 +58,27 @@
     {% include '_job_note_display.html' %}
   </section>
 
+  {% if wg_day %}
+  <section class="booking-details-section wg-booking-day">
+    <h3>WG Day · {{ wg_day.stops_label }} <span class="cal-wg-badge">WG OUTDOOR LIFE</span></h3>
+    <p class="hint">Crew: {{ wg_day.crew_display }} · {{ wg_day.truck }}.
+      <a href="{{ url_for('wg_orders', date=wg_day.move_date) }}">Edit WG Day / stops</a> ·
+      <a href="{{ url_for('staff_wg_run_sheet', booking_id=wg_day.booking_id) }}">Run Sheet</a> ·
+      <a href="{{ url_for('staff_wg_run_sheet_pdf', booking_id=wg_day.booking_id) }}">Run Sheet PDF</a></p>
+    <ol class="wg-day-list">
+      {% for s in wg_day.stops %}
+      <li class="wg-day-item">
+        <span class="wg-day-time">{{ s.time_range }}</span>
+        <span class="wg-day-customer">{{ s.customer }}</span>
+        {% if s.payment_display %}<span class="wg-day-payment">{{ s.payment_display }}</span>{% endif %}
+        {% if s.reference %}<span class="wg-day-ref">{{ s.reference }}</span>{% endif %}
+        <span class="wg-day-meta">{{ s.address }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+  {% endif %}
+
   {% include '_booking_furniture_panel.html' %}
 
   <section class="booking-details-section">

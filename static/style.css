@@ -4311,14 +4311,61 @@ button:disabled {
   }
 }
 
-.wg-order-tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+/* WG Day: date / crew / truck once, then the stops */
+.wg-day-head {
+  border-left-color: #1f3a5f;
 }
 
-#wg-order-rows > .wg-order:first-child [data-wg-copy-prev] {
-  display: none;
+.wg-day-times summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.wg-stop-tools {
+  margin: 0.4rem 0 0;
+  text-align: right;
+}
+
+.wg-stop-delete {
+  background: none;
+  border: none;
+  padding: 0.25rem 0;
+  font-size: 0.82rem;
+  color: #8a2f2f;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.wg-day-summary-line {
+  margin: 0 0 0.4rem;
+}
+
+.wg-older {
+  margin-top: 1rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  background: #f5f6f8;
+}
+
+.wg-older h4 {
+  margin: 0 0 0.25rem;
+}
+
+.wg-older-list {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.wg-older-list li {
+  margin-bottom: 0.5rem;
+}
+
+.wg-older-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+  align-items: center;
+  margin-top: 0.3rem;
 }
 
 .wg-form-head {

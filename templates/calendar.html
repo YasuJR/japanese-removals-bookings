@@ -83,8 +83,10 @@
           <a class="calendar-booking cal-{{ booking.status_class }}" href="{{ booking.edit_url }}"
              data-booking-id="{{ booking.id }}">
             <span class="cal-booking-time">{{ booking.time_range }}</span>
-            <strong class="cal-booking-customer">{% if booking.is_wg %}<span class="cal-wg-badge">WG</span> {% endif %}{{ booking.customer_name }}</strong>
-            <span class="cal-booking-meta">{{ booking.num_movers }} movers · {{ booking.crew }}</span>
+            {% if booking.is_wg_day %}<strong class="cal-booking-customer"><span class="cal-wg-badge">WG</span> WG OUTDOOR LIFE</strong>
+            <span class="cal-booking-meta cal-wg-stops">{{ booking.wg_stops_label }}</span>
+            <span class="cal-booking-meta">Crew: {{ booking.crew }}</span>{% else %}<strong class="cal-booking-customer">{% if booking.is_wg %}<span class="cal-wg-badge">WG</span> {% endif %}{{ booking.customer_name }}</strong>
+            <span class="cal-booking-meta">{{ booking.num_movers }} movers · {{ booking.crew }}</span>{% endif %}
             <span class="cal-booking-status">{{ booking.status|upper }}</span>
           </a>
           {% endfor %}
@@ -115,7 +117,7 @@
         {% for booking in day.bookings %}
         <a class="calendar-week-booking cal-{{ booking.status_class }}" href="{{ booking.edit_url }}"
            style="--cal-start: {{ booking.start_minutes }}; --cal-duration: {{ (booking.duration_hours * 60)|int }};">
-          <strong>{% if booking.is_wg %}<span class="cal-wg-badge">WG</span> {% endif %}{{ booking.customer_name }}</strong>
+          <strong>{% if booking.is_wg_day %}<span class="cal-wg-badge">WG</span> WG OUTDOOR LIFE · {{ booking.wg_stops_label }}{% else %}{% if booking.is_wg %}<span class="cal-wg-badge">WG</span> {% endif %}{{ booking.customer_name }}{% endif %}</strong>
           <span>{{ booking.time_range }}</span>
         </a>
         {% endfor %}
@@ -138,8 +140,9 @@
       {% for booking in cal.events %}
       <a class="calendar-booking cal-{{ booking.status_class }} calendar-booking-large" href="{{ booking.edit_url }}">
         <span class="cal-booking-time">{{ booking.time_range }}</span>
-        <strong class="cal-booking-customer">{% if booking.is_wg %}<span class="cal-wg-badge">WG</span> {% endif %}{{ booking.customer_name }}</strong>
-        <span class="cal-booking-meta">{{ booking.num_movers }} movers · {{ booking.crew }} · {{ booking.truck_assigned or 'No truck' }}</span>
+        {% if booking.is_wg_day %}<strong class="cal-booking-customer"><span class="cal-wg-badge">WG</span> WG OUTDOOR LIFE</strong>
+        <span class="cal-booking-meta cal-wg-stops">{{ booking.wg_stops_label }} · Crew: {{ booking.crew }} · {{ booking.truck_assigned or 'No truck' }}</span>{% else %}<strong class="cal-booking-customer">{% if booking.is_wg %}<span class="cal-wg-badge">WG</span> {% endif %}{{ booking.customer_name }}</strong>
+        <span class="cal-booking-meta">{{ booking.num_movers }} movers · {{ booking.crew }} · {{ booking.truck_assigned or 'No truck' }}</span>{% endif %}
         <span class="cal-booking-status">{{ booking.status|upper }} · {{ booking.payment_status }}</span>
       </a>
       {% else %}

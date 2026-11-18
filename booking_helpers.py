@@ -23,6 +23,14 @@ def apple_maps_url(address: Any) -> str:
     return "https://maps.apple.com/?q={0}".format(quote(text))
 
 
+def google_maps_url(address: Any) -> str:
+    """Google Maps search URL for an address (WG run sheet), or empty string."""
+    text = str(address or "").strip()
+    if not text:
+        return ""
+    return "https://www.google.com/maps/search/?api=1&query={0}".format(quote(text))
+
+
 def _phone_digits(phone: Any) -> str:
     """Digits only (and leading +), spaces stripped."""
     text = str(phone or "").strip()

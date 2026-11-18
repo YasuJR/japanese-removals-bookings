@@ -1,0 +1,153 @@
+/* Staff Portal WG Run Sheet (/staff/wg/<id>): one WG Day, every stop in time order. */
+:root {
+  --wgr-green: #1f5f3a;
+  --wgr-ink: #1b1f23;
+  --wgr-muted: #5a6470;
+  --wgr-line: #d7dde3;
+  --wgr-bg: #f4f6f5;
+}
+
+* { box-sizing: border-box; }
+
+.wgr-body {
+  margin: 0;
+  padding: 0 16px 32px;
+  background: var(--wgr-bg);
+  color: var(--wgr-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", sans-serif;
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.wgr-header,
+.wgr-main {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.wgr-header {
+  padding: 16px 0 8px;
+}
+
+.wgr-badge {
+  display: inline-block;
+  margin: 0 0 6px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: var(--wgr-green);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.wgr-title {
+  margin: 0 0 6px;
+  font-size: 1.5rem;
+}
+
+.wgr-meta {
+  margin: 2px 0;
+  font-size: 1.05rem;
+}
+
+.wgr-meta span {
+  font-weight: 700;
+}
+
+.wgr-actions,
+.wgr-stop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.wgr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 88px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: var(--wgr-green);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.wgr-btn-secondary {
+  background: #fff;
+  color: var(--wgr-green);
+  border: 1px solid var(--wgr-green);
+}
+
+.wgr-btn-disabled {
+  background: #e3e6e9;
+  color: #8a939c;
+}
+
+.wgr-stop {
+  margin: 14px 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border-left: 6px solid var(--wgr-green);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  overflow-wrap: anywhere;
+}
+
+.wgr-stop-number {
+  margin: 0;
+  color: var(--wgr-green);
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.wgr-stop-time {
+  margin: 2px 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.wgr-stop-customer {
+  margin: 2px 0 8px;
+  font-size: 1.3rem;
+}
+
+.wgr-label {
+  margin: 10px 0 0;
+  color: var(--wgr-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.wgr-value,
+.wgr-products,
+.wgr-notes {
+  margin: 1px 0 0;
+}
+
+.wgr-products,
+.wgr-notes {
+  white-space: pre-line;
+}
+
+.wgr-ref {
+  font-weight: 700;
+}
+
+.wgr-empty {
+  color: var(--wgr-muted);
+}
+
+@media print {
+  .wgr-actions,
+  .wgr-stop-actions { display: none; }
+  .wgr-body { background: #fff; }
+  .wgr-stop { box-shadow: none; border: 1px solid var(--wgr-line); break-inside: avoid; }
+}

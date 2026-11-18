@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1f5f3a">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>WG Run Sheet · {{ sheet.date_heading }} — Japanese Removals</title>
+  {% include '_head_icons.html' %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='wg_run_sheet.css') }}">
+</head>
+<body class="wgr-body">
+  <header class="wgr-header">
+    <p class="wgr-badge">WG OUTDOOR LIFE</p>
+    <h1 class="wgr-title">{{ sheet.date_heading }}</h1>
+    <p class="wgr-meta"><span>Crew:</span> {{ sheet.crew_display }}</p>
+    <p class="wgr-meta"><span>Truck:</span> {{ sheet.truck }} · {{ sheet.stops_label }} · {{ sheet.time_range }}</p>
+    <p class="wgr-actions">
+      <a class="wgr-btn wgr-btn-secondary" href="{{ url_for('staff_portal') }}">← Staff Portal</a>
+      <a class="wgr-btn" href="{{ url_for('staff_wg_run_sheet_pdf', booking_id=sheet.booking_id) }}">Download WG Run Sheet PDF</a>
+    </p>
+  </header>
+  <main class="wgr-main">
+    {% for s in sheet.stops %}
+    <article class="wgr-stop" id="stop-{{ s.number }}">
+      <p class="wgr-stop-number">STOP {{ s.number }}</p>
+      <p class="wgr-stop-time">{{ s.time_range }}</p>
+      <h2 class="wgr-stop-customer">{{ s.customer }}</h2>
+      {% if s.products %}
+      <p class="wgr-label">Products</p>
+      <p class="wgr-products">{{ s.products }}</p>
+      {% endif %}
+      <p class="wgr-label">Address</p>
+      <p class="wgr-value">{{ s.address or '—' }}</p>
+      <p class="wgr-label">Phone</p>
+      <p class="wgr-value">{{ s.phone or '—' }}</p>
+      {% if s.payment_display %}
+      <p class="wgr-label">Payment</p>
+      <p class="wgr-value">{{ s.payment_display }}</p>
+      {% endif %}
+      {% if s.reference %}
+      <p class="wgr-label">Reference</p>
+      <p class="wgr-value wgr-ref">{{ s.reference }}</p>
+      {% endif %}
+      {% if s.notes %}
+      <p class="wgr-label">Notes</p>
+      <p class="wgr-notes">{{ s.notes }}</p>
+      {% endif %}
+      <p class="wgr-stop-actions">
+        {% if s.map_url %}<a class="wgr-btn" href="{{ s.map_url }}" target="_blank" rel="noopener noreferrer">Map</a>{% else %}<span class="wgr-btn wgr-btn-disabled">Map</span>{% endif %}
+        {% if s.tel_href %}<a class="wgr-btn" href="{{ s.tel_href }}">Call</a>{% else %}<span class="wgr-btn wgr-btn-disabled">Call</span>{% endif %}
+      </p>
+    </article>
+    {% else %}
+    <p class="wgr-empty">No stops on this WG Day yet.</p>
+    {% endfor %}
+  </main>
+</body>
+</html>

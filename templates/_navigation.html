@@ -7,7 +7,7 @@
 {% set driver_active_endpoints = ('driver', 'driver_run_sheet_pdf') %}
 {% set furniture_active_endpoints = ('furniture_lists_index', 'office_furniture_list', 'office_furniture_pdf', 'furniture_volumes_admin') %}
 {% set furniture_active = request.endpoint in furniture_active_endpoints %}
-{% set wg_active = request.endpoint in ('wg_orders', 'wg_order_edit') %}
+{% set wg_active = request.endpoint in ('wg_orders', 'wg_orders_import') %}
 
 <nav class="main-nav main-nav-desktop" aria-label="Main">
   <a href="{{ url_for('ceo_dashboard') }}" class="{% if request.endpoint == 'ceo_dashboard' %}active{% endif %}">Home</a>

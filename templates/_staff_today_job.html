@@ -32,7 +32,7 @@
     {% endif %}
   </p>
   {% endif %}
-  {% if job.delivery_address %}
+  {% if job.delivery_address and not job.is_wg_day %}
   <p class="staff-today-job-address">
     <span>{{ 'Address:' if job.is_wg else 'Delivery:' }}</span>
     {% if job.delivery_map_url %}

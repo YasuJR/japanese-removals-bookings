@@ -48,6 +48,20 @@ def is_wg_order(job: Any) -> bool:
     return str(_field(job, "source") or "").strip().lower() == WG_ORDER_SOURCE
 
 
+def is_wg_day(job: Any) -> bool:
+    """True for a WG Day booking (one per day; its delivery stops are in wg_stops)."""
+    return is_wg_order(job) and _field(job, "wg_stop_count") not in (None, "")
+
+
+def stops_label(count: Any) -> str:
+    """"4 stops" / "1 stop"."""
+    try:
+        n = int(count or 0)
+    except (TypeError, ValueError):
+        n = 0
+    return "{0} stop{1}".format(n, "" if n == 1 else "s")
+
+
 def is_wg_outdoor_life(job: Any) -> bool:
     if is_wg_order(job):
         return True

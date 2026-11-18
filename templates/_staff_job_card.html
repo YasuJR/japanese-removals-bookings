@@ -10,7 +10,7 @@
   <p class="staff-job-headline">{{ job.start_time }}</p>
   <p class="staff-job-customer">{{ job.customer_name }}</p>
   <p class="staff-job-date"><span>Date</span> {{ job.date_display }}</p>
-  <p class="staff-job-route">{% if job.is_wg %}{{ job.dropoff_label or "—" }}{% else %}{{ job.pickup_label or "—" }}{% if job.pickup_address_2 %} → {{ job.pickup_2_label }}{% endif %} → {{ job.dropoff_label or "—" }}{% endif %}</p>
+  <p class="staff-job-route">{% if job.is_wg_day %}WG delivery run · {{ job.wg_stops_label }}{% elif job.is_wg %}{{ job.dropoff_label or "—" }}{% else %}{{ job.pickup_label or "—" }}{% if job.pickup_address_2 %} → {{ job.pickup_2_label }}{% endif %} → {{ job.dropoff_label or "—" }}{% endif %}</p>
   <p class="staff-job-crew-line"><span>Crew</span> {{ job.crew }}</p>
   {% else %}
   <p class="staff-job-headline">{{ job.start_time }} — {{ job.customer_name }}</p>
@@ -70,10 +70,12 @@
       <dd>{{ job.pickup_address_2 }}</dd>
     </div>
     {% endif %}
+    {% if not job.is_wg_day %}
     <div>
       <dt>{{ 'Address' if job.is_wg else 'Drop-off' }}</dt>
       <dd>{{ job.dropoff_address or "—" }}</dd>
     </div>
+    {% endif %}
     <div>
       <dt>Phone Number</dt>
       <dd>{{ job.phone or "—" }}</dd>
@@ -93,10 +95,12 @@
       <dd>{{ job.pickup_address_2 }}</dd>
     </div>
     {% endif %}
+    {% if not job.is_wg_day %}
     <div>
       <dt>{{ 'Address' if job.is_wg else 'Drop-off' }}</dt>
       <dd>{{ job.dropoff_address or "—" }}</dd>
     </div>
+    {% endif %}
     <div>
       <dt>Phone Number</dt>
       <dd>{{ job.phone or "—" }}</dd>
@@ -104,6 +108,7 @@
   </dl>
   {% endif %}
 
+  {% if not job.is_wg_day %}
   <div class="staff-job-actions">
     {% if job.tel_href %}
     <a class="staff-job-btn" href="{{ job.tel_href }}">Call Customer</a>
@@ -130,6 +135,7 @@
     <span class="staff-job-btn staff-job-btn-disabled">Drop-off Map</span>
     {% endif %}
   </div>
+  {% endif %}
 
   {% include "_staff_job_note.html" %}
   {% include "_staff_furniture.html" %}

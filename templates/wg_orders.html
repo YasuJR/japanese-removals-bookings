@@ -5,11 +5,10 @@
 {% macro warn_class(o, field) %}{% if o.field_warnings and o.field_warnings.get(field) %} wg-field-warn{% endif %}{% endmacro %}
 {% macro warn_msgs(o, field) %}{% if o.field_warnings and o.field_warnings.get(field) %}{% for msg in o.field_warnings.get(field) %}<span class="wg-warn-msg">⚠ {{ msg }}</span>{% endfor %}{% endif %}{% endmacro %}
 
-{% macro order_fields(o, n) %}
-{% set p = 'orders-' ~ n ~ '-' %}
-<fieldset class="wg-order{% if o.imported %} wg-order-imported{% endif %}" data-wg-order>
-  <legend>{% if o.booking_id %}WG Order · booking #{{ o.booking_id }}{% else %}WG Order <span class="wg-order-number"></span>{% endif %}</legend>
-  {% if o.booking_id %}<input type="hidden" name="{{ p }}booking_id" value="{{ o.booking_id }}">{% endif %}
+{% macro stop_fields(o, n) %}
+{% set p = 'stops-' ~ n ~ '-' %}
+<fieldset class="wg-order wg-stop{% if o.imported %} wg-order-imported{% endif %}" data-wg-stop>
+  <legend>Stop <span class="wg-stop-number"></span></legend>
   {% if o.errors %}
   <ul class="wg-order-errors">
     {% for e in o.errors %}<li>{{ e }}</li>{% endfor %}
@@ -17,32 +16,18 @@
   {% endif %}
   {% if o.duplicates %}
   <div class="wg-order-warning">
-    <p><strong>Possible duplicate:</strong></p>
+    <p><strong>Possible duplicate of:</strong></p>
     <ul>
       {% for d in o.duplicates %}
-      <li><a href="{{ url_for('view_booking', booking_id=d.id) }}" target="_blank" rel="noopener">#{{ d.id }} {{ d.customer_name }}</a> · {{ d.time_label }} · {{ d.reasons|join(', ') }}</li>
+      <li>{% if d.booking_id %}<a href="{{ url_for('view_booking', booking_id=d.booking_id) }}" target="_blank" rel="noopener">{{ d.label }}</a>{% else %}{{ d.label }}{% endif %} · {{ d.reasons|join(', ') }}</li>
       {% endfor %}
     </ul>
-    <label class="wg-check"><input type="checkbox" name="{{ p }}force_duplicate" {% if o.force_duplicate %}checked{% endif %}> Save anyway (not a duplicate)</label>
-  </div>
-  {% endif %}
-  {% if o.conflicts %}
-  <div class="wg-order-warning">
-    <p><strong>Time overlap (same truck or no truck):</strong></p>
-    <ul>
-      {% for c in o.conflicts %}<li>#{{ c.id }} {{ c.customer_name }} · {{ c.time_label }}</li>{% endfor %}
-    </ul>
-    <label class="wg-check"><input type="checkbox" name="{{ p }}override" {% if o.override %}checked{% endif %}> I understand this may be double booked</label>
   </div>
   {% endif %}
   <div class="wg-order-grid">
     <label class="wg-span-2{{ warn_class(o, 'customer') }}">{{ bl('Customer name *', 'お客様名') }}
       <input type="text" name="{{ p }}customer" value="{{ o.customer or '' }}" autocomplete="off">
       {{ warn_msgs(o, 'customer') }}
-    </label>
-    <label class="{{ warn_class(o, 'move_date') }}">{{ bl('Date *', '日付') }}
-      <input type="date" name="{{ p }}move_date" value="{{ o.move_date or '' }}" data-wg-date>
-      {{ warn_msgs(o, 'move_date') }}
     </label>
     <label class="{{ warn_class(o, 'start_time') }}">{{ bl('Start time *', '開始時間') }}
       <input type="time" name="{{ p }}start_time" value="{{ o.start_time or '' }}">
@@ -72,7 +57,7 @@
       <input type="text" name="{{ p }}payment_type" value="{{ o.payment_type or '' }}" list="wg-payment-types" maxlength="30" placeholder="COD / Confirmed / Invoice">
       {{ warn_msgs(o, 'payment_type') }}
     </label>
-    <label class="{{ warn_class(o, 'reference') }}">{{ bl('Ready / Reference', 'REX番号') }}
+    <label class="{{ warn_class(o, 'reference') }}">{{ bl('Ready / REX Reference', 'REX番号') }}
       <input type="text" name="{{ p }}reference" value="{{ o.reference or '' }}" placeholder="REX 3277">
       {{ warn_msgs(o, 'reference') }}
     </label>
@@ -80,33 +65,8 @@
       <textarea name="{{ p }}notes" rows="2">{{ o.notes or '' }}</textarea>
       {{ warn_msgs(o, 'notes') }}
     </label>
-    <fieldset class="wg-span-full wg-crew{{ warn_class(o, 'crew') }}" data-wg-crew>
-      <legend>{{ bl('Crew', '担当スタッフ') }}</legend>
-      <div class="wg-crew-options">
-        {% for name in crew_options %}
-        {% set cid = p ~ 'crew-' ~ loop.index %}
-        <label class="wg-crew-option" for="{{ cid }}">
-          <input type="checkbox" id="{{ cid }}" name="{{ p }}crew" value="{{ name }}" {% if name in (o.crew or []) %}checked{% endif %}>
-          <span>{{ name }}</span>
-        </label>
-        {% endfor %}
-      </div>
-      {{ warn_msgs(o, 'crew') }}
-    </fieldset>
-    <label class="{{ warn_class(o, 'truck') }}">{{ bl('Truck', 'トラック') }}
-      <select name="{{ p }}truck" data-wg-truck>
-        <option value="">— No truck —</option>
-        {% for truck in truck_options %}<option value="{{ truck }}" {% if o.truck == truck %}selected{% endif %}>{{ truck }}</option>{% endfor %}
-      </select>
-      {{ warn_msgs(o, 'truck') }}
-    </label>
   </div>
-  {% if not o.booking_id %}
-  <div class="wg-order-tools">
-    <button type="button" class="btn-secondary btn-sm" data-wg-copy-prev>Copy previous crew &amp; truck</button>
-    <button type="button" class="btn-secondary btn-sm wg-order-remove" data-wg-remove>Remove Order · <span lang="ja">削除</span></button>
-  </div>
-  {% endif %}
+  <p class="wg-stop-tools"><button type="button" class="wg-stop-delete" data-wg-delete-stop>Delete stop</button></p>
 </fieldset>
 {% endmacro %}
 
@@ -115,10 +75,9 @@
   {% for t in payment_types %}<option value="{{ t }}">{% endfor %}
 </datalist>
 
-{% if not edit_booking_id %}
 <section class="panel wg-import">
   <h3>WG Order Import · <span lang="ja">WG注文を取り込む</span></h3>
-  <p class="hint">Upload WG’s photo, screenshot or PDF (JPG, PNG or PDF, max 15 MB) and press Analyse. The orders found are put into the cards below for you to check — <strong>nothing is saved until you press Save All WG Orders</strong>. The file itself is not kept.</p>
+  <p class="hint">Upload WG’s sheet — photo, screenshot or PDF (JPG, PNG or PDF, max 15 MB) — and press Analyse. The date, crew (when the sheet names one) and every stop are put into the WG Day form below for you to check — <strong>nothing is saved until you press Save WG Day</strong>. The file itself is not kept.</p>
   <form method="post" action="{{ url_for('wg_orders_import') }}" enctype="multipart/form-data" class="wg-import-form">
     <input type="hidden" name="day" value="{{ day_iso }}">
     <input type="file" name="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required>
@@ -126,19 +85,18 @@
   </form>
   {% if import_result %}
   <div class="wg-import-result">
-    <p><strong>{{ import_result.count }} WG order{{ '' if import_result.count == 1 else 's' }}</strong> read from {{ import_result.filename }}{% if import_result.notices %} · {{ import_result.notices|join(' · ') }}{% endif %}.
+    <p><strong>{{ import_result.count }} stop{{ '' if import_result.count == 1 else 's' }}</strong> read from {{ import_result.filename }}{% if import_result.notices %} · {{ import_result.notices|join(' · ') }}{% endif %}{% if import_result.existing %} · added after the {{ import_result.existing }} saved stop{{ '' if import_result.existing == 1 else 's' }} of this WG Day{% endif %}.
       {% if import_result.warning_count %}<span class="wg-warn-msg">⚠ {{ import_result.warning_count }} field{{ '' if import_result.warning_count == 1 else 's' }} need checking (yellow).</span>{% endif %}
       Not saved yet.</p>
   </div>
   {% endif %}
 </section>
-{% endif %}
 
 <section class="panel wg-orders-page">
   <div class="panel-head panel-head-wrap">
     <div class="panel-head-main">
       <h2>WG Orders <span class="cal-wg-badge">WG OUTDOOR LIFE</span></h2>
-      <p class="hint">Delivery orders from WG Outdoor Life. Each order becomes a booking (shown as “WG - Customer”) on the Calendar, Staff Portal and Weekly Schedule. WG payments stay in the Dashboard’s WG OUTDOOR LIFE section, apart from normal unpaid customers.</p>
+      <p class="hint">One WG Day per date: the crew and truck are set once and run every stop in time order. Dashboard, Calendar and the Staff Portal show the day as one “WG” job; the stops are on the WG Run Sheet. The WG Day is invoiced like a normal hourly job and stays in the Dashboard’s WG OUTDOOR LIFE section.</p>
     </div>
   </div>
 
@@ -149,48 +107,125 @@
   </form>
 
   <h3 class="wg-day-heading">{{ day_heading }}</h3>
-  {% if day_orders %}
-  <ol class="wg-day-list">
-    {% for d in day_orders %}
-    <li class="wg-day-item">
-      <span class="wg-day-time">{{ d.time_range }}</span>
-      <span class="wg-day-customer">{{ d.customer }}</span>
-      {% if d.payment %}<span class="wg-day-payment">{{ d.payment }}{% if d.payment_type %} · {{ d.payment_type }}{% endif %}</span>{% endif %}
-      {% if d.reference %}<span class="wg-day-ref">{{ d.reference }}</span>{% endif %}
-      <span class="wg-day-meta">{{ d.crew }} · {{ d.truck }}</span>
-      <span class="wg-day-links">
-        {% if d.is_order %}<a href="{{ url_for('wg_order_edit', booking_id=d.id) }}">Edit</a> · {% endif %}<a href="{{ url_for('view_booking', booking_id=d.id) }}">#{{ d.id }}</a>
-      </span>
-    </li>
-    {% endfor %}
-  </ol>
+  {% if saved_day %}
+  <div class="wg-day-summary" data-wg-saved-day>
+    <p class="wg-day-summary-line"><strong>WG DAY</strong> · {{ saved_day.time_range }} · {{ saved_day.stops_label }} · Crew: {{ saved_day.crew_display }} · {{ saved_day.truck }}
+      · <a href="{{ url_for('view_booking', booking_id=saved_day.booking_id) }}">Booking #{{ saved_day.booking_id }}</a>
+      · <a href="{{ url_for('staff_wg_run_sheet', booking_id=saved_day.booking_id) }}">Run Sheet</a>
+      · <a href="{{ url_for('staff_wg_run_sheet_pdf', booking_id=saved_day.booking_id) }}">PDF</a></p>
+    <ol class="wg-day-list">
+      {% for s in saved_day.stops %}
+      <li class="wg-day-item">
+        <span class="wg-day-time">{{ s.time_range }}</span>
+        <span class="wg-day-customer">{{ s.customer }}</span>
+        {% if s.payment_display %}<span class="wg-day-payment">{{ s.payment_display }}</span>{% endif %}
+        {% if s.reference %}<span class="wg-day-ref">{{ s.reference }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
   {% else %}
-  <p class="empty">No WG orders on this day yet.</p>
+  <p class="empty">No WG Day saved for this date yet.</p>
+  {% endif %}
+
+  {% if older_bookings %}
+  <div class="wg-older">
+    <h4>Older WG bookings on this day</h4>
+    <p class="hint">Made before WG Days (one booking per customer) or by hand. They stay exactly as they are unless you move them.</p>
+    <ul class="wg-older-list">
+      {% for b in older_bookings %}
+      <li>
+        <a href="{{ url_for('view_booking', booking_id=b.id) }}">#{{ b.id }} {{ b.customer_name }}</a> · {{ b.time_range }} · {{ b.crew }} · {{ b.truck }}
+        {% if b.is_order %}
+        <form method="post" action="{{ url_for('wg_orders_move', booking_id=b.id) }}" class="wg-older-action">
+          <label class="wg-check"><input type="checkbox" name="confirm" value="yes"> Move into the WG Day as a stop (deletes booking #{{ b.id }})</label>
+          <button type="submit" class="btn-secondary btn-sm">Move into WG Day</button>
+        </form>
+        {% elif not saved_day %}
+        <form method="post" action="{{ url_for('wg_orders_adopt', booking_id=b.id) }}" class="wg-older-action">
+          <button type="submit" class="btn-secondary btn-sm">Use as this date’s WG Day</button>
+          <span class="hint">Keeps its crew, truck, times and invoice.</span>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
   {% endif %}
 </section>
 
 <section class="panel">
   <div class="wg-form-head">
-    <h3>{% if edit_booking_id %}Edit WG Order #{{ edit_booking_id }}{% elif import_result %}Check the imported WG Orders{% else %}Add WG Orders · {{ day_heading }}{% endif %}</h3>
-    {% if not edit_booking_id %}<span class="wg-order-count" id="wg-order-count"></span>{% endif %}
+    <h3>{% if import_result %}Check the imported WG Day{% elif day.booking_id %}Edit WG Day · booking #{{ day.booking_id }}{% else %}New WG Day{% endif %}</h3>
+    <span class="wg-order-count" id="wg-stop-count"></span>
   </div>
-  <form method="post" action="{{ url_for('wg_order_edit', booking_id=edit_booking_id) if edit_booking_id else url_for('wg_orders') }}" class="wg-orders-form" id="wg-orders-form">
+  <form method="post" action="{{ url_for('wg_orders') }}" class="wg-orders-form" id="wg-day-form">
     <input type="hidden" name="day" value="{{ day_iso }}">
-    <div id="wg-order-rows" data-next-index="{{ rows|length }}">
-      {% for o in rows %}{{ order_fields(o, loop.index0) }}{% endfor %}
+    {% if day.booking_id %}<input type="hidden" name="booking_id" value="{{ day.booking_id }}">{% endif %}
+
+    <fieldset class="wg-order wg-day-head">
+      <legend>WG DAY</legend>
+      {% if day.conflicts %}
+      <div class="wg-order-warning">
+        <p><strong>Time overlap (same truck or no truck):</strong></p>
+        <ul>
+          {% for c in day.conflicts %}<li>#{{ c.id }} {{ c.customer_name }} · {{ c.time_label }}</li>{% endfor %}
+        </ul>
+        <label class="wg-check"><input type="checkbox" name="override" {% if day.override %}checked{% endif %}> I understand this may be double booked</label>
+      </div>
+      {% endif %}
+      {% if day.stops|selectattr('duplicates')|list %}
+      <div class="wg-order-warning">
+        <p><strong>Some stops look like duplicates</strong> (marked below).</p>
+        <label class="wg-check"><input type="checkbox" name="force_duplicate" {% if day.force_duplicate %}checked{% endif %}> Save anyway (not duplicates)</label>
+      </div>
+      {% endif %}
+      <div class="wg-order-grid">
+        <label class="{{ warn_class(day, 'move_date') }}">{{ bl('Date *', '日付') }}
+          <input type="date" name="move_date" value="{{ day.move_date or day_iso }}" data-wg-date>
+          {{ warn_msgs(day, 'move_date') }}
+        </label>
+        <label class="{{ warn_class(day, 'truck') }}">{{ bl('Truck', 'トラック') }}
+          <select name="truck" data-wg-truck>
+            <option value="">— No truck —</option>
+            {% for truck in truck_options %}<option value="{{ truck }}" {% if day.truck == truck %}selected{% endif %}>{{ truck }}</option>{% endfor %}
+          </select>
+          {{ warn_msgs(day, 'truck') }}
+        </label>
+        <fieldset class="wg-span-full wg-crew{{ warn_class(day, 'crew') }}" data-wg-crew>
+          <legend>{{ bl('WG Day Crew', '担当スタッフ') }}</legend>
+          <div class="wg-crew-options">
+            {% for name in crew_options %}
+            {% set cid = 'wg-crew-' ~ loop.index %}
+            <label class="wg-crew-option" for="{{ cid }}">
+              <input type="checkbox" id="{{ cid }}" name="crew" value="{{ name }}" {% if name in (day.crew or []) %}checked{% endif %}>
+              <span>{{ name }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          {{ warn_msgs(day, 'crew') }}
+        </fieldset>
+        <details class="wg-span-full wg-day-times"{% if day.day_start or day.day_finish %} open{% endif %}>
+          <summary>Day start / finish (optional)</summary>
+          <p class="hint">Blank = first stop’s start{% if auto_times[0] %} ({{ auto_times[0] }}){% endif %} to last stop’s finish{% if auto_times[1] %} ({{ auto_times[1] }}){% endif %}. Used for the Calendar time and the hourly invoice.</p>
+          <div class="wg-order-grid">
+            <label>{{ bl('Day start', '開始') }}<input type="time" name="day_start" value="{{ day.day_start or '' }}"></label>
+            <label>{{ bl('Day finish', '終了') }}<input type="time" name="day_finish" value="{{ day.day_finish or '' }}"></label>
+          </div>
+        </details>
+      </div>
+    </fieldset>
+
+    <div id="wg-stop-rows" data-next-index="{{ day.stops|length }}">
+      {% for o in day.stops %}{{ stop_fields(o, loop.index0) }}{% endfor %}
     </div>
     <div class="form-actions wg-form-actions">
-      {% if not edit_booking_id %}
-      <button type="button" class="btn-secondary" id="wg-order-add">+ Add WG Order</button>
-      {% endif %}
-      <button type="submit" class="btn-primary" id="wg-save-all">{% if edit_booking_id %}Save WG Order{% else %}Save All WG Orders{% endif %}</button>
-      {% if edit_booking_id %}<a class="btn-secondary" href="{{ url_for('wg_orders', date=day_iso) }}">Cancel</a>{% endif %}
+      <button type="button" class="btn-secondary" id="wg-stop-add">+ Add Stop</button>
+      <button type="submit" class="btn-primary" id="wg-save-day">Save WG Day</button>
     </div>
-    {% if not edit_booking_id %}<p class="hint">Only filled-in orders are saved. Orders with a problem stay on the page so you can fix them; the others are saved straight away, so you can save part of a day and add more later.</p>{% endif %}
+    <p class="hint">Stops are saved in start-time order. Blank stops are skipped. If anything needs fixing, nothing is saved and the page stays as typed.</p>
   </form>
-  {% if not edit_booking_id %}
-  <template id="wg-order-template">{{ order_fields(blank_row, '__N__') }}</template>
-  {% endif %}
+  <template id="wg-stop-template">{{ stop_fields(blank_stop, '__N__') }}</template>
 </section>
 <script src="{{ url_for('static', filename='wg_orders.js') }}" defer></script>
 {% endblock %}

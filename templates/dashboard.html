@@ -254,6 +254,7 @@
         <tr{% if payment_wg_index is not none and payment_wg_index <= loop.index0 <= payment_wg_last_index %} class="dashboard-wg-row"{% endif %}>
           <td class="customer-cell">
             <a class="customer-link" href="{{ url_for('view_booking', booking_id=b.id) }}"><strong>{{ b.customer_name }}</strong></a>
+            {% if b.wg_stop_count is not none and b.source == 'wg_outdoor_life' %}<div class="dashboard-customer-invoice">WG Day · {{ b.wg_stop_count }} stop{{ '' if b.wg_stop_count == 1 else 's' }}</div>{% endif %}
             {% if b.dashboard_invoice_number %}
             <div class="dashboard-customer-invoice">{{ b.dashboard_invoice_number }}</div>
             {% endif %}

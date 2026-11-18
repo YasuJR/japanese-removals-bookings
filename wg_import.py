@@ -1,8 +1,9 @@
 """WG Order Import: read WG delivery orders from an uploaded photo / screenshot / PDF.
 
-Nothing here saves a booking. analyse_upload() returns order dicts (the same
-keys as wg_orders.ORDER_KEYS) plus per-field warnings; the WG Orders page shows
-them as editable order cards and the owner saves them with "Save All WG Orders".
+Nothing here saves a booking. analyse_upload() returns one WG Day (build_day:
+date, crew, truck, stops with the wg_orders.STOP_KEYS fields) plus per-field
+warnings; the WG Orders page shows it as the editable WG Day form and the
+owner saves it with "Save WG Day".
 
 Two readers, same post-processing:
 
@@ -15,7 +16,8 @@ Two readers, same post-processing:
 
 normalize_orders() then turns raw values into form values (times, date, payment
 amount + type, crew, truck) and adds warnings ("Time unclear", "Address may
-need review", "Phone number uncertain", "Possible duplicate" …). Anything it
+need review", "Phone number uncertain" …; duplicates are marked by
+wg_orders.annotate_duplicates). Anything it
 is not sure about is left for the owner to check instead of being "fixed".
 
 Uploads are checked by extension, size and file signature, read in memory and
@@ -56,7 +58,6 @@ WARN_PHONE = "Phone number uncertain"
 WARN_PAYMENT = "Payment unclear — check amount / type"
 WARN_CREW = "Crew not clear — choose the crew"
 WARN_NAME = "Customer name unclear"
-WARN_DUPLICATE = "Possible duplicate of an existing WG order"
 
 
 class ImportError_(Exception):
@@ -537,18 +538,63 @@ def normalize_orders(
     return out
 
 
-def add_duplicate_warnings(orders: List[Dict[str, Any]]) -> None:
-    """Flag orders that look like an existing WG order (warning only)."""
-    import wg_orders
+DAY_KEYS = ("move_date", "crew", "truck")
 
+
+def build_day(orders: List[Dict[str, Any]], *, default_date: str = "") -> Dict[str, Any]:
+    """
+    Normalised readings → one WG Day: the sheet's date, the crew named on it (only
+    names that match an active crew member), the truck if one is named, and the
+    orders as stops. Unclear day fields get yellow warnings; nothing is guessed.
+    """
+    from collections import Counter
+
+    day_warnings: Dict[str, List[str]] = {}
+
+    def warn(field: str, msg: str) -> None:
+        day_warnings.setdefault(field, [])
+        if msg not in day_warnings[field]:
+            day_warnings[field].append(msg)
+
+    dates = Counter(o["move_date"] for o in orders if o.get("move_date"))
+    if dates:
+        top = max(dates.values())
+        move_date = sorted(d for d, n in dates.items() if n == top)[0]
+    else:
+        move_date = default_date
+        warn("move_date", WARN_DATE)
+    crew: List[str] = []
+    trucks: List[str] = []
+    stops = []
     for order in orders:
-        if not order.get("move_date"):
-            continue
-        cleaned = wg_orders.clean_order(dict(order))
-        dups = wg_orders.find_duplicates(cleaned)
-        if dups:
-            order["duplicates"] = dups
-            order.setdefault("field_warnings", {}).setdefault("customer", []).append(WARN_DUPLICATE)
+        warnings = dict(order.get("field_warnings") or {})
+        for msg in warnings.pop("move_date", []):
+            warn("move_date", msg)
+        crew_msgs = warnings.pop("crew", [])
+        for msg in warnings.pop("truck", []):
+            warn("truck", msg)
+        for name in order.get("crew") or []:
+            if name not in crew:
+                crew.append(name)
+        if not order.get("crew"):
+            for msg in crew_msgs:
+                if "not found" in msg:
+                    warn("crew", msg)
+        if order.get("truck") and order["truck"] not in trucks:
+            trucks.append(order["truck"])
+        if order.get("move_date") and order["move_date"] != move_date:
+            warnings.setdefault("start_time", []).append(
+                "The sheet gives this stop another date ({0}) — check".format(order["move_date"])
+            )
+        stop = {k: v for k, v in order.items() if k not in DAY_KEYS}
+        stop["field_warnings"] = warnings
+        stops.append(stop)
+    if not crew:
+        warn("crew", WARN_CREW)
+    truck = trucks[0] if len(trucks) == 1 else ""
+    if len(trucks) > 1:
+        warn("truck", "The sheet names more than one truck ({0}) — choose one".format(", ".join(trucks)))
+    return {"move_date": move_date, "crew": crew, "truck": truck, "stops": stops, "field_warnings": day_warnings}
 
 
 # --- entry point -------------------------------------------------------------------------
@@ -563,7 +609,7 @@ def analyse_upload(
     today: date,
     default_date: str = "",
 ) -> Dict[str, Any]:
-    """Check the file, read the orders, normalise them. Never saves anything."""
+    """Check the file, read the orders, normalise them into one WG Day. Never saves anything."""
     safe, kind = check_upload(filename, data)
     readings: Dict[str, Any] = {"orders": [], "date_text": ""}
     method = ""
@@ -592,5 +638,5 @@ def analyse_upload(
         today=today,
         default_date=default_date,
     )
-    add_duplicate_warnings(orders)
-    return {"filename": safe, "kind": kind, "method": method, "orders": orders, "notices": notices}
+    day = build_day(orders, default_date=default_date) if orders else None
+    return {"filename": safe, "kind": kind, "method": method, "orders": orders, "day": day, "notices": notices}

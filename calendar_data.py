@@ -96,7 +96,7 @@ def calendar_event(
         "truck_assigned": (b.get("truck_assigned") or "").strip(),
         "conflict_badge": badge,
         "has_conflict": badge == "conflict",
-        "edit_url": "/bookings/{0}/edit".format(bid),
+        "edit_url": "/wg-orders?date={0}".format(str(b.get("move_date") or "")[:10]) if wg_jobs.is_wg_day(b) else "/bookings/{0}/edit".format(bid),
         "start_minutes": job_start_minutes(
             {
                 "id": b.get("id"),
@@ -107,6 +107,8 @@ def calendar_event(
         ),
         "duration_hours": parse_duration_hours(b.get("duration_hours")) or 1.0,
         "is_wg": wg_jobs.is_wg_outdoor_life(b),
+        "is_wg_day": wg_jobs.is_wg_day(b),
+        "wg_stops_label": wg_jobs.stops_label(b.get("wg_stop_count")) if wg_jobs.is_wg_day(b) else "",
     }
 
 
