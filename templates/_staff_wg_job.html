@@ -1,0 +1,21 @@
+{# WG Outdoor Life order details (wg_orders.staff_fields). Normal bookings: nothing. #}
+{% if job.is_wg %}
+<div class="staff-wg-job">
+  {% if job.wg_products %}
+  <p class="staff-wg-row"><span class="staff-wg-label">Products:</span></p>
+  <p class="staff-wg-products">{{ job.wg_products }}</p>
+  {% endif %}
+  {% if job.wg_payment_display %}
+  <p class="staff-wg-row"><span class="staff-wg-label">Payment:</span> {{ job.wg_payment_display }}</p>
+  {% endif %}
+  {% if job.wg_reference %}
+  <p class="staff-wg-row"><span class="staff-wg-label">Reference:</span> {{ job.wg_reference }}</p>
+  {% endif %}
+  {% if job.delivery_map_url or job.dropoff_map_url or job.tel_href %}
+  <div class="staff-job-actions staff-wg-actions">
+    {% if job.delivery_map_url or job.dropoff_map_url %}<a class="staff-job-btn" href="{{ job.delivery_map_url or job.dropoff_map_url }}" target="_blank" rel="noopener noreferrer">Map</a>{% endif %}
+    {% if job.tel_href %}<a class="staff-job-btn" href="{{ job.tel_href }}">Call</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}

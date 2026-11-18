@@ -7,6 +7,7 @@ import automation
 import config
 import database as db
 import job_status
+import wg_jobs
 from integrations import email_send, gmail_config, google_calendar, sms_automation, sms_config
 
 
@@ -46,6 +47,8 @@ def run_on_pending_to_confirmed(booking: Dict[str, Any]) -> List[str]:
 
 
 def _maybe_send_confirmation_sms(booking: Dict[str, Any]) -> Optional[str]:
+    if wg_jobs.is_wg_order(booking):  # WG Outdoor Life orders: no customer SMS / reminders
+        return None
     booking_id = int(booking["id"])
     if (booking.get("sms_booking_confirmed_sent_at") or "").strip():
         msg = "Confirmation SMS already sent."

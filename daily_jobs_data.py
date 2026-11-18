@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 import database as db
 import job_status
+import wg_orders
 from booking_times import (
     duration_hours_from_times,
     effective_finish_hm,
@@ -92,6 +93,7 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
         "phone": (row.get("phone") or "").strip(),
         "pickup_address": (row.get("pickup_address") or "—").strip(),
         "pickup_address_2": (row.get("pickup_address_2") or "").strip(),
+        **wg_orders.staff_fields(row),
         "delivery_address": (row.get("delivery_address") or "—").strip(),
         "notes": (row.get("notes") or "").strip(),
         "status": job_status.display(row),

@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional, Tuple
 import automation
 import database as db
 import job_status
+import wg_jobs
 from integrations import xero
 
 
@@ -118,6 +119,8 @@ def auto_create_invoice_on_pending_confirmed(
     Phase 7 — when status changes Pending → Confirmed, create and approve
     a Xero invoice once (skip if already linked).
     """
+    if wg_jobs.is_wg_order(booking):  # WG orders: Xero invoices are created by hand
+        return None
     booking_id = int(booking["id"])
     current = job_status.display(booking)
     if current != "Confirmed":

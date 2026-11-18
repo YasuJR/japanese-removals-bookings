@@ -7,6 +7,7 @@
 {% set driver_active_endpoints = ('driver', 'driver_run_sheet_pdf') %}
 {% set furniture_active_endpoints = ('furniture_lists_index', 'office_furniture_list', 'office_furniture_pdf', 'furniture_volumes_admin') %}
 {% set furniture_active = request.endpoint in furniture_active_endpoints %}
+{% set wg_active = request.endpoint in ('wg_orders', 'wg_order_edit') %}
 
 <nav class="main-nav main-nav-desktop" aria-label="Main">
   <a href="{{ url_for('ceo_dashboard') }}" class="{% if request.endpoint == 'ceo_dashboard' %}active{% endif %}">Home</a>
@@ -17,6 +18,7 @@
   <a href="{{ url_for('search_bookings') }}" class="{% if request.endpoint == 'search_bookings' %}active{% endif %}">Search</a>
   {% if is_admin %}
   <a href="{{ url_for('furniture_lists_index') }}" class="{% if furniture_active %}active{% endif %}"{% if furniture_active %} aria-current="page"{% endif %}>Furniture Lists</a>
+  <a href="{{ url_for('wg_orders') }}" class="{% if wg_active %}active{% endif %}"{% if wg_active %} aria-current="page"{% endif %}>WG Orders</a>
   {% endif %}
   <a href="{{ url_for('settings') }}" class="{% if request.endpoint in settings_active_endpoints %}active{% endif %}">Settings</a>
   <a href="{{ url_for('logout') }}" class="nav-logout">Log out{% if g.user %} ({{ g.user.username }}){% endif %}</a>
@@ -50,6 +52,7 @@
     <p class="mobile-more-title">More</p>
     <div class="mobile-more-links">
       <a href="{{ url_for('ceo_dashboard') }}" class="{% if request.endpoint == 'ceo_dashboard' %}active{% endif %}">Home</a>
+      {% if is_admin %}<a href="{{ url_for('wg_orders') }}" class="{% if wg_active %}active{% endif %}">WG Orders</a>{% endif %}
       <a href="{{ url_for('driver') }}" class="{% if request.endpoint in driver_active_endpoints %}active{% endif %}">Driver</a>
       <a href="{{ url_for('outstanding_invoices') }}" class="{% if request.endpoint == 'outstanding_invoices' %}active{% endif %}">Invoices</a>
       <a href="{{ url_for('search_bookings') }}" class="{% if request.endpoint == 'search_bookings' %}active{% endif %}">Search</a>

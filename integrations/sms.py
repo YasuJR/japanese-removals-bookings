@@ -14,6 +14,7 @@ from typing import Any, Dict, Optional, Tuple
 import automation
 import config
 import database as db
+import wg_jobs
 
 
 def is_configured() -> bool:
@@ -178,6 +179,8 @@ def send_booking_notification(
     booking: Dict[str, Any], event: str = "created"
 ) -> Optional[str]:
     """Send SMS; returns status message or None if skipped."""
+    if wg_jobs.is_wg_order(booking):  # WG Outdoor Life orders: no customer SMS / reminders
+        return None
     ok, msg, _sid = _send_legacy(booking, event)
     return msg if ok or msg else None
 

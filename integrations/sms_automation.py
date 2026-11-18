@@ -8,6 +8,7 @@ import config
 import database as db
 import invoice
 import job_status
+import wg_jobs
 from booking_times import display_start_time
 from display_dates import format_display_date
 from integrations import sms, sms_config
@@ -205,6 +206,8 @@ def maybe_send_thank_you(
     previous_status: str,
 ) -> Optional[str]:
     """Send thank-you SMS when status changes to Completed."""
+    if wg_jobs.is_wg_order(booking):  # WG Outdoor Life orders: no customer SMS / reminders
+        return None
     current = job_status.display(booking)
     if current != "Completed":
         return None
@@ -219,6 +222,8 @@ def maybe_send_booking_confirmed(
     previous_status: str,
 ) -> Optional[str]:
     """Send confirmation SMS when status changes from Pending to Confirmed."""
+    if wg_jobs.is_wg_order(booking):  # WG Outdoor Life orders: no customer SMS / reminders
+        return None
     current = job_status.display(booking)
     if current != "Confirmed":
         return None
@@ -229,6 +234,8 @@ def maybe_send_booking_confirmed(
 
 
 def _eligible_for_reminder(booking: Dict[str, Any]) -> bool:
+    if wg_jobs.is_wg_order(booking):  # WG Outdoor Life orders: no customer SMS / reminders
+        return False
     status = job_status.display(booking)
     if status == "Cancelled":
         return False

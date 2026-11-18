@@ -24,6 +24,7 @@ DESKTOP_PRIMARY = [
     "Crew",
     "Search",
     "Furniture Lists",  # admins only (the test client is an admin)
+    "WG Orders",  # admins only
     "Settings",
     "Log out",
 ]

@@ -6,6 +6,7 @@ import config
 import database as db
 import invoice
 import job_status
+import wg_jobs
 from integrations import (
     confirmed_automation,
     email_send,
@@ -92,6 +93,9 @@ def after_booking_created(booking_id: int) -> List[str]:
 
 def _auto_create_xero_invoice_on_create(booking_id: int) -> Optional[str]:
     """Create and approve a Xero invoice when a new booking is saved."""
+    row = db.get_booking(booking_id)
+    if row is not None and wg_jobs.is_wg_order(dict(row)):  # WG orders: Xero by hand
+        return None
     if not xero_config.auto_create_on_booking_create():
         return None
     if not xero.is_ready():
@@ -112,6 +116,9 @@ def _auto_create_xero_invoice_on_create(booking_id: int) -> Optional[str]:
 
 def _maybe_auto_create_xero_draft(booking_id: int) -> Optional[str]:
     """Create a Xero draft when setting is on and booking is Confirmed."""
+    row = db.get_booking(booking_id)
+    if row is not None and wg_jobs.is_wg_order(dict(row)):  # WG orders: Xero by hand
+        return None
     if not xero_config.auto_create_draft_on_confirmed():
         return None
     if not xero.is_ready():

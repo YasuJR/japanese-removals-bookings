@@ -83,7 +83,7 @@
           <a class="calendar-booking cal-{{ booking.status_class }}" href="{{ booking.edit_url }}"
              data-booking-id="{{ booking.id }}">
             <span class="cal-booking-time">{{ booking.time_range }}</span>
-            <strong class="cal-booking-customer">{{ booking.customer_name }}</strong>
+            <strong class="cal-booking-customer">{% if booking.is_wg %}<span class="cal-wg-badge">WG</span> {% endif %}{{ booking.customer_name }}</strong>
             <span class="cal-booking-meta">{{ booking.num_movers }} movers · {{ booking.crew }}</span>
             <span class="cal-booking-status">{{ booking.status|upper }}</span>
           </a>
@@ -115,7 +115,7 @@
         {% for booking in day.bookings %}
         <a class="calendar-week-booking cal-{{ booking.status_class }}" href="{{ booking.edit_url }}"
            style="--cal-start: {{ booking.start_minutes }}; --cal-duration: {{ (booking.duration_hours * 60)|int }};">
-          <strong>{{ booking.customer_name }}</strong>
+          <strong>{% if booking.is_wg %}<span class="cal-wg-badge">WG</span> {% endif %}{{ booking.customer_name }}</strong>
           <span>{{ booking.time_range }}</span>
         </a>
         {% endfor %}
@@ -138,7 +138,7 @@
       {% for booking in cal.events %}
       <a class="calendar-booking cal-{{ booking.status_class }} calendar-booking-large" href="{{ booking.edit_url }}">
         <span class="cal-booking-time">{{ booking.time_range }}</span>
-        <strong class="cal-booking-customer">{{ booking.customer_name }}</strong>
+        <strong class="cal-booking-customer">{% if booking.is_wg %}<span class="cal-wg-badge">WG</span> {% endif %}{{ booking.customer_name }}</strong>
         <span class="cal-booking-meta">{{ booking.num_movers }} movers · {{ booking.crew }} · {{ booking.truck_assigned or 'No truck' }}</span>
         <span class="cal-booking-status">{{ booking.status|upper }} · {{ booking.payment_status }}</span>
       </a>

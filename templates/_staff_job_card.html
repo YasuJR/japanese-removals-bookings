@@ -1,4 +1,5 @@
 <article class="staff-job-card{% if compact %} staff-job-card-week{% endif %}">
+  {% include "_staff_wg_badge.html" %}
   <div class="staff-job-card-top">
     {% if job.status_display %}
     <p class="staff-job-status{% if job.is_completed_status %} staff-job-status-completed{% endif %}">{{ job.status_display }}</p>
@@ -9,7 +10,7 @@
   <p class="staff-job-headline">{{ job.start_time }}</p>
   <p class="staff-job-customer">{{ job.customer_name }}</p>
   <p class="staff-job-date"><span>Date</span> {{ job.date_display }}</p>
-  <p class="staff-job-route">{{ job.pickup_label or "—" }}{% if job.pickup_address_2 %} → {{ job.pickup_2_label }}{% endif %} → {{ job.dropoff_label or "—" }}</p>
+  <p class="staff-job-route">{% if job.is_wg %}{{ job.dropoff_label or "—" }}{% else %}{{ job.pickup_label or "—" }}{% if job.pickup_address_2 %} → {{ job.pickup_2_label }}{% endif %} → {{ job.dropoff_label or "—" }}{% endif %}</p>
   <p class="staff-job-crew-line"><span>Crew</span> {{ job.crew }}</p>
   {% else %}
   <p class="staff-job-headline">{{ job.start_time }} — {{ job.customer_name }}</p>
@@ -54,12 +55,15 @@
   </p>
   {% endif %}
 
+  {% include "_staff_wg_job.html" %}
   {% if not compact %}
   <dl class="staff-job-meta">
+    {% if not job.is_wg %}
     <div>
       <dt>{{ 'Pickup 1' if job.pickup_address_2 else 'Pickup' }}</dt>
       <dd>{{ job.pickup_address or "—" }}</dd>
     </div>
+    {% endif %}
     {% if job.pickup_address_2 %}
     <div>
       <dt>Pickup 2</dt>
@@ -67,7 +71,7 @@
     </div>
     {% endif %}
     <div>
-      <dt>Drop-off</dt>
+      <dt>{{ 'Address' if job.is_wg else 'Drop-off' }}</dt>
       <dd>{{ job.dropoff_address or "—" }}</dd>
     </div>
     <div>
@@ -77,10 +81,12 @@
   </dl>
   {% else %}
   <dl class="staff-job-meta staff-job-meta-week">
+    {% if not job.is_wg %}
     <div>
       <dt>{{ 'Pickup 1' if job.pickup_address_2 else 'Pickup' }}</dt>
       <dd>{{ job.pickup_address or "—" }}</dd>
     </div>
+    {% endif %}
     {% if job.pickup_address_2 %}
     <div>
       <dt>Pickup 2</dt>
@@ -88,7 +94,7 @@
     </div>
     {% endif %}
     <div>
-      <dt>Drop-off</dt>
+      <dt>{{ 'Address' if job.is_wg else 'Drop-off' }}</dt>
       <dd>{{ job.dropoff_address or "—" }}</dd>
     </div>
     <div>
@@ -109,7 +115,8 @@
     {% else %}
     <span class="staff-job-btn staff-job-btn-disabled">Text Customer</span>
     {% endif %}
-    {% if job.pickup_map_url %}
+    {% if job.is_wg %}
+    {% elif job.pickup_map_url %}
     <a class="staff-job-btn" href="{{ job.pickup_map_url }}" target="_blank" rel="noopener noreferrer">{{ 'Map Pickup 1' if job.pickup_address_2 else 'Pickup Map' }}</a>
     {% else %}
     <span class="staff-job-btn staff-job-btn-disabled">Pickup Map</span>
@@ -118,7 +125,7 @@
     <a class="staff-job-btn" href="{{ job.pickup_2_map_url }}" target="_blank" rel="noopener noreferrer">Map Pickup 2</a>
     {% endif %}
     {% if job.dropoff_map_url %}
-    <a class="staff-job-btn" href="{{ job.dropoff_map_url }}" target="_blank" rel="noopener noreferrer">Drop-off Map</a>
+    <a class="staff-job-btn" href="{{ job.dropoff_map_url }}" target="_blank" rel="noopener noreferrer">{{ 'Map' if job.is_wg else 'Drop-off Map' }}</a>
     {% else %}
     <span class="staff-job-btn staff-job-btn-disabled">Drop-off Map</span>
     {% endif %}

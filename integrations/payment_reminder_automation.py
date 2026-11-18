@@ -8,6 +8,7 @@ import config
 import database as db
 import invoice
 import job_status
+import wg_jobs
 from integrations import sms, sms_config, xero
 from outstanding_invoices_data import (
     _is_paid,
@@ -108,6 +109,8 @@ def is_reminders_cancelled(booking: Dict[str, Any]) -> bool:
 
 
 def is_eligible(booking: Dict[str, Any]) -> bool:
+    if wg_jobs.is_wg_order(booking):  # WG Outdoor Life orders: no customer SMS / reminders
+        return False
     status = job_status.display(booking)
     if status in ("Pending", "Cancelled"):
         return False

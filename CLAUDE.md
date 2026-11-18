@@ -86,7 +86,7 @@ When adding a route: put it in `app.py` near its area, use the right decorator, 
 - **Postgres can return `date`/`datetime` objects** for date-like values. Normalize with `display_dates.normalize_move_date()` / `dashboard_data.job_move_date_iso()`. Never call `.strip()` on a raw DB value.
 
 ### Tables (key columns)
-- **bookings** — customer_name, phone, email, pickup_address, delivery_address, `move_date` TEXT `YYYY-MM-DD`, num_movers, notes, status, `crew` (CSV of names), `truck_assigned`, `start_time`, `finish_time`, `duration_hours`, `actual_start_time`, `actual_finish_time`, `actual_duration` (min; Staff Paid Hours only, no longer on Booking Edit), `work_period_2_start` / `_finish` / `_movers` / `_rate` (optional second billing period, see §7), `pickup_address_2` (optional second pickup, see §7), `hourly_rate`, `callout_fee`, `callout_minutes`, `gst_enabled`, invoice_* (number, status, issue/due date, description, custom text, bank overrides, sent_at/to/method), payment_* / paid_at / payment_token, stripe_*, xero_invoice_id, xero_payment_id, double_booking_override_at, gmail_message_id, source, review_* / SMS / reminder timestamps, profit fields (staff_cost, fuel_cost, …, estimated_profit, profit_margin_percent). ~85 columns total; list in `database.py BOOKING_EXTRA_COLUMNS`.
+- **bookings** — customer_name, phone, email, pickup_address, delivery_address, `move_date` TEXT `YYYY-MM-DD`, num_movers, notes, status, `crew` (CSV of names), `truck_assigned`, `start_time`, `finish_time`, `duration_hours`, `actual_start_time`, `actual_finish_time`, `actual_duration` (min; Staff Paid Hours only, no longer on Booking Edit), `work_period_2_start` / `_finish` / `_movers` / `_rate` (optional second billing period, see §7), `pickup_address_2` (optional second pickup, see §7), `wg_products` / `wg_reference` / `wg_payment_amount` / `wg_payment_type` (WG Orders, see §7c), `hourly_rate`, `callout_fee`, `callout_minutes`, `gst_enabled`, invoice_* (number, status, issue/due date, description, custom text, bank overrides, sent_at/to/method), payment_* / paid_at / payment_token, stripe_*, xero_invoice_id, xero_payment_id, double_booking_override_at, gmail_message_id, source, review_* / SMS / reminder timestamps, profit fields (staff_cost, fuel_cost, …, estimated_profit, profit_margin_percent). ~85 columns total; list in `database.py BOOKING_EXTRA_COLUMNS`.
 - **booking_extra_charges** — booking_id, description, quantity, unit_price, sort_order (breaks live here, see §6).
 - **booking_crew_hours** — per-crew time overrides (see §5).
 - **crew_members** — name UNIQUE, phone, role, active, `star_points`. **crew_star_point_events** — crew_id, change_type, points_delta, points_after, reason, created_at, created_by_user_id.
@@ -218,6 +218,7 @@ Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out 
   - Invoice / Receipt (preview + PDF): `invoice_customer_bill_to` returns `pickup_lines` — `["Pickup: …"]` normally, `["Pickup:", "1. …", "2. …"]` with two pickups. `pickup_line` is unchanged.
   - Analyse (Paste Customer Information): `enquiry_parser._extract_two_pickups` fills Pickup 1/2/Delivery only for explicit numbered labels ("Pickup 1:/Pickup 2:", "House 1/House 2", "First/Second pickup", label alone on a line with the address below) plus a labelled delivery ("Delivery:", "Going to:", "Drop-off:"). A vaguer mention of a second pickup stays in Notes with a warning.
   - Search matches `pickup_address_2`. CSV export appends it as the last column. Customer SMS / confirmation texts still name Pickup 1 only.
+- **WG Orders** (`wg_orders.py`, `/wg-orders`, 2026-11-18) — see §7c.
 - **Actual start / finish / duration** left Booking Edit on 2026-10-28. The columns stay. They are written only from the Staff Portal (owner "All Staff" edit, `/bookings/<id>/actual-times`) and are still step 2–3 of the Paid Hours precedence (§6). A Booking Edit save never changes them. When a booking still has them, Booking Edit shows a "Recorded actual time … Staff Paid Hours only" note.
 - **Invoice numbers** (`invoice_numbering.py`, `database.allocate_invoice_number`):
   - The counter is in the DB table `invoice_sequence`, row-locked (`FOR UPDATE` on Postgres, `BEGIN IMMEDIATE` on SQLite). It is always `max(next_number, max_used + 1)`.
@@ -246,7 +247,7 @@ Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out 
   3. **PAID**: Payment status Paid, any date.
 - Unpaid groups 1 and 2 sort **oldest date first**, then true start time. Upcoming and Paid keep status priority, then date.
 - The dividers show "N jobs · Total: $X" (`dashboard_unpaid_summaries`, invoice totals over the whole filtered list, not just the visible page). The WG block has navy 6px bars above and below it and a tinted row background.
-- **WG detection** (`wg_jobs.is_wg_outdoor_life_name`): there is no company / client field, so it uses `customer_name`. It matches when the first word is "WG" or the name contains the words "WG Outdoor Life" (case-, space- and punctuation-insensitive). Production spellings on 2026-10-25 were "WG", "WG Outdoor Life" and "WG Outdoor life". It never uses a raw substring, so "Wgrace" and "WGM Logistics" don't match.
+- **WG detection** (`wg_jobs.is_wg_outdoor_life`): bookings from the WG Orders page (`source = wg_outdoor_life`, §7c) always count. Otherwise (`is_wg_outdoor_life_name`): there is no company / client field, so it uses `customer_name`. It matches when the first word is "WG" or the name contains the words "WG Outdoor Life" (case-, space- and punctuation-insensitive). Production spellings on 2026-10-25 were "WG", "WG Outdoor Life" and "WG Outdoor life". It never uses a raw substring, so "Wgrace" and "WGM Logistics" don't match.
 - The top "Unpaid Amount" stat card (`sales_dashboard.outstanding_invoices`) still includes WG.
 
 ---
@@ -297,6 +298,16 @@ Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out 
 - The live website (theme `japanese-removals`) self-hosts the embed script and sets `data-app` to this app's URL. Don't ask for the old `<script src=…onrender.com…>` snippet.
 
 ---
+
+## 7c. WG Outdoor Life orders (2026-11-18)
+
+- **Page:** `/wg-orders` ("WG Orders" in the admin nav and mobile More). A day view (time order: time, customer, $, payment type, REX, crew, truck, Edit) plus a form for that day: "+ Add WG Order" adds rows, "Save All WG Orders" saves every filled row. Rows with a problem stay on the page with the message; the others are saved, so part of a day can be saved and more added later. `/wg-orders/<id>/edit` edits one order.
+- **Storage:** each order is an ordinary booking — `source = "wg_outdoor_life"`, `customer_name = "WG - <customer>"` (so the name-based WG checks and every list show it as WG), `delivery_address` = the order address, `pickup_address = "WG Outdoor Life"`, `status` Confirmed, plus `wg_products` (multi-line as typed), `wg_reference` ("REX 3277"), `wg_payment_amount`, `wg_payment_type` (COD / Confirmed / Invoice / Other). Crew and truck use the normal fields.
+- **Invoice:** `hourly_rate` 0 and one extra charge "WG Outdoor Life delivery — <REX>" = payment amount, so the invoice total, Dashboard WG OUTDOOR LIFE totals and Xero all use it. `invoice_labour_lines` drops the empty $0 labour line for WG orders. `payment_status` starts Unpaid; past-date unpaid orders sit in the Dashboard WG OUTDOOR LIFE section, never REGULAR UNPAID.
+- **Checks:** existing double-booking rules (different trucks never conflict; same truck / no truck needs "I understand this may be double booked"), crew/truck warnings, and a duplicate warning — another WG booking on the same date with the same customer, address, or a shared REX number — that needs "Save anyway".
+- **Shown on:** Calendar (small green "WG" badge), Staff Portal Today / Weekly / Calendar / job cards (`wg_orders.staff_fields`: "WG OUTDOOR LIFE" badge, Products, Payment, Reference, Map + Call; the Pickup row is hidden and Delivery is labelled Address), office Weekly / Daily Jobs. Search matches `wg_reference` and `wg_products`.
+- **No automatic customer contact or Xero for WG orders** (`wg_jobs.is_wg_order` guards): booking SMS, confirmation / thank-you / day-before SMS, review requests, payment reminders, Xero auto-invoice / auto-draft. Google Calendar sync still runs. Older bookings named "WG …" without the source keep their old behaviour.
+- **Later imports (CSV / screenshot / AI):** build order dicts with `wg_orders.ORDER_KEYS` and call `wg_orders.save_orders(rows)`; the page form is just `parse_form_rows(form)` feeding the same function.
 
 ## 8. Truck conflict / double booking
 
@@ -405,6 +416,7 @@ export GOOGLE_CALENDAR_ENABLED=false GMAIL_INBOX_ENABLED=false XERO_ENABLED=fals
 | Finish time = source of truth | `test_finish_time_source_of_truth_e2e.py`, `test_edit_finish_time_e2e.py`, `test_invoice_duration_from_times_e2e.py` |
 | Work periods (Period 2, call-out once, break per period, actual fields removed) | `test_work_periods_e2e.py` (also passes on Postgres) |
 | Second pickup address (form, detail, Staff Portal maps, invoice/receipt, PDFs, search, Analyse) | `test_pickup_address_2_e2e.py` (also passes on Postgres) |
+| WG Orders (save, day view, truck conflicts, crew views, WG Outstanding, edit, multi-line products, duplicates, no SMS/Xero) | `test_wg_orders_e2e.py` (also passes on Postgres) |
 | Receipts (paid only, RCT numbers, payment date/method, totals = invoice, iPhone PDF) | `test_receipts_e2e.py` |
 | Invoice | `test_edit_booking_save_unifies_invoice_e2e.py`, `test_invoice_numbering_e2e.py`, `test_invoice_edit_e2e.py`, `test_invoice_negative_adjustments_e2e.py`, `test_invoice_pdf_layout_e2e.py` |
 | Double booking | `test_truck_double_booking_e2e.py`, `test_phase14_double_booking_e2e.py` |

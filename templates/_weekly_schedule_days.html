@@ -18,15 +18,20 @@
             {% endif %}
           </p>
           <h3 class="weekly-job-customer">{{ job.customer_name }}</h3>
+          {% if job.is_wg %}
+          <p class="weekly-job-row"><span class="cal-wg-badge">WG OUTDOOR LIFE</span>{% if job.wg_reference %} {{ job.wg_reference }}{% endif %}{% if job.wg_payment_display %} · {{ job.wg_payment_display }}{% endif %}</p>
+          {% if job.wg_products %}<p class="weekly-job-row weekly-wg-products">{{ job.wg_products }}</p>{% endif %}
+          {% endif %}
           <p class="weekly-job-row"><span class="weekly-job-field">Movers:</span> {{ job.num_movers }}</p>
           <p class="weekly-job-row"><span class="weekly-job-field">Crew:</span> {{ job.crew_display }}</p>
-          {% if job.pickup_address_2 %}
+          {% if job.is_wg %}
+          {% elif job.pickup_address_2 %}
           <p class="weekly-job-row"><span class="weekly-job-field">Pickup 1:</span> {{ job.pickup_address or '—' }}</p>
           <p class="weekly-job-row"><span class="weekly-job-field">Pickup 2:</span> {{ job.pickup_address_2 }}</p>
           {% else %}
           <p class="weekly-job-row"><span class="weekly-job-field">Pickup:</span> {{ job.pickup_address or '—' }}</p>
           {% endif %}
-          <p class="weekly-job-row"><span class="weekly-job-field">Delivery:</span> {{ job.delivery_address or '—' }}</p>
+          <p class="weekly-job-row"><span class="weekly-job-field">{{ 'Address:' if job.is_wg else 'Delivery:' }}</span> {{ job.delivery_address or '—' }}</p>
           <p class="weekly-job-row"><span class="weekly-job-field">Phone:</span> {{ job.phone or '—' }}</p>
           <p class="weekly-job-row"><span class="weekly-job-field">Status:</span> {{ job.status|upper }}</p>
           {% if job.paid_hours_display is defined %}

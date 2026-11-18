@@ -11,6 +11,8 @@ import unicodedata
 from typing import Any
 
 WG_SECTION_LABEL = "WG OUTDOOR LIFE"
+# bookings.source for orders entered on the WG Orders page (wg_orders.py).
+WG_ORDER_SOURCE = "wg_outdoor_life"
 
 _WG_PHRASE_RE = re.compile(r"\bwg outdoor life\b")
 
@@ -30,7 +32,25 @@ def is_wg_outdoor_life_name(name: Any) -> bool:
     return text.split()[0] == "wg" or bool(_WG_PHRASE_RE.search(text))
 
 
+def _field(job: Any, key: str) -> Any:
+    if isinstance(job, dict):
+        return job.get(key)
+    if hasattr(job, "keys"):
+        try:
+            return job[key]
+        except (KeyError, TypeError, IndexError):
+            return None
+    return None
+
+
+def is_wg_order(job: Any) -> bool:
+    """True for bookings created from the WG Orders page (source = wg_outdoor_life)."""
+    return str(_field(job, "source") or "").strip().lower() == WG_ORDER_SOURCE
+
+
 def is_wg_outdoor_life(job: Any) -> bool:
+    if is_wg_order(job):
+        return True
     raw = None
     if isinstance(job, dict):
         raw = job.get("customer_name")

@@ -84,6 +84,7 @@ import furniture_volumes
 import job_status
 import receipts
 import pickups
+import wg_orders
 import work_periods
 from crew_schedule_data import RANGE_OPTIONS, build_crew_schedule
 from ceo_dashboard_data import build_ceo_dashboard
@@ -2794,6 +2795,83 @@ def furniture_enquiry_pdf(fl_id):
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return response
+
+
+def _wg_date_arg(value):
+    text = str(value or "").strip()[:10]
+    try:
+        return date.fromisoformat(text).isoformat()
+    except ValueError:
+        return perth_today().isoformat()
+
+
+def _render_wg_orders(day_iso, rows, *, edit_booking_id=None):
+    day = date.fromisoformat(day_iso)
+    return render_template(
+        "wg_orders.html",
+        day_iso=day_iso,
+        day_heading=day.strftime("%A %-d %B %Y"),
+        prev_day=(day - timedelta(days=1)).isoformat(),
+        next_day=(day + timedelta(days=1)).isoformat(),
+        day_orders=wg_orders.day_orders(day_iso),
+        rows=rows,
+        edit_booking_id=edit_booking_id,
+        crew_options=active_crew_names(),
+        truck_options=active_truck_names(),
+        payment_types=wg_orders.PAYMENT_TYPES,
+        blank_row=wg_orders.empty_order(day_iso),
+    )
+
+
+def _wg_save_and_report(raw_rows):
+    """Save rows; flash the results. Returns the rows that still need attention."""
+    outcomes = wg_orders.save_orders(raw_rows)
+    saved = [o for o in outcomes if o["booking_id"]]
+    failed = [o for o in outcomes if not o["booking_id"]]
+    for o in saved:
+        for msg in o["warnings"]:
+            flash("{0}: {1}".format(o["order"]["customer"], msg), "warning")
+        _flash_integration_messages(o["messages"])
+    if saved:
+        flash("Saved {0} WG order{1}.".format(len(saved), "" if len(saved) == 1 else "s"), "success")
+    if failed:
+        flash("{0} WG order{1} not saved — see the messages below.".format(len(failed), "" if len(failed) == 1 else "s"), "error")
+    if not outcomes:
+        flash("Nothing to save — fill in at least one WG order.", "error")
+    return [dict(o["order"], errors=o["errors"], duplicates=o["duplicates"], conflicts=o["conflicts"]) for o in failed], saved
+
+
+@app.route("/wg-orders", methods=["GET", "POST"], endpoint="wg_orders")
+@auth.login_required
+def wg_orders_page():
+    if request.method == "POST":
+        day_iso = _wg_date_arg(request.form.get("day"))
+        failed, _saved = _wg_save_and_report(wg_orders.parse_form_rows(request.form))
+        if failed:
+            return _render_wg_orders(day_iso, failed)
+        return redirect(url_for("wg_orders", date=day_iso))
+    day_iso = _wg_date_arg(request.args.get("date"))
+    return _render_wg_orders(day_iso, [wg_orders.empty_order(day_iso)])
+
+
+@app.route("/wg-orders/<int:booking_id>/edit", methods=["GET", "POST"], endpoint="wg_order_edit")
+@auth.login_required
+def wg_order_edit(booking_id):
+    row = db.get_booking(booking_id)
+    if row is None:
+        flash("Booking not found.", "error")
+        return redirect(url_for("wg_orders"))
+    if request.method == "POST":
+        raw_rows = wg_orders.parse_form_rows(request.form)
+        for raw in raw_rows:
+            raw["booking_id"] = booking_id
+        failed, saved = _wg_save_and_report(raw_rows[:1])
+        if failed:
+            return _render_wg_orders(failed[0]["move_date"] or _wg_date_arg(row["move_date"]), failed, edit_booking_id=booking_id)
+        day_iso = _wg_date_arg(dict(db.get_booking(booking_id))["move_date"])
+        return redirect(url_for("wg_orders", date=day_iso))
+    order = wg_orders.order_from_booking(row)
+    return _render_wg_orders(_wg_date_arg(order["move_date"]), [order], edit_booking_id=booking_id)
 
 
 @app.route("/furniture-lists", methods=["GET", "POST"], endpoint="furniture_lists_index")

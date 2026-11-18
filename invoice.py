@@ -291,6 +291,12 @@ def invoice_labour_lines(
     if totals is None:
         totals = calculate_invoice_totals(booking)
     lines = totals.get("labour_lines") or []
+    # WG Outdoor Life orders are billed as one flat "WG Outdoor Life delivery" extra
+    # charge (wg_orders.py); their empty $0 labour line is left off.
+    import wg_jobs
+
+    if wg_jobs.is_wg_order(booking) and not any(float(line.get("amount") or 0) for line in lines):
+        return []
     out = []
     for index, line in enumerate(lines):
         if index == 0:

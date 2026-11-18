@@ -164,3 +164,9 @@
     font-size: 0.92rem;
   }
 }
+
+/* WG Outdoor Life: products keep their lines */
+.weekly-wg-products {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}

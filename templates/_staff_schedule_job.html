@@ -5,12 +5,14 @@
     {% endif %}
     {% include "_staff_job_owner_edit_toggle.html" %}
   </div>
+  {% include "_staff_wg_badge.html" %}
   <p class="staff-schedule-time">{{ job.scheduled_range_display or job.start_time }}</p>
   <p class="staff-schedule-customer">Job: {{ job.customer_name }}</p>
+  {% include "_staff_wg_job.html" %}
   {% if job.crew_display %}
   <p class="staff-schedule-crew"><span class="staff-schedule-crew-label">Crew:</span> {{ job.crew_display }}</p>
   {% endif %}
-  {% if job.pickup_address %}
+  {% if job.pickup_address and not job.is_wg %}
   <p class="staff-schedule-address">
     <span class="staff-schedule-address-label">{{ 'Pickup 1:' if job.pickup_address_2 else 'Pickup:' }}</span>
     {% if job.pickup_map_url %}
@@ -32,7 +34,7 @@
   {% endif %}
   {% if job.delivery_address %}
   <p class="staff-schedule-address">
-    <span class="staff-schedule-address-label">Delivery:</span>
+    <span class="staff-schedule-address-label">{{ 'Address:' if job.is_wg else 'Delivery:' }}</span>
     {% if job.delivery_map_url %}
     <a href="{{ job.delivery_map_url }}" target="_blank" rel="noopener noreferrer">{{ job.delivery_address }}</a>
     {% else %}

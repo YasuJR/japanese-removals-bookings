@@ -8,6 +8,7 @@ import automation
 import config
 import database as db
 import job_status
+import wg_jobs
 from integrations import email_send, review_config, sms
 
 
@@ -91,6 +92,8 @@ def schedule_on_completed(
     previous_status: str,
 ) -> Optional[str]:
     """Queue a review request after wait_hours when status changes to Completed."""
+    if wg_jobs.is_wg_order(booking):  # WG Outdoor Life orders: no customer SMS / reminders
+        return None
     if not review_config.is_automation_enabled():
         return None
 

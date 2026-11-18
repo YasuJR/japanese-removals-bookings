@@ -2540,3 +2540,54 @@ a.staff-job-btn:active {
 .staff-cal-job-detail-list dd {
   overflow-wrap: anywhere;
 }
+
+/* WG Outdoor Life jobs (wg_orders.staff_fields) */
+.staff-wg-badge {
+  display: inline-block;
+  margin: 0 0 0.4rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: #1f5f3a;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.cal-wg-badge {
+  display: inline-block;
+  padding: 0 0.3rem;
+  border-radius: 4px;
+  background: #1f5f3a;
+  color: #fff;
+  font-size: 0.72em;
+  font-weight: 800;
+}
+
+.staff-wg-job {
+  margin: 0.4rem 0 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border-left: 4px solid #1f5f3a;
+  background: #f1f7f3;
+}
+
+.staff-wg-row {
+  margin: 0.15rem 0;
+  overflow-wrap: anywhere;
+}
+
+.staff-wg-label {
+  font-weight: 700;
+}
+
+.staff-wg-products,
+.weekly-wg-products {
+  margin: 0.1rem 0 0.35rem;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.staff-wg-actions {
+  margin-top: 0.5rem;
+}

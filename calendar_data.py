@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import database as db
 import invoice
 import job_status
+import wg_jobs
 from booking_times import (
     display_finish_time,
     display_start_time,
@@ -105,6 +106,7 @@ def calendar_event(
             }
         ),
         "duration_hours": parse_duration_hours(b.get("duration_hours")) or 1.0,
+        "is_wg": wg_jobs.is_wg_outdoor_life(b),
     }
 
 

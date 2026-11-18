@@ -104,6 +104,11 @@ BOOKING_EXTRA_COLUMNS = [
     ("amount_paid", "REAL"),
     # Optional second pickup (pickups.py). Empty = single-pickup booking.
     ("pickup_address_2", "TEXT"),
+    # WG Outdoor Life delivery orders (wg_orders.py; source = "wg_outdoor_life").
+    ("wg_products", "TEXT"),
+    ("wg_reference", "TEXT"),
+    ("wg_payment_amount", "REAL"),
+    ("wg_payment_type", "TEXT"),
 ]
 
 STAFF_EXTRA_COLUMNS = [
@@ -1522,6 +1527,29 @@ def save_booking_actual_times(
         conn.commit()
 
 
+def save_booking_wg_fields(booking_id: int, fields: Dict[str, Any]) -> None:
+    """Save the WG Outdoor Life order fields (source, products, reference, payment)."""
+    amount = fields.get("wg_payment_amount")
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE bookings
+            SET source = ?, wg_products = ?, wg_reference = ?,
+                wg_payment_amount = ?, wg_payment_type = ?
+            WHERE id = ?
+            """,
+            (
+                str(fields.get("source") or ""),
+                str(fields.get("wg_products") or ""),
+                str(fields.get("wg_reference") or ""),
+                float(amount) if amount not in (None, "") else None,
+                str(fields.get("wg_payment_type") or ""),
+                booking_id,
+            ),
+        )
+        conn.commit()
+
+
 def save_booking_pickup_address_2(booking_id: int, address: str) -> None:
     """Save (or clear, with "") the optional second pickup address."""
     with get_connection() as conn:
@@ -2166,6 +2194,8 @@ def search_bookings(query: str) -> List[sqlite3.Row]:
         "LOWER(email) LIKE ?",
         "LOWER(pickup_address) LIKE ?",
         "LOWER(COALESCE(pickup_address_2, '')) LIKE ?",
+        "LOWER(COALESCE(wg_reference, '')) LIKE ?",
+        "LOWER(COALESCE(wg_products, '')) LIKE ?",
         "LOWER(delivery_address) LIKE ?",
         "LOWER(move_date) LIKE ?",
         "LOWER(notes) LIKE ?",

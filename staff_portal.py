@@ -37,6 +37,7 @@ from display_dates import (
 )
 import staff_job_times
 import star_points
+import wg_orders
 from weekly_schedule_data import _day_heading, _week_range_heading
 
 logger = logging.getLogger(__name__)
@@ -481,6 +482,10 @@ def _calendar_job_card(job: Dict[str, Any]) -> Dict[str, Any]:
         "pickup_map_url": job.get("pickup_map_url") or "",
         "pickup_address_2": job.get("pickup_address_2") or "",
         "pickup_2_map_url": job.get("pickup_2_map_url") or "",
+        "is_wg": job.get("is_wg", False),
+        "wg_products": job.get("wg_products") or "",
+        "wg_reference": job.get("wg_reference") or "",
+        "wg_payment_display": job.get("wg_payment_display") or "",
         "delivery_map_url": job.get("delivery_map_url") or "",
         "furniture_token": job.get("furniture_token") or "",
         "furniture_status": job.get("furniture_status") or "",
@@ -822,6 +827,7 @@ def _serialize_job(
         "is_completed_status": bool(times.get("is_completed_status")) or is_done_status,
     }
     payload.update(pickups.staff_fields(row))
+    payload.update(wg_orders.staff_fields(row))
     payload.update(times)
     payload.update(hours)
     payload["status_display"] = status_display
@@ -1003,6 +1009,10 @@ def _owner_weekly_job_from_portal(job: Dict[str, Any]) -> Dict[str, Any]:
         "extra_pay_hours_label": job.get("extra_pay_hours_label") or "",
         "paid_hours": job.get("paid_hours"),
         "paid_hours_display": job.get("paid_hours_display") or "—",
+        "is_wg": job.get("is_wg", False),
+        "wg_products": job.get("wg_products") or "",
+        "wg_reference": job.get("wg_reference") or "",
+        "wg_payment_display": job.get("wg_payment_display") or "",
         "furniture": job.get("furniture"),
     }
 
