@@ -20,7 +20,12 @@
           <h3 class="weekly-job-customer">{{ job.customer_name }}</h3>
           <p class="weekly-job-row"><span class="weekly-job-field">Movers:</span> {{ job.num_movers }}</p>
           <p class="weekly-job-row"><span class="weekly-job-field">Crew:</span> {{ job.crew_display }}</p>
+          {% if job.pickup_address_2 %}
+          <p class="weekly-job-row"><span class="weekly-job-field">Pickup 1:</span> {{ job.pickup_address or '—' }}</p>
+          <p class="weekly-job-row"><span class="weekly-job-field">Pickup 2:</span> {{ job.pickup_address_2 }}</p>
+          {% else %}
           <p class="weekly-job-row"><span class="weekly-job-field">Pickup:</span> {{ job.pickup_address or '—' }}</p>
+          {% endif %}
           <p class="weekly-job-row"><span class="weekly-job-field">Delivery:</span> {{ job.delivery_address or '—' }}</p>
           <p class="weekly-job-row"><span class="weekly-job-field">Phone:</span> {{ job.phone or '—' }}</p>
           <p class="weekly-job-row"><span class="weekly-job-field">Status:</span> {{ job.status|upper }}</p>

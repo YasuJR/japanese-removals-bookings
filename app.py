@@ -83,6 +83,7 @@ import furniture_volume_refs
 import furniture_volumes
 import job_status
 import receipts
+import pickups
 import work_periods
 from crew_schedule_data import RANGE_OPTIONS, build_crew_schedule
 from ceo_dashboard_data import build_ceo_dashboard
@@ -260,6 +261,7 @@ CSV_HEADERS = [
     "xero_invoice_id",
     "sms_last_sent_at",
     "created_at",
+    "pickup_address_2",
 ]
 
 
@@ -3329,6 +3331,8 @@ def edit_booking(booking_id):
         )
     )
     form.update(_work_period_2_form_values(_row_to_dict(row)))
+    form["pickup_address_2"] = pickups.second_pickup(_row_to_dict(row))
+    form[pickups.FORM_FLAG] = "1" if form["pickup_address_2"] else "0"
     return render_template(
         "edit_booking.html",
         booking=row,
@@ -3509,6 +3513,8 @@ def _booking_overlay_for_invoice_preview(booking: dict, data: dict) -> dict:
     if data.get("work_period_2_present"):
         for key in work_periods.FIELDS:
             overlay[key] = data.get(key)
+    if data.get("pickup_address_2_present"):
+        overlay[pickups.FIELD] = data.get(pickups.FIELD) or ""
     overlay["extra_charges"] = list(data.get("extra_charges") or [])
     if data.get("crew_csv") is not None:
         overlay["crew"] = data["crew_csv"]

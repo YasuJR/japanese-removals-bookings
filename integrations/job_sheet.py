@@ -9,12 +9,38 @@ from crew import display_crew
 from extra_charges import charge_line_total
 from integrations import company_config
 import invoice
+import pickups
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+
+_ADDRESS_STYLE = ParagraphStyle("JobSheetAddress", fontName="Helvetica", fontSize=10, leading=12)
+
+
+def _address_cell(text: Any) -> Paragraph:
+    """Wrapped cell so long addresses never run past the table edge."""
+    from xml.sax.saxutils import escape
+
+    return Paragraph(escape(str(text or "—")), _ADDRESS_STYLE)
+
+
+def _address_rows(booking: Dict[str, Any]) -> list:
+    """Pickup / Delivery rows; Pickup 1 / Pickup 2 / Delivery when there are two pickups."""
+    second = pickups.second_pickup(booking)
+    if not second:
+        return [
+            ["Pickup", _address_cell(booking.get("pickup_address"))],
+            ["Delivery", _address_cell(booking.get("delivery_address"))],
+        ]
+    return [
+        ["Pickup 1", _address_cell(booking.get("pickup_address"))],
+        ["Pickup 2", _address_cell(second)],
+        ["Delivery", _address_cell(booking.get("delivery_address"))],
+    ]
 
 
 def generate_job_sheet_pdf(booking: Dict[str, Any]) -> bytes:
@@ -72,8 +98,7 @@ def generate_job_sheet_pdf(booking: Dict[str, Any]) -> bytes:
         ["Customer", booking["customer_name"]],
         ["Phone", booking["phone"]],
         ["Email", booking["email"]],
-        ["Pickup", booking["pickup_address"]],
-        ["Delivery", booking["delivery_address"]],
+        *_address_rows(booking),
         ["Crew", display_crew(booking)],
         ["Movers required", str(booking["num_movers"])],
         ["Hourly rate", invoice.format_aud(totals["hourly_rate"]) + "/hr"],

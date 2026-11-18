@@ -16,6 +16,7 @@ import callout_pricing
 import database as db
 import furniture_lists
 import job_status
+import pickups
 from booking_helpers import apple_maps_url, pickup_suburb, sms_href, tel_href
 from booking_times import (
     display_start_time,
@@ -478,6 +479,8 @@ def _calendar_job_card(job: Dict[str, Any]) -> Dict[str, Any]:
         "tel_href": job.get("tel_href") or "",
         "sms_href": job.get("sms_href") or "",
         "pickup_map_url": job.get("pickup_map_url") or "",
+        "pickup_address_2": job.get("pickup_address_2") or "",
+        "pickup_2_map_url": job.get("pickup_2_map_url") or "",
         "delivery_map_url": job.get("delivery_map_url") or "",
         "furniture_token": job.get("furniture_token") or "",
         "furniture_status": job.get("furniture_status") or "",
@@ -818,6 +821,7 @@ def _serialize_job(
         "status_display": status_display,
         "is_completed_status": bool(times.get("is_completed_status")) or is_done_status,
     }
+    payload.update(pickups.staff_fields(row))
     payload.update(times)
     payload.update(hours)
     payload["status_display"] = status_display
@@ -988,6 +992,7 @@ def _owner_weekly_job_from_portal(job: Dict[str, Any]) -> Dict[str, Any]:
         "num_movers": job.get("num_movers") or 0,
         "crew_display": job.get("crew_display") or job.get("crew") or "—",
         "pickup_address": job.get("pickup_address") or "—",
+        "pickup_address_2": job.get("pickup_address_2") or "",
         "delivery_address": job.get("delivery_address") or job.get("dropoff_address") or "—",
         "phone": job.get("phone") or "—",
         "status": job.get("status") or job.get("status_display") or "",
@@ -1599,6 +1604,7 @@ def _pdf_job(job: Dict[str, Any], is_all_staff: bool) -> Dict[str, Any]:
         "num_movers": job.get("num_movers") or "",
         "crew_display": job.get("crew_display") or job.get("crew") or "—",
         "pickup_address": job.get("pickup_address") or "—",
+        "pickup_address_2": job.get("pickup_address_2") or "",
         "delivery_address": job.get("delivery_address")
         or job.get("dropoff_address")
         or "—",

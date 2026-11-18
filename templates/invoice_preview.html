@@ -48,7 +48,9 @@
     <section class="invoice-bill-section">
       <h3 class="invoice-section-title">BILL TO</h3>
       <p class="invoice-bill-to">{{ inv.customer_name }}</p>
-      <p class="invoice-bill-detail">{{ inv.pickup_line }}</p>
+      {% for line in (inv.pickup_lines or [inv.pickup_line]) %}
+      <p class="invoice-bill-detail">{{ line }}</p>
+      {% endfor %}
       <p class="invoice-bill-detail">{{ inv.dropoff_line }}</p>
     </section>
 

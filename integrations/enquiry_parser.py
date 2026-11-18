@@ -806,6 +806,76 @@ def _location_result(
     )
 
 
+# Two pickups (bookings.pickup_address_2). Only explicit numbered labels count —
+# "Pickup 1: … / Pickup 2: …", "House 1 / House 2", "First / Second pickup" — plus a
+# labelled delivery ("Delivery:", "Going to:", "Drop-off:"). Anything less clear is
+# left alone, so the extra address stays in Notes instead of being guessed.
+_PICKUP_WORD = r"(?:pick[\s-]*up|pickup|collection|house|property)"
+MULTI_PICKUP_LINE_RE = re.compile(
+    r"^\s*(?:"
+    r"{word}\s*(?:address\s*)?(?:#|no\.?\s*)?(?P<n>[12])"
+    r"|(?P<ord>first|1st|second|2nd)\s+{word}(?:\s+address)?"
+    r")\s*[:\-–)]\s*(?P<value>.*)$".format(word=_PICKUP_WORD),
+    re.IGNORECASE,
+)
+MULTI_DELIVERY_LINE_RE = re.compile(
+    r"^\s*(?:"
+    r"(?:final\s+)?(?:delivery|drop[\s-]?off|destination)(?:\s+address)?\s*[:\-–]"
+    r"|(?:going|moving|delivering|deliver(?:y)?)\s+to\s*[:\-–]?"
+    r"|to\s*[:\-–]"
+    r")\s*(?P<value>.*)$",
+    re.IGNORECASE,
+)
+SECOND_PICKUP_HINT_RE = re.compile(
+    r"\b(?:{word}\s*(?:#|no\.?\s*)?2\b|(?:second|2nd)\s+{word}|(?:two|2)\s+(?:pick[\s-]*ups|pickups|houses|pickup\s+addresses))".format(
+        word=_PICKUP_WORD
+    ),
+    re.IGNORECASE,
+)
+
+
+def _labelled_value(lines: List[str], index: int, value: str) -> str:
+    """Value after a label, or the next non-empty line when the label stands alone."""
+    if (value or "").strip():
+        return value.strip()
+    for line in lines[index + 1 :]:
+        if line.strip():
+            if MULTI_PICKUP_LINE_RE.match(line) or MULTI_DELIVERY_LINE_RE.match(line):
+                return ""
+            return line.strip()
+    return ""
+
+
+def _extract_two_pickups(text: str, asides: Optional[List[str]] = None) -> Optional[Tuple[str, str, str]]:
+    """(pickup 1, pickup 2, delivery) when the text clearly lists two pickups, else None."""
+    lines = (text or "").splitlines()
+    found: Dict[int, str] = {}
+    delivery = ""
+    for i, line in enumerate(lines):
+        match = MULTI_PICKUP_LINE_RE.match(line)
+        if match:
+            n = match.group("n")
+            if not n:
+                n = "1" if match.group("ord").lower() in ("first", "1st") else "2"
+            if int(n) in found:
+                return None  # the same number twice — not clear
+            found[int(n)] = _clean_address(_labelled_value(lines, i, match.group("value")), asides)
+            continue
+        match = MULTI_DELIVERY_LINE_RE.match(line)
+        if match and not delivery:
+            delivery = _clean_address(_labelled_value(lines, i, match.group("value")), asides)
+    first, second = found.get(1, ""), found.get(2, "")
+    if not (_is_plausible_address(first) and _is_plausible_address(second)):
+        return None
+    if first.lower() == second.lower():
+        return None
+    if not _is_plausible_address(delivery):
+        delivery = _labelled_address(text, DELIVERY_LABELS, asides)
+        if delivery.lower() in (first.lower(), second.lower()):
+            delivery = ""
+    return first, second, delivery
+
+
 def _extract_locations(text: str) -> Tuple[str, str, bool, bool, List[str]]:
     asides: List[str] = []
     labelled_pickup = _labelled_address(text, PICKUP_LABELS, asides)
@@ -954,6 +1024,10 @@ def _structured_line(line: str, parsed: Dict[str, Any]) -> bool:
         return True
     pickup = (parsed.get("pickup_address") or "").strip()
     delivery = (parsed.get("delivery_address") or "").strip()
+    pickup_2 = (parsed.get("pickup_address_2") or "").strip()
+    if pickup_2:
+        if pickup_2 in stripped or MULTI_PICKUP_LINE_RE.match(stripped) or MULTI_DELIVERY_LINE_RE.match(stripped):
+            return True
     if pickup and pickup in stripped:
         return True
     if delivery and delivery in stripped:
@@ -984,7 +1058,7 @@ def _scrub_structured_text(text: str, parsed: Dict[str, Any]) -> str:
         if _structured_line(stripped, parsed):
             continue
         scrubbed = stripped
-        for key in ("pickup_address", "delivery_address", "customer_name", "phone", "email"):
+        for key in ("pickup_address", "pickup_address_2", "delivery_address", "customer_name", "phone", "email"):
             value = (parsed.get(key) or "").strip()
             if value and value.lower() in scrubbed.lower():
                 scrubbed = re.sub(re.escape(value), " ", scrubbed, flags=re.IGNORECASE)
@@ -1025,7 +1099,7 @@ def _extract_notes(text: str, parsed: Dict[str, Any], asides: Optional[List[str]
         if _structured_line(cleaned, parsed):
             continue
         duplicate = False
-        for key in ("customer_name", "phone", "email", "pickup_address", "delivery_address"):
+        for key in ("customer_name", "phone", "email", "pickup_address", "pickup_address_2", "delivery_address"):
             value = (parsed.get(key) or "").strip()
             if value and value.lower() == cleaned.lower():
                 duplicate = True
@@ -1096,6 +1170,7 @@ def parse_pasted_text(
         "email": "",
         "move_date": "",
         "pickup_address": "",
+        "pickup_address_2": "",
         "delivery_address": "",
         "start_time": "",
         "notes": "",
@@ -1114,6 +1189,16 @@ def parse_pasted_text(
     move_date, date_ambiguous = _extract_move_date(date_source, ref_date)
 
     pickup, delivery, pickup_suburb_only, delivery_suburb_only, asides = _extract_locations(message)
+    pickup_2 = ""
+    multi_asides: List[str] = []
+    two = _extract_two_pickups(message, multi_asides)
+    if two:
+        pickup, pickup_2, multi_delivery = two
+        delivery = multi_delivery or delivery
+        pickup_suburb_only = not _has_full_street_address(pickup)
+        delivery_suburb_only = not _has_full_street_address(delivery)
+        asides = asides + [a for a in multi_asides if a not in asides]
+    second_pickup_unclear = not pickup_2 and bool(SECOND_PICKUP_HINT_RE.search(message))
 
     start_time, time_approximate, time_vague = _extract_start_time(date_source)
 
@@ -1123,6 +1208,7 @@ def parse_pasted_text(
         "email": email,
         "move_date": move_date,
         "pickup_address": pickup,
+        "pickup_address_2": pickup_2,
         "delivery_address": delivery,
     }
     notes = _extract_notes(message, interim, asides + _paren_notes)
@@ -1133,6 +1219,7 @@ def parse_pasted_text(
         "email": email,
         "move_date": move_date,
         "pickup_address": pickup,
+        "pickup_address_2": pickup_2,
         "delivery_address": delivery,
         "start_time": start_time,
         "notes": notes,
@@ -1142,6 +1229,9 @@ def parse_pasted_text(
         "_time_vague": time_vague,
         "_pickup_suburb_only": pickup_suburb_only,
         "_delivery_suburb_only": delivery_suburb_only,
+        "_warnings": ["A second pickup may be mentioned — check Notes and add Pickup 2 if needed"]
+        if second_pickup_unclear
+        else [],
     }
     fields["warnings"] = _build_warnings(fields)
     fields["confidence"] = sms_inbound_parser.confidence_score(fields)
@@ -1161,6 +1251,10 @@ def apply_parsed_fields(form: Dict[str, Any], parsed: Dict[str, Any]) -> Dict[st
         "notes": parsed.get("notes") or "",
         "start_time": (parsed.get("start_time") or "").strip(),
     }
+    pickup_2 = (parsed.get("pickup_address_2") or "").strip()
+    if pickup_2:
+        mapping["pickup_address_2"] = pickup_2
+        mapping["pickup_address_2_enabled"] = "1"
     merged.update(mapping)
     return merged
 
@@ -1186,6 +1280,11 @@ def summary_rows(parsed: Dict[str, Any]) -> List[Tuple[str, str]]:
         ("Phone", (parsed.get("phone") or "").strip() or "—"),
         ("Email", (parsed.get("email") or "").strip() or "—"),
         ("From", (parsed.get("pickup_address") or "").strip() or "—"),
+        *(
+            [("From 2", parsed["pickup_address_2"].strip())]
+            if (parsed.get("pickup_address_2") or "").strip()
+            else []
+        ),
         ("To", (parsed.get("delivery_address") or "").strip() or "—"),
         ("Date", _format_move_date_display(parsed.get("move_date") or "")),
         ("Start Time", format_start_time_display(parsed.get("start_time") or "")),

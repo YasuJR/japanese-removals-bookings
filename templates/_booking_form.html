@@ -151,9 +151,29 @@
            value="{{ form.get('pickup_address', '') }}">
     <span class="placeholder-ja-hint" lang="ja" aria-hidden="true">例：2/155 Stock Rd, Attadale WA</span>
   </label>
+  {# Optional second pickup (pickups.py). Hidden until "Add another pickup address". #}
+  {% set pickup2_on = form.get('pickup_address_2_enabled') == '1' or (form.get('pickup_address_2') or '')|trim %}
+  <div class="full-width pickup-2-wrap">
+    <input type="hidden" name="pickup_address_2_enabled" id="pickup_address_2_enabled" value="{{ '1' if pickup2_on else '0' }}">
+    <button type="button" class="btn-secondary btn-sm" id="pickup-2-add" {% if pickup2_on %}hidden{% endif %}>
+      + Add another pickup address · <span lang="ja">2件目の引越し元住所を追加</span>
+    </button>
+    <div class="pickup-2-box" id="pickup-2-box" {% if not pickup2_on %}hidden{% endif %}>
+      <label class="full-width">
+        {{ bl('Pickup address 2', '引越し元住所 2') }}
+        <input type="text" name="pickup_address_2" id="pickup_address_2"
+               placeholder="Street, suburb, WA"
+               value="{{ form.get('pickup_address_2', '') or '' }}">
+      </label>
+      <button type="button" class="btn-secondary btn-sm" id="pickup-2-remove">
+        Remove second pickup · <span lang="ja">2件目を削除</span>
+      </button>
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='pickups.js') }}" defer></script>
   {% if form.get('pickup_address') or form.get('delivery_address') %}
   <div class="full-width">
-    {% with pickup=form.get('pickup_address', ''), delivery=form.get('delivery_address', '') %}
+    {% with pickup=form.get('pickup_address', ''), pickup2=form.get('pickup_address_2', ''), delivery=form.get('delivery_address', '') %}
     {% include '_map_buttons.html' %}
     {% endwith %}
   </div>

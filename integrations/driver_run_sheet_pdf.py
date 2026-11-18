@@ -109,7 +109,11 @@ def generate_driver_run_sheet_pdf(
 
             rows = [
                 ["Phone", job.get("phone") or "—"],
-                ["Pickup", job.get("pickup_address") or "—"],
+                *(
+                    [["Pickup 1", job.get("pickup_address") or "—"], ["Pickup 2", job["pickup_address_2"]]]
+                    if job.get("pickup_address_2")
+                    else [["Pickup", job.get("pickup_address") or "—"]]
+                ),
                 ["Delivery", job.get("delivery_address") or "—"],
             ]
             notes = job.get("notes") or ""

@@ -70,9 +70,15 @@
         </div>
         <div class="daily-job-locations">
           <p class="daily-job-row daily-job-location">
-            <span class="daily-job-field">Pickup:</span>
+            <span class="daily-job-field">{{ 'Pickup 1:' if job.pickup_address_2 else 'Pickup:' }}</span>
             <span class="daily-job-address">{{ job.pickup_address or '—' }}</span>
           </p>
+          {% if job.pickup_address_2 %}
+          <p class="daily-job-row daily-job-location">
+            <span class="daily-job-field">Pickup 2:</span>
+            <span class="daily-job-address">{{ job.pickup_address_2 }}</span>
+          </p>
+          {% endif %}
           <p class="daily-job-row daily-job-location">
             <span class="daily-job-field">Delivery:</span>
             <span class="daily-job-address">{{ job.delivery_address or '—' }}</span>
@@ -96,7 +102,7 @@
       </a>
       <div class="daily-job-actions">
         {% with phone=job.phone %}{% include '_contact_actions.html' %}{% endwith %}
-        {% with pickup=job.pickup_address, delivery=job.delivery_address %}{% include '_map_buttons.html' %}{% endwith %}
+        {% with pickup=job.pickup_address, pickup2=job.pickup_address_2, delivery=job.delivery_address %}{% include '_map_buttons.html' %}{% endwith %}
       </div>
     </article>
     {% endfor %}

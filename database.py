@@ -102,6 +102,8 @@ BOOKING_EXTRA_COLUMNS = [
     ("receipt_number", "TEXT"),
     ("receipt_issued_at", "TEXT"),
     ("amount_paid", "REAL"),
+    # Optional second pickup (pickups.py). Empty = single-pickup booking.
+    ("pickup_address_2", "TEXT"),
 ]
 
 STAFF_EXTRA_COLUMNS = [
@@ -1520,6 +1522,16 @@ def save_booking_actual_times(
         conn.commit()
 
 
+def save_booking_pickup_address_2(booking_id: int, address: str) -> None:
+    """Save (or clear, with "") the optional second pickup address."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE bookings SET pickup_address_2 = ? WHERE id = ?",
+            ((address or "").strip(), booking_id),
+        )
+        conn.commit()
+
+
 def save_booking_work_period_2(booking_id: int, fields: Dict[str, Any]) -> None:
     """Save (or clear, with empty values) the optional second billing work period."""
     movers = fields.get("work_period_2_movers")
@@ -2153,6 +2165,7 @@ def search_bookings(query: str) -> List[sqlite3.Row]:
         "LOWER(phone) LIKE ?",
         "LOWER(email) LIKE ?",
         "LOWER(pickup_address) LIKE ?",
+        "LOWER(COALESCE(pickup_address_2, '')) LIKE ?",
         "LOWER(delivery_address) LIKE ?",
         "LOWER(move_date) LIKE ?",
         "LOWER(notes) LIKE ?",

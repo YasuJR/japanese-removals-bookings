@@ -1,0 +1,8 @@
+{# Two pickups: one map button per stop, in route order (pickups.staff_fields). #}
+{% if job.pickup_address_2 %}
+<div class="staff-job-actions staff-pickup-maps">
+  {% if job.pickup_map_url %}<a class="staff-job-btn" href="{{ job.pickup_map_url }}" target="_blank" rel="noopener noreferrer">Map Pickup 1</a>{% endif %}
+  {% if job.pickup_2_map_url %}<a class="staff-job-btn" href="{{ job.pickup_2_map_url }}" target="_blank" rel="noopener noreferrer">Map Pickup 2</a>{% endif %}
+  {% if job.delivery_map_url %}<a class="staff-job-btn" href="{{ job.delivery_map_url }}" target="_blank" rel="noopener noreferrer">Map Delivery</a>{% endif %}
+</div>
+{% endif %}

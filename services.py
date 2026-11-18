@@ -52,6 +52,8 @@ def _persist_booking_extras(booking_id: int, data: Dict[str, Any]) -> None:
             data
         )
     db.update_booking_invoice_fields(booking_id, invoice_fields)
+    if data.get("pickup_address_2_present"):
+        db.save_booking_pickup_address_2(booking_id, data.get("pickup_address_2") or "")
     truck = (data.get("truck_assigned") or "").strip()
     if "truck_assigned" in data:
         db.update_booking_integration_fields(

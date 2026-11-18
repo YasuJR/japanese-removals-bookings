@@ -83,6 +83,9 @@
         {% else %}
         <span class="driver-action-btn driver-action-disabled">Pickup Map</span>
         {% endif %}
+        {% if job.pickup_address_2 %}
+        <a class="driver-action-btn" href="{{ job.pickup_address_2|apple_maps_url }}" target="_blank" rel="noopener noreferrer">Pickup 2 Map</a>
+        {% endif %}
         {% if job.delivery_address %}
         <a class="driver-action-btn" href="{{ job.delivery_address|apple_maps_url }}" target="_blank" rel="noopener noreferrer">Delivery Map</a>
         {% else %}

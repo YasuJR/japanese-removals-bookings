@@ -21,7 +21,7 @@
     {% with phone=booking.phone %}
     {% include '_contact_actions.html' %}
     {% endwith %}
-    {% with pickup=booking.pickup_address, delivery=booking.delivery_address %}
+    {% with pickup=booking.pickup_address, pickup2=booking.pickup_address_2 or '', delivery=booking.delivery_address %}
     {% include '_map_buttons.html' %}
     {% endwith %}
   </div>
@@ -32,8 +32,14 @@
       <div><dt>Customer name</dt><dd>{{ booking.customer_name }}</dd></div>
       <div><dt>Phone number</dt><dd>{% with phone=booking.phone %}{% include '_phone_link.html' %}{% endwith %}</dd></div>
       <div><dt>Email</dt><dd>{% if booking.email %}<a href="mailto:{{ booking.email }}">{{ booking.email }}</a>{% else %}Not provided{% endif %}</dd></div>
+      {% if (booking.pickup_address_2 or '')|trim %}
+      <div><dt>Pickup 1</dt><dd>{{ booking.pickup_address or '—' }}</dd></div>
+      <div><dt>Pickup 2</dt><dd>{{ booking.pickup_address_2 }}</dd></div>
+      <div><dt>Delivery</dt><dd>{{ booking.delivery_address or '—' }}</dd></div>
+      {% else %}
       <div><dt>Pickup address</dt><dd>{{ booking.pickup_address or '—' }}</dd></div>
       <div><dt>Delivery address</dt><dd>{{ booking.delivery_address or '—' }}</dd></div>
+      {% endif %}
       <div><dt>Move date</dt><dd>{% with date_str=booking.move_date %}{% include '_date_badge.html' %}{% endwith %}</dd></div>
       <div><dt>Start time</dt><dd>{{ booking|booking_start_time }}</dd></div>
       <div><dt>Finish time</dt><dd>{{ booking|booking_finish_time }}</dd></div>

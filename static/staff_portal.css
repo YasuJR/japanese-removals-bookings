@@ -2524,3 +2524,19 @@ a.staff-job-btn:active {
 .staff-furniture-note p { margin: 0; font-size: 0.97rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .staff-furniture-photos { margin: 0.6rem 0 0; font-size: 0.92rem; }
 .weekly-job .staff-furniture { margin: 0.5rem 0.6rem 0.6rem; }
+
+/* Two pickups: Map Pickup 1 / Map Pickup 2 / Map Delivery (route order) */
+.staff-pickup-maps {
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  margin-top: 0.6rem;
+}
+
+.staff-pickup-maps .staff-job-btn {
+  min-height: 44px;
+}
+
+.staff-today-job-address a,
+.staff-schedule-address a,
+.staff-cal-job-detail-list dd {
+  overflow-wrap: anywhere;
+}

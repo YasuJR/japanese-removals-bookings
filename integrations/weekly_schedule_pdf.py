@@ -133,7 +133,8 @@ def _job_html(job: dict) -> str:
         "<b>{0}</b>".format(time_line),
         "<b>{0}</b>".format(name),
         "Movers: {0} &nbsp; Crew: {1}".format(movers, crew),
-        "P: {0}".format(pickup),
+        "P{0}: {1}".format(" 1" if job.get("pickup_address_2") else "", pickup),
+        *(["P 2: {0}".format(_esc(job["pickup_address_2"]))] if job.get("pickup_address_2") else []),
         "D: {0}".format(delivery),
         "Ph: {0}".format(phone),
         "Status: {0}".format(status),
@@ -432,7 +433,11 @@ def _staff_job_card(job: dict, styles: dict, width: float) -> Table:
     if job.get("show_movers") and job.get("num_movers"):
         crew = "Movers: {0} · {1}".format(m(job["num_movers"]), crew)
     lines.append(crew)
-    lines.append("P: {0}".format(m(job.get("pickup_address") or "—", lead="P: ")))
+    if job.get("pickup_address_2"):
+        lines.append("P 1: {0}".format(m(job.get("pickup_address") or "—", lead="P 1: ")))
+        lines.append("P 2: {0}".format(m(job["pickup_address_2"], lead="P 2: ")))
+    else:
+        lines.append("P: {0}".format(m(job.get("pickup_address") or "—", lead="P: ")))
     lines.append("D: {0}".format(m(job.get("delivery_address") or "—", lead="D: ")))
     lines.append("Ph: {0}".format(m(job.get("phone") or "—", lead="Ph: ")))
     if job.get("notes"):

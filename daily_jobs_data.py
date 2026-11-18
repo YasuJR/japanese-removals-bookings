@@ -91,6 +91,7 @@ def _serialize_job(booking: Dict[str, Any]) -> Dict[str, Any]:
         "customer_name": (row.get("customer_name") or "—").strip(),
         "phone": (row.get("phone") or "").strip(),
         "pickup_address": (row.get("pickup_address") or "—").strip(),
+        "pickup_address_2": (row.get("pickup_address_2") or "").strip(),
         "delivery_address": (row.get("delivery_address") or "—").strip(),
         "notes": (row.get("notes") or "").strip(),
         "status": job_status.display(row),

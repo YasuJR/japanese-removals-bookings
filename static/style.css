@@ -4083,3 +4083,33 @@ button:disabled {
   gap: 0.25rem;
   font-weight: 600;
 }
+
+/* Optional second pickup address (pickups.py) */
+.pickup-2-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.pickup-2-box {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border, #d8dee8);
+  border-left: 4px solid var(--navy, #1a2744);
+  border-radius: 8px;
+  background: #f7f9fc;
+  box-sizing: border-box;
+}
+
+.pickup-2-box[hidden] {
+  display: none !important;
+}
+
+.pickup-2-box label {
+  width: 100%;
+}

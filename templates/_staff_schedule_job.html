@@ -12,11 +12,21 @@
   {% endif %}
   {% if job.pickup_address %}
   <p class="staff-schedule-address">
-    <span class="staff-schedule-address-label">Pickup:</span>
+    <span class="staff-schedule-address-label">{{ 'Pickup 1:' if job.pickup_address_2 else 'Pickup:' }}</span>
     {% if job.pickup_map_url %}
     <a href="{{ job.pickup_map_url }}" target="_blank" rel="noopener noreferrer">{{ job.pickup_address }}</a>
     {% else %}
     {{ job.pickup_address }}
+    {% endif %}
+  </p>
+  {% endif %}
+  {% if job.pickup_address_2 %}
+  <p class="staff-schedule-address">
+    <span class="staff-schedule-address-label">Pickup 2:</span>
+    {% if job.pickup_2_map_url %}
+    <a href="{{ job.pickup_2_map_url }}" target="_blank" rel="noopener noreferrer">{{ job.pickup_address_2 }}</a>
+    {% else %}
+    {{ job.pickup_address_2 }}
     {% endif %}
   </p>
   {% endif %}
@@ -30,6 +40,7 @@
     {% endif %}
   </p>
   {% endif %}
+  {% include "_staff_pickup_maps.html" %}
   {% include "_staff_job_note.html" %}
   {% include "_staff_furniture.html" %}
   {% if job.phone %}

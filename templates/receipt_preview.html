@@ -49,7 +49,9 @@
     <section class="invoice-bill-section">
       <h3 class="invoice-section-title">RECEIVED FROM</h3>
       <p class="invoice-bill-to">{{ rct.customer_name }}</p>
-      <p class="invoice-bill-detail">{{ rct.pickup_line }}</p>
+      {% for line in (rct.pickup_lines or [rct.pickup_line]) %}
+      <p class="invoice-bill-detail">{{ line }}</p>
+      {% endfor %}
       <p class="invoice-bill-detail">{{ rct.dropoff_line }}</p>
     </section>
 

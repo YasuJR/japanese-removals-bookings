@@ -204,6 +204,7 @@ def build_invoice_document(booking: Dict[str, Any]) -> Dict[str, Any]:
         "pickup_address": bill_to["pickup_address"],
         "dropoff_address": bill_to["dropoff_address"],
         "pickup_line": bill_to["pickup_line"],
+        "pickup_lines": bill_to["pickup_lines"],
         "dropoff_line": bill_to["dropoff_line"],
         "invoice_number": invoice_number,
         "issue_date": _format_display_date(issue_date),
@@ -716,9 +717,8 @@ def generate_invoice_pdf(booking: Dict[str, Any]) -> bytes:
     story.append(
         Paragraph(_pdf_markup(doc_data.get("customer_name") or ""), styles["customer_name"])
     )
-    story.append(
-        Paragraph(_pdf_markup(doc_data.get("pickup_line") or "Pickup:"), styles["customer_detail"])
-    )
+    for line in doc_data.get("pickup_lines") or [doc_data.get("pickup_line") or "Pickup:"]:
+        story.append(Paragraph(_pdf_markup(line), styles["customer_detail"]))
     story.append(
         Paragraph(
             _pdf_markup(doc_data.get("dropoff_line") or "Drop-off:"),
@@ -1023,7 +1023,8 @@ def generate_receipt_pdf(booking: Dict[str, Any]) -> bytes:
 
     story.append(Paragraph("RECEIVED FROM", styles["section_heading"]))
     story.append(Paragraph(_pdf_markup(doc_data.get("customer_name") or ""), styles["customer_name"]))
-    story.append(Paragraph(_pdf_markup(doc_data.get("pickup_line") or "Pickup:"), styles["customer_detail"]))
+    for line in doc_data.get("pickup_lines") or [doc_data.get("pickup_line") or "Pickup:"]:
+        story.append(Paragraph(_pdf_markup(line), styles["customer_detail"]))
     story.append(Paragraph(_pdf_markup(doc_data.get("dropoff_line") or "Drop-off:"), styles["customer_detail"]))
     story.append(Spacer(1, BILL_GAP))
     story.append(_line_items_table(doc_data, styles))

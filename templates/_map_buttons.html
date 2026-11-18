@@ -1,7 +1,11 @@
-{# pickup / delivery: address strings; hide button when empty #}
+{# pickup / pickup2 / delivery: address strings; hide button when empty #}
+{% set _p2 = (pickup2 if pickup2 is defined else '') or '' %}
 <div class="map-actions touch-action-bar">
   {% if pickup and pickup.strip() %}
-  <a class="touch-action-btn touch-action-map" href="{{ pickup|apple_maps_url }}" target="_blank" rel="noopener noreferrer">Pickup Map</a>
+  <a class="touch-action-btn touch-action-map" href="{{ pickup|apple_maps_url }}" target="_blank" rel="noopener noreferrer">{{ 'Pickup 1 Map' if _p2.strip() else 'Pickup Map' }}</a>
+  {% endif %}
+  {% if _p2.strip() %}
+  <a class="touch-action-btn touch-action-map" href="{{ _p2|apple_maps_url }}" target="_blank" rel="noopener noreferrer">Pickup 2 Map</a>
   {% endif %}
   {% if delivery and delivery.strip() %}
   <a class="touch-action-btn touch-action-map" href="{{ delivery|apple_maps_url }}" target="_blank" rel="noopener noreferrer">Delivery Map</a>

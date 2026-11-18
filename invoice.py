@@ -156,11 +156,19 @@ def invoice_customer_bill_to(booking: Any) -> Dict[str, str]:
             break
     pickup_line = "Pickup: {0}".format(pickup).rstrip()
     dropoff_line = "Drop-off: {0}".format(dropoff).rstrip()
+    # Optional second pickup: "Pickup:" then a numbered line per address.
+    pickup_2 = str(row.get("pickup_address_2") or "").strip()
+    if pickup_2:
+        pickup_lines = ["Pickup:", "1. {0}".format(pickup or "—"), "2. {0}".format(pickup_2)]
+    else:
+        pickup_lines = [pickup_line]
     return {
         "customer_name": str(row.get("customer_name") or "").strip(),
         "pickup_address": pickup,
+        "pickup_address_2": pickup_2,
         "dropoff_address": dropoff,
         "pickup_line": pickup_line,
+        "pickup_lines": pickup_lines,
         "dropoff_line": dropoff_line,
     }
 

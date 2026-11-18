@@ -3,6 +3,7 @@
 from typing import Any, Dict, List, Tuple
 
 import job_status
+import pickups
 import work_periods
 from booking_times import normalize_time_input, validate_times
 from callout_pricing import parse_callout_minutes_form, resolve_callout_fee
@@ -137,6 +138,11 @@ def parse_booking_form(
         form, start_time=start_norm, finish_time=finish_norm
     )
     errors.extend(period_errors)
+    # Optional second pickup. None = form without the Pickup 2 section (keep saved value).
+    pickup_2 = pickups.parse_form(form)
+    data["pickup_address_2_present"] = pickup_2 is not None
+    data[pickups.FIELD] = pickup_2 or ""
+    data[pickups.FORM_FLAG] = "1" if pickup_2 else "0"
     data["work_period_2_present"] = work_period_2 is not None
     data[work_periods.FORM_FLAG] = "1" if str(form.get(work_periods.FORM_FLAG) or "") == "1" else "0"
     data.update(work_period_2 or work_periods.empty_fields())

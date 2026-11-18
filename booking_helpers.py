@@ -302,6 +302,7 @@ def build_calendar_description(
     customer = str(booking.get("customer_name") or "").strip() or "—"
     crew_text = display_crew(booking)
     pickup_raw = str(booking.get("pickup_address") or "").strip()
+    pickup_2_raw = str(booking.get("pickup_address_2") or "").strip()
     delivery_raw = str(booking.get("delivery_address") or "").strip()
     notes_text = str(booking.get("notes") or "").strip()
     booking_id = booking.get("id")
@@ -321,7 +322,11 @@ def build_calendar_description(
         "Customer: {0}".format(customer),
         "Phone: {0}".format(phone_raw or "—"),
         "Email: {0}".format(email_raw or "—"),
-        "Pickup: {0}".format(pickup_raw or "—"),
+        *(
+            ["Pickup 1: {0}".format(pickup_raw or "—"), "Pickup 2: {0}".format(pickup_2_raw)]
+            if pickup_2_raw
+            else ["Pickup: {0}".format(pickup_raw or "—")]
+        ),
         "Delivery: {0}".format(delivery_raw or "—"),
         "Notes: {0}".format(notes_text if _notes_has_content(notes_text) else "—"),
         "Crew: {0}".format(crew_text if crew_text and crew_text != "—" else "—"),
@@ -347,7 +352,14 @@ def build_calendar_description(
         capitalize_suburb_in_address(delivery_raw) if delivery_raw else ""
     )
     if pickup_raw and pickup_display:
-        block = _html_address_block("📍 Pickup map:", pickup_raw, pickup_display)
+        label = "📍 Pickup 1 map:" if pickup_2_raw else "📍 Pickup map:"
+        block = _html_address_block(label, pickup_raw, pickup_display)
+        if block:
+            blocks.append(block)
+    if pickup_2_raw:
+        block = _html_address_block(
+            "📍 Pickup 2 map:", pickup_2_raw, capitalize_suburb_in_address(pickup_2_raw)
+        )
         if block:
             blocks.append(block)
     if delivery_raw and delivery_display:

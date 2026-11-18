@@ -81,6 +81,7 @@ def build_driver_run_sheet(
                 or "—",
                 "phone": phone,
                 "pickup_address": str(booking.get("pickup_address") or "").strip(),
+                "pickup_address_2": str(booking.get("pickup_address_2") or "").strip(),
                 "delivery_address": str(
                     booking.get("delivery_address") or ""
                 ).strip(),

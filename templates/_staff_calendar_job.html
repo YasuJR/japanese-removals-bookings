@@ -3,6 +3,7 @@
     <span class="cal-booking-time">{{ job.time_range }}</span>
     <strong class="cal-booking-customer">{{ job.customer_name }}</strong>
     <span class="cal-booking-meta">Crew: {{ job.crew_display }}</span>
+    {% if job.pickup_address_2 %}<span class="cal-booking-meta">2 pickups</span>{% endif %}
     {% if job.status_display %}
     <span class="cal-booking-status">{{ job.status_display }}</span>
     {% endif %}
@@ -22,9 +23,15 @@
         <dd>{{ job.crew_display }}</dd>
       </div>
       <div>
-        <dt>Pickup</dt>
-        <dd>{{ job.pickup_address or "—" }}</dd>
+        <dt>{{ 'Pickup 1' if job.pickup_address_2 else 'Pickup' }}</dt>
+        <dd>{% if job.pickup_map_url %}<a href="{{ job.pickup_map_url }}" target="_blank" rel="noopener noreferrer">{{ job.pickup_address }}</a>{% else %}{{ job.pickup_address or "—" }}{% endif %}</dd>
       </div>
+      {% if job.pickup_address_2 %}
+      <div>
+        <dt>Pickup 2</dt>
+        <dd>{% if job.pickup_2_map_url %}<a href="{{ job.pickup_2_map_url }}" target="_blank" rel="noopener noreferrer">{{ job.pickup_address_2 }}</a>{% else %}{{ job.pickup_address_2 }}{% endif %}</dd>
+      </div>
+      {% endif %}
       <div>
         <dt>Delivery</dt>
         <dd>{{ job.delivery_address or "—" }}</dd>
