@@ -23,6 +23,7 @@
     Completed: "completed",
     Cancelled: "cancelled",
     Pending: "pending",
+    "Check to Confirm": "check-to-confirm",
     "On Route": "on-route",
     "In Progress": "in-progress",
     Paid: "paid",
@@ -31,6 +32,7 @@
   function statusClasses() {
     return [
       "status-pending",
+      "status-check-to-confirm",
       "status-quote",
       "status-confirmed",
       "status-on-route",

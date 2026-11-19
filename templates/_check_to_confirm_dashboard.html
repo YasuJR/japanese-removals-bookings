@@ -1,0 +1,59 @@
+{# Dashboard: bookings created from sent "Confirmed" emails (integrations/company_gmail.py). #}
+<section class="check-confirm-panel{% if gmail_check.count %} check-confirm-panel-active{% endif %}" id="check-to-confirm">
+  <div class="check-confirm-head">
+    <h3>
+      <span class="status-badge status-check-to-confirm">Check to Confirm</span>
+      <span class="check-confirm-count">{{ gmail_check.count }}</span>
+      <span class="check-confirm-count-label">booking{% if gmail_check.count != 1 %}s{% endif %} from email</span>
+    </h3>
+    <a class="check-confirm-settings" href="{{ url_for('company_gmail_settings') }}">Company Gmail</a>
+  </div>
+
+  {% if gmail_check.pending %}
+  <ul class="check-confirm-list">
+    {% for item in gmail_check.pending %}
+    {% set b = item.booking %}
+    <li class="check-confirm-item">
+      <a class="check-confirm-main" href="{{ url_for('edit_booking', booking_id=b.id) }}">
+        <strong>{{ b.customer_name or 'Name missing' }}</strong>
+        <span>{{ b.move_date|format_display_date if b.move_date else 'Date missing' }}{% if b.start_time %} · {{ b.start_time|format_hm_12h }}{% endif %}</span>
+        {% if item.summary %}<span class="check-confirm-summary">{{ item.summary }}</span>{% endif %}
+      </a>
+      <span class="check-confirm-flags">
+        {% if item.missing_count %}<span class="check-flag check-flag-missing">{{ item.missing_count }} missing</span>{% endif %}
+        {% if item.uncertain_count %}<span class="check-flag check-flag-uncertain">{{ item.uncertain_count }} to check</span>{% endif %}
+        {% if item.gmail_url %}<a class="check-confirm-gmail" href="{{ item.gmail_url }}" target="_blank" rel="noopener">Gmail</a>{% endif %}
+        <a class="btn-sm btn-primary" href="{{ url_for('edit_booking', booking_id=b.id) }}#check-to-confirm">Review</a>
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted check-confirm-empty">No bookings waiting — new “Confirmed” emails appear here within 5 minutes.</p>
+  {% endif %}
+
+  {% if gmail_check.reviews %}
+  <h4 class="check-confirm-subhead">Email updates to check</h4>
+  <ul class="check-confirm-list">
+    {% for item in gmail_check.reviews %}
+    {% set r = item.row %}
+    <li class="check-confirm-item">
+      <span class="check-confirm-main">
+        <strong>{{ {'amendment': 'Change', 'duplicate': 'Confirmed again', 'cancellation': 'Cancellation'}.get(r.kind, r.kind|title) }}</strong>
+        {% if item.booking %}
+        <a href="{{ url_for('edit_booking', booking_id=item.booking.id) }}">#{{ item.booking.id }} {{ item.booking.customer_name }}</a>
+        {% endif %}
+        {% if r.summary %}<span class="check-confirm-summary">{{ r.summary }}</span>{% endif %}
+      </span>
+      <span class="check-confirm-flags">
+        {% if item.gmail_url %}<a class="check-confirm-gmail" href="{{ item.gmail_url }}" target="_blank" rel="noopener">Gmail</a>{% endif %}
+        <form method="post" action="{{ url_for('gmail_review_done', review_id=r.id) }}">
+          <input type="hidden" name="next" value="{{ url_for('dashboard') }}#check-to-confirm">
+          <button type="submit" class="btn-sm btn-secondary">Checked</button>
+        </form>
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>

@@ -1,4 +1,8 @@
 {% set current = b|booking_job_status %}
+{% if current == 'Check to Confirm' %}
+<a class="status-badge status-check-to-confirm" href="{{ url_for('edit_booking', booking_id=b.id) }}"
+   title="Created from a sent Confirmed email — review and press Confirm Booking">Check to Confirm</a>
+{% else %}
 <div class="dashboard-status-picker" data-booking-id="{{ b.id }}" data-current-status="{{ current }}">
   <button type="button"
           class="status-badge status-{{ current|job_status_css }} dashboard-status-trigger"
@@ -9,3 +13,4 @@
     <span class="dashboard-status-chevron" aria-hidden="true">▾</span>
   </button>
 </div>
+{% endif %}

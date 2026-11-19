@@ -199,6 +199,37 @@ def _make_flow(redirect_uri: str):
     )
 
 
+def make_flow_for_scopes(redirect_uri: str, scopes: List[str]):
+    """OAuth flow with its own scopes (company Gmail). Same Google client, own token;
+    the Calendar flow above and its token file are not touched."""
+    _ensure_oauth_local_http()
+    from google_auth_oauthlib.flow import Flow
+
+    oauth_json = (config.GOOGLE_OAUTH_JSON or "").strip()
+    if oauth_json:
+        client_config = json.loads(oauth_json)
+    elif config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET:
+        client_config = {
+            "web": {
+                "client_id": config.GOOGLE_CLIENT_ID,
+                "client_secret": config.GOOGLE_CLIENT_SECRET,
+                "redirect_uris": [redirect_uri],
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+            }
+        }
+    else:
+        client_config = _load_credentials_file()
+    if not client_config:
+        raise ValueError("Google OAuth client is not configured.")
+    return Flow.from_client_config(
+        client_config,
+        scopes=scopes,
+        redirect_uri=redirect_uri,
+        autogenerate_code_verifier=False,
+    )
+
+
 def begin_oauth(redirect_uri: str) -> Tuple[str, str]:
     """Return (authorization_url, state) for Flask session."""
     clear_stored_token()

@@ -642,6 +642,11 @@ def _should_hide_status(booking: Dict[str, Any]) -> bool:
     return job_status.display(booking) == "Cancelled"
 
 
+def _unconfirmed_email_booking(booking: Dict[str, Any]) -> bool:
+    """Check to Confirm (from email) is never shown to staff, even to the owner view."""
+    return job_status.is_check_to_confirm(booking)
+
+
 def _suburb_label(address: str) -> str:
     if not address:
         return ""
@@ -1125,6 +1130,8 @@ def _load_all_rows(
     rows = [dict(row) for row in db.list_between_dates(start_iso, end_iso)]
     matched: List[Dict[str, Any]] = []
     for row in rows:
+        if _unconfirmed_email_booking(row):
+            continue
         if hide_cancelled and _should_hide_status(row):
             continue
         move_iso = _booking_date_iso(row)
@@ -1277,7 +1284,7 @@ def _load_rows(staff: str, start_iso: str, end_iso: str) -> List[Dict[str, Any]]
     for row in rows:
         if not _staff_assigned(row, staff):
             continue
-        if _should_hide_status(row):
+        if _should_hide_status(row) or _unconfirmed_email_booking(row):
             continue
         move_iso = _booking_date_iso(row)
         if move_iso and start_iso <= move_iso <= end_iso:

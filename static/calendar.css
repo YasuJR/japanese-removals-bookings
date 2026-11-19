@@ -157,6 +157,7 @@
 
 .cal-quote { border-left-color: #94a3b8; background: #f1f5f9; }
 .cal-confirmed { border-left-color: #2563eb; background: #eff6ff; }
+.cal-check-to-confirm { border-left-color: #e8590c; background: #fff4e6; border-left-style: dashed; }
 .cal-paid { border-left-color: #16a34a; background: #ecfdf5; }
 .cal-unpaid { border-left-color: #ca8a04; background: #fefce8; }
 .cal-conflict { border-left-color: #dc2626; background: #fef2f2; }

@@ -459,7 +459,7 @@ def is_included_in_monthly_summary(
     exclude_pending: bool = True,
 ) -> bool:
     status = job_status.display(booking)
-    if exclude_pending and status == "Pending":
+    if exclude_pending and status in ("Pending", job_status.CHECK_TO_CONFIRM):
         return False
     if status == "Cancelled":
         return False

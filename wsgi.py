@@ -27,5 +27,8 @@ if config.PRODUCTION and not config.get_database_url():
     )
 
 from app import app as application  # noqa: E402
+from integrations import company_gmail  # noqa: E402
+
+company_gmail.start_background_polling()  # 5-minute sent "Confirmed" check (Render only)
 
 app = application

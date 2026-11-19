@@ -112,7 +112,7 @@ def is_eligible(booking: Dict[str, Any]) -> bool:
     if wg_jobs.is_wg_order(booking):  # WG Outdoor Life orders: no customer SMS / reminders
         return False
     status = job_status.display(booking)
-    if status in ("Pending", "Cancelled"):
+    if status in ("Pending", "Cancelled", job_status.CHECK_TO_CONFIRM):
         return False
     if _is_paid(booking):
         return False

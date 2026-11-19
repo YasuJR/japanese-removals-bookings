@@ -141,6 +141,17 @@
     </article>
 
     <article class="integration-card">
+      <h3>Company Gmail — Check to Confirm</h3>
+      <p class="status-pill {% if company_gmail_status.enabled and company_gmail_status.connected %}ok{% elif company_gmail_status.connected %}pending{% else %}off{% endif %}">
+        {% if company_gmail_status.enabled and company_gmail_status.connected %}Checking every {{ company_gmail_status.poll_minutes }} min
+        {% elif company_gmail_status.connected %}Connected — checking off
+        {% else %}Not connected{% endif %}
+      </p>
+      <p>Sent “Confirmed” emails from {{ company_gmail_status.expected_email }} become <strong>Check to Confirm</strong> bookings (read-only, no notifications).</p>
+      <a class="btn-primary btn-sm" href="{{ url_for('company_gmail_settings') }}">Company Gmail</a>
+    </article>
+
+    <article class="integration-card">
       <h3>Gmail inbox automation</h3>
       <p class="status-pill {% if status.gmail_automation_enabled and status.gmail_scope_granted %}ok{% elif status.gmail_inbox_enabled %}pending{% else %}off{% endif %}">
         {% if status.gmail_automation_enabled and status.gmail_scope_granted %}Enabled

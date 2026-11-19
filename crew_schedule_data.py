@@ -149,6 +149,8 @@ def build_crew_schedule(
     bookings: List[Dict[str, Any]] = []
     for row in rows:
         booking = dict(row)
+        if job_status.is_check_to_confirm(booking):
+            continue
         crew_names = crew_from_storage(booking.get("crew"))
         if not crew_names:
             continue

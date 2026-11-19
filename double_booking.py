@@ -116,6 +116,33 @@ def find_conflicts(
     return conflicts
 
 
+def overlapping_jobs(booking: Dict[str, Any], exclude_booking_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    """Confirmed / active jobs on the same date whose times overlap, whatever the truck.
+
+    Shown before Confirm Booking (Check to Confirm) so the owner sees how busy the day is;
+    find_conflicts() above is the stricter rule that needs the override tick.
+    """
+    move_date = (booking.get("move_date") or "").strip()
+    if not move_date:
+        return []
+    candidate = dict(booking, id=exclude_booking_id if exclude_booking_id is not None else -1)
+    jobs: List[Dict[str, Any]] = []
+    for other in (dict(row) for row in db.list_by_date(move_date)):
+        if int(other["id"]) == int(candidate["id"]) or should_ignore_status(other.get("status")):
+            continue
+        if not _times_overlap(candidate, other):
+            continue
+        jobs.append({
+            "id": int(other["id"]),
+            "customer_name": other.get("customer_name") or "—",
+            "status": job_status.display(other),
+            "time_label": "{0} – {1}".format(display_start_time(other), display_finish_hm(other)),
+            "truck": (other.get("truck_assigned") or "").strip(),
+            "crew": (other.get("crew") or "").strip(),
+        })
+    return jobs
+
+
 def display_finish_hm(booking: Dict[str, Any]) -> str:
     return format_time_12h(_effective_finish_hm(booking))
 

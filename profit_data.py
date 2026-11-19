@@ -56,7 +56,7 @@ def _profit_row(booking: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _is_countable(booking: Dict[str, Any]) -> bool:
-    return job_status.display(booking) not in ("Cancelled", "Pending")
+    return job_status.display(booking) not in ("Cancelled", "Pending", job_status.CHECK_TO_CONFIRM)
 
 
 def _sum_metrics(rows: List[Dict[str, Any]]) -> Dict[str, float]:

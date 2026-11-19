@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Company Gmail{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <p class="breadcrumb muted"><a href="{{ url_for('settings') }}">Settings</a> → Company Gmail</p>
+  <h2>Company Gmail — Check to Confirm</h2>
+  <p class="hint">Every {{ gmail.poll_minutes }} minutes the app reads the <strong>sent</strong> emails of
+    {{ gmail.expected_email }} (read-only). A sent email with “Confirmed” becomes a
+    <span class="status-badge status-check-to-confirm">Check to Confirm</span> booking. It reaches the Staff Portal
+    and calendars only after you press <strong>Confirm Booking</strong>. No email, SMS or notification is sent, and
+    Gmail is never changed.</p>
+
+  {% if gmail.connected %}
+  <p class="status-pill ok">Connected · {{ gmail.account_email }} · read-only</p>
+  {% else %}
+  <p class="status-pill off">Not connected</p>
+  {% endif %}
+  {% if gmail.connected %}
+    {% if gmail.enabled %}
+    <p class="status-pill ok">Checking is on — emails sent after {{ gmail.start_after }} UTC</p>
+    {% else %}
+    <p class="status-pill off">Checking is off</p>
+    {% endif %}
+  {% endif %}
+  {% if not gmail.ai_ready %}
+  <p class="status-pill pending">ANTHROPIC_API_KEY is missing — emails cannot be read yet.</p>
+  {% endif %}
+  {% if not gmail.polling_on %}
+  <p class="muted form-hint">The 5-minute background check runs on Render only (this copy: use “Check now”).</p>
+  {% endif %}
+  {% if gmail.last_error %}
+  <p class="flash flash-error">{{ gmail.last_error }}</p>
+  {% endif %}
+  {% if gmail.last_checked_at %}
+  <p class="muted">Last check {{ gmail.last_checked_at }} UTC · {{ gmail.last_result }}</p>
+  {% endif %}
+
+  <div class="form-actions">
+    {% if not gmail.connected %}
+    <a class="btn-primary" href="{{ url_for('company_gmail_connect') }}">Connect {{ gmail.expected_email }}</a>
+    {% else %}
+    <form method="post">
+      {% if gmail.enabled %}
+      <button type="submit" name="action" value="check_now" class="btn-primary">Check now</button>
+      <button type="submit" name="action" value="disable" class="btn-secondary">Turn checking off</button>
+      {% else %}
+      <button type="submit" name="action" value="enable" class="btn-primary"
+              onclick="return confirm('Start checking? Only emails sent from now on are imported.');">Turn checking on</button>
+      {% endif %}
+      <button type="submit" name="action" value="disconnect" class="btn-secondary"
+              onclick="return confirm('Disconnect the company Gmail?');">Disconnect</button>
+    </form>
+    {% endif %}
+  </div>
+</section>
+
+<section class="panel">
+  <h3>Recent sent “Confirmed” emails</h3>
+  {% if recent %}
+  <div class="table-scroll">
+    <table class="sheet">
+      <thead><tr><th>Sent (UTC)</th><th>Result</th><th>Booking</th><th>Summary</th><th></th></tr></thead>
+      <tbody>
+        {% for r in recent %}
+        <tr>
+          <td class="nowrap">{{ r.sent_at[:16]|replace('T', ' ') }}</td>
+          <td>{{ r.outcome }}{% if r.kind %} · {{ r.kind }}{% endif %}</td>
+          <td>
+            {% if r.booking_id %}<a href="{{ url_for('edit_booking', booking_id=r.booking_id) }}">#{{ r.booking_id }}</a>
+            {% elif r.related_booking_id %}<a href="{{ url_for('edit_booking', booking_id=r.related_booking_id) }}">#{{ r.related_booking_id }}</a>{% if not r.reviewed_at %} (to check){% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td>{{ r.summary }}</td>
+          <td>{% if r.thread_id %}<a href="{{ thread_url(r.thread_id) }}" target="_blank" rel="noopener">Gmail</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Nothing yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

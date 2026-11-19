@@ -102,6 +102,13 @@ DEFAULT_DRIVER_ORIGIN = _env(
 # Google OAuth / Calendar / Gmail
 GOOGLE_CALENDAR_ENABLED = _env_bool("GOOGLE_CALENDAR_ENABLED")
 GMAIL_INBOX_ENABLED = _env_bool("GMAIL_INBOX_ENABLED")
+# Company Gmail (integrations/company_gmail.py): sent "Confirmed" emails -> Check to Confirm.
+COMPANY_GMAIL_ADDRESS = (_env("COMPANY_GMAIL_ADDRESS") or "info@japaneseremovals.com").strip().lower()
+# Background check every 5 minutes inside the web service (no extra Render cost). On by
+# default on Render; set COMPANY_GMAIL_POLLING=false to stop it. Off locally unless set.
+COMPANY_GMAIL_POLLING = (
+    _env_bool("COMPANY_GMAIL_POLLING") if os.environ.get("COMPANY_GMAIL_POLLING") is not None else None
+)
 GOOGLE_CREDENTIALS_FILE = _env_path(
     "GOOGLE_CREDENTIALS_FILE", "credentials/google_credentials.json"
 )

@@ -4,7 +4,7 @@ import json
 import logging
 import secrets
 import sqlite3
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -111,6 +111,10 @@ BOOKING_EXTRA_COLUMNS = [
     ("wg_payment_type", "TEXT"),
     # WG Day (wg_orders.py): number of stops in wg_stops. NULL = not a WG Day.
     ("wg_stop_count", "INTEGER"),
+    # Check to Confirm email imports (integrations/company_gmail.py): Gmail thread and
+    # the missing / uncertain fields to highlight until the owner confirms.
+    ("gmail_thread_id", "TEXT"),
+    ("gmail_review_json", "TEXT"),
 ]
 
 STAFF_EXTRA_COLUMNS = [
@@ -231,6 +235,42 @@ def _ensure_booking_crew_hours_table(conn) -> None:
         "ON booking_crew_hours(booking_id)"
     )
     _ensure_booking_crew_hours_columns(conn)
+
+
+def _ensure_gmail_confirmations_table(conn) -> None:
+    """Sent "Confirmed" emails already looked at (company_gmail.py). One row per Gmail message."""
+    pg = db_backend.is_postgres()
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS gmail_confirmations (
+            id {pk},
+            message_id TEXT NOT NULL UNIQUE,
+            thread_id TEXT NOT NULL DEFAULT '',
+            sent_at TEXT NOT NULL DEFAULT '',
+            subject TEXT NOT NULL DEFAULT '',
+            customer_email TEXT NOT NULL DEFAULT '',
+            kind TEXT NOT NULL DEFAULT '',
+            outcome TEXT NOT NULL DEFAULT '',
+            summary TEXT NOT NULL DEFAULT '',
+            booking_id INTEGER,
+            related_booking_id INTEGER,
+            details_json TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT '',
+            reviewed_at TEXT NOT NULL DEFAULT ''
+        )
+        """.format(pk="SERIAL PRIMARY KEY" if pg else "INTEGER PRIMARY KEY AUTOINCREMENT")
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_gmail_confirmations_thread ON gmail_confirmations(thread_id)")
+    # One-worker-at-a-time leases (try_acquire_lease). TEXT times so SQLite and Postgres compare alike.
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS job_leases (
+            id {pk},
+            lease_key TEXT NOT NULL UNIQUE,
+            expires_at TEXT NOT NULL DEFAULT ''
+        )
+        """.format(pk="SERIAL PRIMARY KEY" if pg else "INTEGER PRIMARY KEY AUTOINCREMENT")
+    )
 
 
 def _ensure_wg_stops_table(conn) -> None:
@@ -877,6 +917,7 @@ def init_db() -> None:
                 _ensure_booking_crew_hours_table(conn)
                 _ensure_furniture_list_tables(conn)
                 _ensure_wg_stops_table(conn)
+                _ensure_gmail_confirmations_table(conn)
                 _ensure_invoice_sequence(conn)
                 _seed_crew_and_trucks(conn)
                 _ensure_indexes(conn)
@@ -1063,6 +1104,7 @@ def init_db() -> None:
         _ensure_booking_crew_hours_table(conn)
         _ensure_furniture_list_tables(conn)
         _ensure_wg_stops_table(conn)
+        _ensure_gmail_confirmations_table(conn)
         _ensure_invoice_sequence(conn)
         _seed_crew_and_trucks(conn)
         _ensure_indexes(conn)
@@ -2507,6 +2549,165 @@ def mark_gmail_message_processed(
                 """,
                 (text, booking_id, (subject or "").strip()),
             )
+        conn.commit()
+
+
+GMAIL_CONFIRMATION_FIELDS = (
+    "message_id",
+    "thread_id",
+    "sent_at",
+    "subject",
+    "customer_email",
+    "kind",
+    "outcome",
+    "summary",
+    "booking_id",
+    "related_booking_id",
+    "details_json",
+)
+
+
+def gmail_confirmation_exists(message_id: str) -> bool:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM gmail_confirmations WHERE message_id = ?",
+            ((message_id or "").strip(),),
+        ).fetchone()
+    return row is not None
+
+
+def add_gmail_confirmation(data: Dict[str, Any]) -> int:
+    """Record one sent "Confirmed" email (company_gmail.py). message_id is UNIQUE."""
+    values = [data.get(key) for key in GMAIL_CONFIRMATION_FIELDS]
+    values = [("" if v is None and key not in ("booking_id", "related_booking_id") else v)
+              for key, v in zip(GMAIL_CONFIRMATION_FIELDS, values)]
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "INSERT INTO gmail_confirmations ({0}, created_at, reviewed_at) VALUES ({1}, ?, '')".format(
+                ", ".join(GMAIL_CONFIRMATION_FIELDS), ", ".join("?" for _ in GMAIL_CONFIRMATION_FIELDS)
+            ),
+            values + [datetime.utcnow().isoformat(timespec="seconds")],
+        )
+        conn.commit()
+        return int(cursor.lastrowid)
+
+
+def list_gmail_confirmations(limit: int = 50) -> List[Dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM gmail_confirmations ORDER BY sent_at DESC, id DESC LIMIT ?",
+            (int(limit),),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def list_open_gmail_reviews() -> List[Dict[str, Any]]:
+    """Amendments / cancellations / possible duplicates linked to a booking, not yet reviewed."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM gmail_confirmations
+            WHERE related_booking_id IS NOT NULL AND reviewed_at = ''
+            ORDER BY sent_at DESC, id DESC
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_gmail_confirmation(confirmation_id: int) -> Optional[Dict[str, Any]]:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM gmail_confirmations WHERE id = ?", (int(confirmation_id),)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def set_gmail_confirmation_booking(confirmation_id: int, booking_id: int) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE gmail_confirmations SET booking_id = ? WHERE id = ?",
+            (int(booking_id), int(confirmation_id)),
+        )
+        conn.commit()
+
+
+def mark_gmail_confirmation_reviewed(confirmation_id: int) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE gmail_confirmations SET reviewed_at = ? WHERE id = ?",
+            (datetime.utcnow().isoformat(timespec="seconds"), int(confirmation_id)),
+        )
+        conn.commit()
+
+
+def bookings_for_gmail_thread(thread_id: str) -> List[Dict[str, Any]]:
+    text = (thread_id or "").strip()
+    if not text:
+        return []
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM bookings WHERE gmail_thread_id = ? ORDER BY id", (text,)
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def bookings_for_customer_email(email: str) -> List[Dict[str, Any]]:
+    text = (email or "").strip().lower()
+    if not text:
+        return []
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM bookings WHERE LOWER(TRIM(email)) = ? ORDER BY id", (text,)
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def save_booking_gmail_fields(booking_id: int, thread_id: str, review_json: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE bookings SET gmail_thread_id = ?, gmail_review_json = ? WHERE id = ?",
+            ((thread_id or "").strip(), review_json or "", int(booking_id)),
+        )
+        conn.commit()
+
+
+def list_check_to_confirm_bookings() -> List[Dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM bookings WHERE status = ? ORDER BY move_date, id",
+            ("Check to Confirm",),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def try_acquire_lease(key: str, seconds: int) -> bool:
+    """Atomic "only one worker runs this" lease (job_leases).
+
+    Gunicorn runs two workers; each polls, only the one whose UPDATE wins runs the job.
+    """
+    now = datetime.utcnow()
+    until = (now + timedelta(seconds=int(seconds))).isoformat(timespec="seconds")
+    with get_connection() as conn:
+        exists = conn.execute("SELECT 1 FROM job_leases WHERE lease_key = ?", (key,)).fetchone()
+    if exists is None:
+        try:
+            with get_connection() as conn:
+                conn.execute("INSERT INTO job_leases (lease_key, expires_at) VALUES (?, ?)", (key, ""))
+                conn.commit()
+        except Exception:  # noqa: BLE001 — the other worker created it first
+            pass
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "UPDATE job_leases SET expires_at = ? WHERE lease_key = ? AND expires_at < ?",
+            (until, key, now.isoformat(timespec="seconds")),
+        )
+        conn.commit()
+        return cursor.rowcount == 1
+
+
+def release_lease(key: str) -> None:
+    with get_connection() as conn:
+        conn.execute("UPDATE job_leases SET expires_at = '' WHERE lease_key = ?", (key,))
         conn.commit()
 
 

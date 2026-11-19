@@ -237,7 +237,7 @@ def _eligible_for_reminder(booking: Dict[str, Any]) -> bool:
     if wg_jobs.is_wg_order(booking):  # WG Outdoor Life orders: no customer SMS / reminders
         return False
     status = job_status.display(booking)
-    if status == "Cancelled":
+    if status in ("Cancelled", job_status.CHECK_TO_CONFIRM):
         return False
     return not _already_sent(booking, "booking_reminder")
 

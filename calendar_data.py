@@ -119,6 +119,8 @@ def _status_calendar_class(booking: Dict[str, Any], conflict_badge: Optional[str
         return "cal-conflict"
     status = job_status.display(booking)
     payment = invoice.normalize_payment_status(booking.get("payment_status"))
+    if status == job_status.CHECK_TO_CONFIRM:
+        return "cal-check-to-confirm"
     if status == "Cancelled":
         return "cal-cancelled"
     if status == "Completed":

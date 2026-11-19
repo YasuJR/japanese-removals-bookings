@@ -24,7 +24,7 @@ from outstanding_invoices_data import (
 )
 from profit_data import _is_countable, _money, _sum_metrics
 
-NOT_STARTED_STATUSES = frozenset({"Pending", "Quote", "Confirmed", "Paid"})
+NOT_STARTED_STATUSES = frozenset({"Check to Confirm", "Pending", "Quote", "Confirmed", "Paid"})
 AUTOMATION_ERROR_STATUSES = frozenset(
     {automation.STATUS_ERROR, automation.STATUS_FAILED}
 )

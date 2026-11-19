@@ -50,6 +50,8 @@ def build_driver_run_sheet(
     member_jobs: List[Dict[str, Any]] = []
     for row in rows:
         booking = dict(row)
+        if job_status.is_check_to_confirm(booking):
+            continue
         if crew not in crew_from_storage(booking.get("crew")):
             continue
         if truck_filter:

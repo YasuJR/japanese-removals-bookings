@@ -126,6 +126,9 @@ def sync_booking_to_calendar(booking: Dict[str, Any]) -> Optional[str]:
     if not is_configured():
         return None
 
+    if str(booking.get("status") or "").strip() == "Check to Confirm":
+        return None  # email imports reach Google Calendar only after Confirm Booking
+
     if not is_connected():
         return "Google Calendar not connected — go to Settings to connect."
 

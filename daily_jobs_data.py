@@ -124,7 +124,8 @@ def build_daily_jobs(date_iso: str) -> Dict[str, Any]:
     """Load bookings for one day, sorted by start time."""
     date_iso = normalize_move_date(date_iso) or (date_iso or "").strip()
     rows = db.list_by_date(date_iso)
-    jobs = [_serialize_job(dict(row)) for row in rows]
+    # Crew documents (daily / weekly schedule): Check to Confirm email imports stay hidden.
+    jobs = [_serialize_job(dict(row)) for row in rows if not job_status.is_check_to_confirm(row)]
     jobs.sort(key=job_start_sort_key)
 
     for index, job in enumerate(jobs, start=1):

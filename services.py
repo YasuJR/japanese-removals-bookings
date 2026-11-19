@@ -70,7 +70,7 @@ def after_booking_created(booking_id: int) -> List[str]:
         return messages
     booking = booking_to_dict(row)
 
-    if job_status.display(booking) == "Pending":
+    if job_status.display(booking) in ("Pending", job_status.CHECK_TO_CONFIRM):
         return messages
 
     cal_msg = google_calendar.sync_booking_to_calendar(booking)
@@ -156,12 +156,20 @@ def after_booking_updated(
         cal_msg = google_calendar.cancel_booking_calendar_event(booking)
         if cal_msg:
             messages.append(cal_msg)
-    elif job_status.display(booking) != "Pending":
+    elif job_status.display(booking) not in ("Pending", job_status.CHECK_TO_CONFIRM):
         cal_msg = google_calendar.sync_booking_to_calendar(booking)
         if cal_msg:
             messages.append(cal_msg)
 
-    if sms_config.is_automation_enabled() and config.SMS_ON_BOOKING_UPDATE:
+    # Check to Confirm (email import): no customer SMS while unconfirmed or on Confirm Booking.
+    unconfirmed_email_booking = job_status.is_check_to_confirm(booking) or job_status.is_check_to_confirm(
+        previous_status
+    )
+    if (
+        sms_config.is_automation_enabled()
+        and config.SMS_ON_BOOKING_UPDATE
+        and not unconfirmed_email_booking
+    ):
         sms_msg = sms.send_booking_notification(booking, event="updated")
         if sms_msg:
             messages.append(sms_msg)

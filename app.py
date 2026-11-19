@@ -42,6 +42,7 @@ from integrations import (
     xero,
 )
 from integrations import executive_config, review_config, sms_config, xero_config, company_config, xero_branding, stripe_config, gmail_config, google_oauth
+from integrations import company_gmail
 from integrations import stripe as stripe_service
 from booking_helpers import apple_maps_url, mailto_href, notes_display, sms_href, tel_href
 from driver_run_sheet_data import build_driver_run_sheet
@@ -364,7 +365,34 @@ def _edit_booking_extras(row) -> dict:
         ),
         **services.invoice_send_context(booking),
         **_double_booking_context(booking),
+        **_check_to_confirm_context(booking),
     }
+
+
+def _check_to_confirm_context(booking: dict) -> dict:
+    """Check to Confirm (sent "Confirmed" email): highlights, Gmail link and the day's jobs."""
+    review = company_gmail.review_for_booking(booking)
+    if review is None:
+        return {"gmail_review": None}
+    as_confirmed = dict(booking, status="Confirmed")
+    return {
+        "gmail_review": review,
+        "confirm_conflicts": double_booking.find_conflicts(as_confirmed, exclude_booking_id=int(booking["id"])),
+        "confirm_same_time_jobs": double_booking.overlapping_jobs(as_confirmed, exclude_booking_id=int(booking["id"])),
+        "confirm_blockers": _confirm_blockers(booking),
+    }
+
+
+def _confirm_blockers(booking: dict) -> list:
+    """What must be filled in before Confirm Booking (the rest is highlighted only)."""
+    blockers = []
+    if not (booking.get("customer_name") or "").strip():
+        blockers.append("Customer name")
+    if not (booking.get("move_date") or "").strip():
+        blockers.append("Move date")
+    if not int(booking.get("num_movers") or 0):
+        blockers.append("Movers")
+    return blockers
 
 
 def _default_driver_name() -> str:
@@ -743,6 +771,7 @@ def settings():
     return render_template(
         "settings.html",
         status=_integration_status(),
+        company_gmail_status=company_gmail.status_for_page(),
     )
 
 
@@ -1242,6 +1271,21 @@ def google_connect():
     return redirect(auth_url)
 
 
+@app.route("/integrations/company-gmail/connect")
+@auth.login_required
+def company_gmail_connect():
+    try:
+        redirect_uri = google_oauth.resolve_redirect_uri()
+        auth_url, state = company_gmail.begin_connect(redirect_uri)
+    except Exception as exc:  # noqa: BLE001
+        flash("Company Gmail login could not start: {0}".format(exc), "error")
+        return redirect(url_for("company_gmail_settings"))
+    session["google_oauth_state"] = state
+    session["google_oauth_redirect_uri"] = redirect_uri
+    session["google_oauth_target"] = "company_gmail"
+    return redirect(auth_url)
+
+
 @app.route("/integrations/google/callback")
 @auth.login_required
 def google_callback():
@@ -1249,6 +1293,18 @@ def google_callback():
     redirect_uri = google_oauth.resolve_redirect_uri(
         session.get("google_oauth_redirect_uri") or ""
     )
+    if session.pop("google_oauth_target", "") == "company_gmail":
+        # Company Gmail (read-only) has its own token; the Calendar token is not touched.
+        try:
+            ok, msg = company_gmail.complete_connect(
+                redirect_uri,
+                google_oauth.normalize_authorization_response(request.url, redirect_uri),
+            )
+            flash(msg, "success" if ok else "error")
+        except Exception as exc:  # noqa: BLE001
+            flash("Company Gmail connection failed: {0}".format(exc), "error")
+        _clear_google_oauth_session()
+        return redirect(url_for("company_gmail_settings"))
     try:
         google_calendar.complete_oauth(redirect_uri, request.url)
         _clear_google_oauth_session()
@@ -1605,6 +1661,7 @@ def dashboard():
     return render_template(
         "dashboard.html",
         dash=dash,
+        gmail_check=company_gmail.dashboard_items(),
         today=dash["today"],
         jobs=enriched_jobs,
         upcoming_divider_index=section_layout["upcoming"],
@@ -1678,6 +1735,8 @@ def update_booking_status_inline(booking_id):
 
     booking = services.booking_to_dict(row)
     previous_status = job_status.display(booking)
+    if previous_status == job_status.CHECK_TO_CONFIRM and new_status != "Cancelled":
+        return jsonify({"error": "Open the booking and press Confirm Booking (checks the details and the schedule first)."}), 400
     if new_status != previous_status:
         db.update_booking_status(booking_id, new_status)
         services.after_booking_updated(booking_id, previous_status=previous_status)
@@ -1809,6 +1868,80 @@ def calendar_weekly_schedule_pdf(date_iso):
             "Content-Disposition": "attachment; filename={0}".format(filename)
         },
     )
+
+
+@app.route("/settings/company-gmail", methods=["GET", "POST"])
+@auth.login_required
+def company_gmail_settings():
+    if request.method == "POST":
+        action = request.form.get("action") or ""
+        if action == "enable":
+            company_gmail.set_enabled(True)
+            flash("Checking turned on. Only emails sent from now on are imported.", "success")
+        elif action == "disable":
+            company_gmail.set_enabled(False)
+            flash("Checking turned off.", "success")
+        elif action == "check_now":
+            # A few emails per click so the request stays well inside the 120 s worker timeout;
+            # the background check (5 min) takes the rest.
+            result = company_gmail.run_check(max_messages=4)
+            flash(result.get("message") or "Checked.", "success" if result.get("ok") else "error")
+        elif action == "disconnect":
+            company_gmail.disconnect()
+            flash("Company Gmail disconnected. Also remove access in the Google account if you want.", "success")
+        return redirect(url_for("company_gmail_settings"))
+    return render_template(
+        "company_gmail_settings.html",
+        gmail=company_gmail.status_for_page(),
+        recent=db.list_gmail_confirmations(40),
+        thread_url=company_gmail.thread_url,
+    )
+
+
+@app.route("/bookings/<int:booking_id>/confirm-check", methods=["POST"])
+@auth.login_required
+def confirm_check_booking(booking_id):
+    """Confirm Booking: Check to Confirm -> Confirmed, then Staff Portal + Google Calendar."""
+    row = db.get_booking(booking_id)
+    if row is None:
+        abort(404)
+    booking = services.booking_to_dict(row)
+    if not job_status.is_check_to_confirm(booking):
+        flash("This booking is not waiting for confirmation.", "error")
+        return redirect(url_for("edit_booking", booking_id=booking_id))
+    blockers = _confirm_blockers(booking)
+    if blockers:
+        flash("Fill in before confirming: {0}. Then press Save, and Confirm Booking.".format(", ".join(blockers)), "error")
+        return redirect(url_for("edit_booking", booking_id=booking_id))
+    as_confirmed = dict(booking, status="Confirmed")
+    errors, _conflicts, _override = double_booking.validate_save(
+        as_confirmed,
+        booking_id=booking_id,
+        override_confirmed=request.form.get(double_booking.OVERRIDE_FORM_FIELD) == "on",
+    )
+    if errors:
+        flash("Schedule conflict: " + " ".join(errors), "error")
+        return redirect(url_for("edit_booking", booking_id=booking_id) + "#check-to-confirm")
+    db.update_booking_status(booking_id, "Confirmed")
+    messages = services.after_booking_updated(booking_id, previous_status=job_status.CHECK_TO_CONFIRM)
+    flash("Booking #{0} confirmed — now on the Staff Portal and calendars.".format(booking_id), "success")
+    for msg in messages:
+        if msg:
+            flash(msg, "info")
+    return redirect(url_for("edit_booking", booking_id=booking_id))
+
+
+@app.route("/gmail-reviews/<int:review_id>/done", methods=["POST"])
+@auth.login_required
+def gmail_review_done(review_id):
+    if db.get_gmail_confirmation(review_id) is None:
+        abort(404)
+    db.mark_gmail_confirmation_reviewed(review_id)
+    flash("Marked as checked.", "success")
+    target = request.form.get("next") or ""
+    if not target.startswith("/") or target.startswith("//"):
+        target = url_for("dashboard")
+    return redirect(target)
 
 
 @app.route("/settings/gmail", methods=["GET", "POST"])
@@ -2571,6 +2704,7 @@ def view_booking(booking_id):
         booking=row,
         furniture=furniture,
         wg_day=wg_orders.run_sheet(row) if wg_jobs.is_wg_day(dict(row)) else None,
+        gmail_review=company_gmail.review_for_booking(dict(row)),
         **_view_booking_extras(row),
     )
 
@@ -3335,8 +3469,8 @@ def edit_booking(booking_id):
             return redirect(url_for("edit_booking", booking_id=booking_id))
         if action == "sync_calendar":
             booking = services.booking_to_dict(db.get_booking(booking_id))
-            if job_status.display(booking) == "Pending":
-                flash("Pending bookings are not synced to Google Calendar.", "error")
+            if job_status.display(booking) in ("Pending", job_status.CHECK_TO_CONFIRM):
+                flash("{0} bookings are not synced to Google Calendar.".format(job_status.display(booking)), "error")
                 return redirect(url_for("edit_booking", booking_id=booking_id))
             msg = google_calendar.sync_booking_to_calendar(booking)
             if not msg:
