@@ -9,6 +9,10 @@
     <a class="check-confirm-settings" href="{{ url_for('company_gmail_settings') }}">Company Gmail</a>
   </div>
 
+  {% if gmail_check.warning %}
+  <p class="check-review-block">⚠ {{ gmail_check.warning }} <a href="{{ url_for('company_gmail_settings') }}">Company Gmail</a></p>
+  {% endif %}
+
   {% if gmail_check.pending %}
   <ul class="check-confirm-list">
     {% for item in gmail_check.pending %}

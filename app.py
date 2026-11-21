@@ -1895,8 +1895,28 @@ def calendar_weekly_schedule_pdf(date_iso):
 @app.route("/settings/company-gmail", methods=["GET", "POST"])
 @auth.login_required
 def company_gmail_settings():
+    preview = None
     if request.method == "POST":
         action = request.form.get("action") or ""
+        if action == "preview":
+            try:
+                preview = company_gmail.preview_recent(limit=3)
+            except Exception as exc:  # noqa: BLE001
+                flash("Preview failed: {0}".format(exc), "error")
+                preview = []
+            return render_template(
+                "company_gmail_settings.html",
+                gmail=company_gmail.status_for_page(),
+                recent=db.list_gmail_confirmations(40),
+                thread_url=company_gmail.thread_url,
+                preview=preview,
+            )
+        if action == "import_message":
+            result = company_gmail.import_message(request.form.get("message_id") or "")
+            flash(result.get("message") or "Done.", "success" if result.get("ok") else "error")
+            if result.get("booking_id"):
+                return redirect(url_for("edit_booking", booking_id=result["booking_id"]) + "#check-to-confirm")
+            return redirect(url_for("company_gmail_settings"))
         if action == "enable":
             company_gmail.set_enabled(True)
             flash("Checking turned on. Only emails sent from now on are imported.", "success")
@@ -1920,6 +1940,7 @@ def company_gmail_settings():
         gmail=company_gmail.status_for_page(),
         recent=db.list_gmail_confirmations(40),
         thread_url=company_gmail.thread_url,
+        preview=preview,
     )
 
 

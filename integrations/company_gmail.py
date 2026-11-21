@@ -112,9 +112,30 @@ def status_for_page() -> Dict[str, Any]:
         "last_result": data.get("last_result") or "",
         "last_error": data.get("last_error") or "",
         "ai_ready": parser.ai_available(),
+        "token_refreshed_at": data.get("token_refreshed_at") or "",
+        "health_warning": health_warning(data),
         "polling_on": polling_wanted(),
         "poll_minutes": POLL_SECONDS // 60,
     }
+
+
+def health_warning(data: Optional[Dict[str, Any]] = None) -> str:
+    """Shown on the dashboard when checking is on but not working (login expired, no recent check)."""
+    data = data if data is not None else _settings()
+    if not data.get("enabled"):
+        return ""
+    if not (data.get("token_json") or "").strip():
+        return "Company Gmail is not connected — reconnect it in Settings."
+    if data.get("last_error"):
+        return str(data.get("last_error"))
+    last = data.get("last_checked_at") or ""
+    try:
+        age = datetime.utcnow() - datetime.fromisoformat(last)
+    except ValueError:
+        age = None
+    if polling_wanted() and (age is None or age > timedelta(minutes=30)):
+        return "Company Gmail has not been checked for over 30 minutes."
+    return ""
 
 
 def set_enabled(enabled: bool) -> None:
@@ -177,7 +198,7 @@ def _credentials():
             _update(last_error="Google login expired — reconnect the company Gmail ({0}).".format(
                 type(exc).__name__))
             return None
-        _update(token_json=creds.to_json())
+        _update(token_json=creds.to_json(), token_refreshed_at=_now_iso())
         return creds
     return None
 
@@ -292,6 +313,89 @@ def poll_once(
     return {"ok": True, "message": summary, **counts}
 
 
+def preview_recent(limit: int = 3, service=None, ask=None, today_iso: str = "") -> List[Dict[str, Any]]:
+    """Owner check (saves nothing): the latest sent "Confirmed" emails, what would be extracted
+    and what would happen (new booking / link to an existing one / skip)."""
+    service = service or gmail_service()
+    if service is None:
+        raise RuntimeError(_settings().get("last_error") or "Company Gmail is not connected.")
+    ask = ask or parser.ask_claude
+    if not today_iso:
+        from dashboard_data import perth_today
+
+        today_iso = perth_today().isoformat()
+    resp = service.users().messages().list(userId="me", q="in:sent confirmed newer_than:30d", maxResults=30).execute()
+    out: List[Dict[str, Any]] = []
+    for ref in resp.get("messages") or []:
+        msg = service.users().messages().get(userId="me", id=ref["id"], format="full").execute()
+        if not parser.says_confirmed(msg):
+            continue
+        fields, context_used = _extract(service, msg, ask, today_iso)
+        related = related_booking(msg.get("threadId") or "", fields["email"], fields["move_date"], today_iso)
+        if db.gmail_confirmation_exists(msg["id"]):
+            would = "already processed"
+        elif fields["kind"] in ("payment", "other"):
+            would = "skip ({0})".format(fields["kind"])
+        elif related is not None:
+            would = "link to booking #{0}".format(related["id"])
+        elif fields["kind"] == "cancellation":
+            would = "skip (cancellation, no booking in the app)"
+        else:
+            would = "new Check to Confirm booking"
+        sent_ms = int(msg.get("internalDate") or 0)
+        out.append({
+            "message_id": msg["id"],
+            "thread_url": thread_url(msg.get("threadId") or ""),
+            "sent_at": datetime.utcfromtimestamp(sent_ms / 1000).isoformat(timespec="minutes") if sent_ms else "",
+            "fields": fields,
+            "would": would,
+            "related_id": int(related["id"]) if related is not None else None,
+            "older_threads_used": context_used,
+            "before_start": sent_ms <= int(_settings().get("start_after_ms") or 0) or not _settings().get("enabled"),
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
+def import_message(message_id: str, service=None, ask=None, today_iso: str = "") -> Dict[str, Any]:
+    """Owner action: process one chosen sent email now, even if it was sent before checking was
+    turned on. Same rules as the automatic check (dedupe, links, Check to Confirm)."""
+    message_id = (message_id or "").strip()
+    if not message_id:
+        return {"ok": False, "message": "No email chosen."}
+    if db.gmail_confirmation_exists(message_id):
+        return {"ok": False, "message": "This email was already processed — nothing new was created."}
+    service = service or gmail_service()
+    if service is None:
+        return {"ok": False, "message": _settings().get("last_error") or "Company Gmail is not connected."}
+    msg = service.users().messages().get(userId="me", id=message_id, format="full").execute()
+    if "SENT" not in (msg.get("labelIds") or []):
+        return {"ok": False, "message": "Only emails sent by the company can be imported."}
+    if not today_iso:
+        from dashboard_data import perth_today
+
+        today_iso = perth_today().isoformat()
+    outcome = process_message(service, msg, ask or parser.ask_claude, today_iso)
+    rows = [r for r in db.list_gmail_confirmations(200) if r["message_id"] == message_id]
+    row = rows[0] if rows else {}
+    return {"ok": True, "outcome": outcome, "booking_id": row.get("booking_id"),
+            "related_booking_id": row.get("related_booking_id"),
+            "message": "Email processed: {0}.".format(outcome)}
+
+
+def _extract(service, msg: Dict[str, Any], ask, today_iso: str) -> Tuple[Dict[str, Any], bool]:
+    thread = _thread_messages(service, msg.get("threadId") or "")
+    thread_text = parser.transcript(thread, COMPANY_ADDRESSES, upto_id=msg.get("id") or "")
+    customer = parser.customer_address(msg, COMPANY_ADDRESSES)
+    context = _older_threads_text(service, customer, msg.get("threadId") or "")
+    fields = parser.clean(ask(thread_text, context, today_iso))
+    if not fields["email"] and customer:
+        fields["email"] = customer  # the address we sent the confirmation to
+        fields["missing"] = [f for f in fields["missing"] if f != "email"]
+    return fields, bool(context)
+
+
 def _ai_failed(msg: Dict[str, Any], reason: str) -> str:
     """Retry a failed message on the next runs; after MAX_AI_ATTEMPTS record it as an error."""
     data = _settings()
@@ -377,14 +481,7 @@ def process_message(service, msg: Dict[str, Any], ask, today_iso: str) -> str:
         _record(msg, kind="", outcome="skipped", summary="'Confirmed' only in a quoted earlier email.")
         return "skipped"
 
-    thread = _thread_messages(service, msg.get("threadId") or "")
-    thread_text = parser.transcript(thread, COMPANY_ADDRESSES, upto_id=msg.get("id") or "")
-    customer = parser.customer_address(msg, COMPANY_ADDRESSES)
-    context = _older_threads_text(service, customer, msg.get("threadId") or "")
-    fields = parser.clean(ask(thread_text, context, today_iso))
-    if not fields["email"] and customer:
-        fields["email"] = customer  # the address we sent the confirmation to
-        fields["missing"] = [f for f in fields["missing"] if f != "email"]
+    fields, _context_used = _extract(service, msg, ask, today_iso)
     kind = fields["kind"]
     summary = fields.get("summary") or fields.get("kind_reason") or kind
     details = json.dumps(fields, ensure_ascii=False)
@@ -536,7 +633,7 @@ def dashboard_items() -> Dict[str, Any]:
             "booking": dict(booking) if booking else None,
             "gmail_url": thread_url(row.get("thread_id") or ""),
         })
-    return {"pending": pending, "reviews": reviews, "count": len(pending)}
+    return {"pending": pending, "reviews": reviews, "count": len(pending), "warning": health_warning()}
 
 
 # --- background thread ------------------------------------------------------------------

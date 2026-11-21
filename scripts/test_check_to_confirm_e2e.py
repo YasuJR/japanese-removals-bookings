@@ -128,7 +128,8 @@ class FakeGmail:
 
         class M:
             def list(self, userId, q, maxResults=100, pageToken=None):
-                after = int(re.search(r"after:(\d+)", q).group(1)) * 1000
+                found = re.search(r"after:(\d+)", q)
+                after = int(found.group(1)) * 1000 if found else 0
                 ids = [m["id"] for m in gmail.store.values()
                        if "SENT" in m["labelIds"] and int(m["internalDate"]) >= after
                        and "confirmed" in json.dumps(m).lower() + _plain(m).lower()]
@@ -618,6 +619,51 @@ def test_case_k_public_pages_and_delete_clears_email_details():
     return True
 
 
+def test_case_l_preview_import_and_health():
+    client = _client()
+    _spy()
+    start = _start_checking(minutes_ago=5)
+    tag = _tag()
+    day = _free_day()
+    # an email sent BEFORE checking was turned on: never imported automatically, owner can import it
+    store, tid, customer = _thread(tag, start - 3 * 3600000, "Confirmed your booking on {0}.".format(day))
+    ANSWERS["[case {0}]".format(tag)] = _answer(customer_name="Prev " + tag, email=customer, move_date=day, num_movers=2,
+                                                summary="preview " + tag)
+    assert _poll(store)["created"] == 0
+    count_before = len(db.list_check_to_confirm_bookings())
+    preview = company_gmail.preview_recent(limit=3, service=FakeGmail(store), ask=fake_ask, today_iso=perth_today().isoformat())
+    item = [p for p in preview if p["message_id"] == "m4-" + tag][0]
+    assert item["would"] == "new Check to Confirm booking" and item["fields"]["customer_name"] == "Prev " + tag
+    assert item["before_start"] is True
+    assert len(db.list_check_to_confirm_bookings()) == count_before and not db.gmail_confirmation_exists("m4-" + tag)
+    result = company_gmail.import_message("m4-" + tag, service=FakeGmail(store), ask=fake_ask, today_iso=perth_today().isoformat())
+    assert result["ok"] and result["outcome"] == "created" and result["booking_id"], result
+    again = company_gmail.import_message("m4-" + tag, service=FakeGmail(store), ask=fake_ask)
+    assert again["ok"] is False and "already processed" in again["message"]
+    preview = company_gmail.preview_recent(limit=3, service=FakeGmail(store), ask=fake_ask, today_iso=perth_today().isoformat())
+    assert [p for p in preview if p["message_id"] == "m4-" + tag][0]["would"] == "already processed"
+    inbox_only = gmsg("in-" + tag, "t-in-" + tag, customer, COMPANY, "x", "confirmed?", start + 100)
+    store[inbox_only["id"]] = inbox_only
+    refused = company_gmail.import_message("in-" + tag, service=FakeGmail(store), ask=fake_ask)
+    assert refused["ok"] is False and "sent by the company" in refused["message"]
+    # health warning on the dashboard
+    company_gmail._update(last_error="Google login expired — reconnect the company Gmail (RefreshError).")
+    assert "expired" in client.get("/dashboard").get_data(as_text=True)
+    company_gmail._update(last_error="", last_checked_at="2000-01-01T00:00:00")
+    original = company_gmail.polling_wanted
+    company_gmail.polling_wanted = lambda: True
+    try:
+        assert "not been checked" in company_gmail.health_warning()
+    finally:
+        company_gmail.polling_wanted = original
+    company_gmail._update(last_checked_at=company_gmail._now_iso())
+    assert company_gmail.health_warning() == ""
+    page = client.get("/settings/company-gmail").get_data(as_text=True)
+    assert "Preview latest emails" in page
+    db.delete_booking(int(result["booking_id"]))
+    return True
+
+
 def main():
     tests = [
         test_case_a_creates_check_to_confirm,
@@ -631,6 +677,7 @@ def main():
         test_case_i_parser,
         test_case_j_normal_bookings_unchanged,
         test_case_k_public_pages_and_delete_clears_email_details,
+        test_case_l_preview_import_and_health,
     ]
     passed = 0
     try:

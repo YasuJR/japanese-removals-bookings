@@ -35,6 +35,9 @@
   {% if gmail.last_checked_at %}
   <p class="muted">Last check {{ gmail.last_checked_at }} UTC · {{ gmail.last_result }}</p>
   {% endif %}
+  {% if gmail.token_refreshed_at %}
+  <p class="muted">Google login renewed automatically {{ gmail.token_refreshed_at }} UTC</p>
+  {% endif %}
 
   <div class="form-actions">
     {% if not gmail.connected %}
@@ -54,6 +57,41 @@
     {% endif %}
   </div>
 </section>
+
+{% if gmail.connected %}
+<section class="panel">
+  <h3>Test with recent emails</h3>
+  <p class="hint">Reads the 3 latest sent “Confirmed” emails (last 30 days) and shows what would be extracted.
+    <strong>Nothing is saved.</strong> “Import” turns one chosen email into a Check to Confirm booking now.</p>
+  <form method="post"><button type="submit" name="action" value="preview" class="btn-secondary">Preview latest emails</button></form>
+  {% if preview %}
+  {% for item in preview %}
+  {% set f = item.fields %}
+  <div class="check-review">
+    <p class="check-review-summary">{{ item.sent_at|replace('T', ' ') }} UTC · {{ f.kind }} · would: <strong>{{ item.would }}</strong>
+      {% if item.thread_url %} · <a href="{{ item.thread_url }}" target="_blank" rel="noopener">Gmail</a>{% endif %}</p>
+    {% if f.summary %}<p>{{ f.summary }}</p>{% endif %}
+    <ul class="check-review-reasons">
+      {% for key, label in [('customer_name','Customer'),('email','Email'),('phone','Phone'),('move_date','Move date'),('start_time','Start'),('pickup_address','Pickup'),('delivery_address','Delivery'),('num_movers','Movers'),('hourly_rate','Hourly rate'),('callout_minutes','Call-out (min)'),('furniture','Furniture'),('notes','Notes')] %}
+      <li><strong>{{ label }}:</strong> {% if f[key] not in (none, '') %}{{ f[key] }}{% else %}<span class="check-flag check-flag-missing">missing</span>{% endif %}</li>
+      {% endfor %}
+      {% for c in f.additional_charges %}<li><strong>Extra:</strong> {{ c.description }} ${{ c.amount }}</li>{% endfor %}
+      {% for u in f.uncertain %}<li><span class="check-flag check-flag-uncertain">check</span> {{ u.field }} — {{ u.reason }}</li>{% endfor %}
+    </ul>
+    {% if item.would == 'new Check to Confirm booking' %}
+    <form method="post" class="form-actions"
+          onsubmit="return confirm('Create a Check to Confirm booking from this email now?');">
+      <input type="hidden" name="message_id" value="{{ item.message_id }}">
+      <button type="submit" name="action" value="import_message" class="btn-sm btn-primary">Import as Check to Confirm</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% elif preview is not none %}
+  <p class="muted">No sent “Confirmed” emails in the last 30 days.</p>
+  {% endif %}
+</section>
+{% endif %}
 
 <section class="panel">
   <h3>Recent sent “Confirmed” emails</h3>
