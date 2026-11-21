@@ -695,6 +695,28 @@ def health_check():
     return payload, 200
 
 
+def _public_page_context() -> dict:
+    return {
+        "company": company_config.get_settings(),
+        "gmail_address": config.COMPANY_GMAIL_ADDRESS,
+        "year": date.today().year,
+    }
+
+
+@app.route("/about", endpoint="public_about")
+def public_about():
+    """Public app homepage (Google OAuth branding). No login."""
+    return render_template("public/about.html", **_public_page_context())
+
+
+@app.route("/privacy", endpoint="privacy_policy")
+def privacy_policy():
+    """Public privacy policy (Google OAuth branding, Gmail / Calendar data). No login."""
+    return render_template(
+        "public/privacy.html", effective_date="21 November 2026", **_public_page_context()
+    )
+
+
 @app.route("/quote", methods=["GET", "POST"], endpoint="website_quote")
 def website_quote_route():
     if request.method == "POST":
@@ -1886,6 +1908,9 @@ def company_gmail_settings():
             # the background check (5 min) takes the rest.
             result = company_gmail.run_check(max_messages=4)
             flash(result.get("message") or "Checked.", "success" if result.get("ok") else "error")
+        elif action == "clear_details":
+            cleared = db.clear_gmail_confirmation_details()
+            flash("Cleared the stored email details of {0} email(s). Bookings are not changed.".format(cleared), "success")
         elif action == "disconnect":
             company_gmail.disconnect()
             flash("Company Gmail disconnected. Also remove access in the Google account if you want.", "success")

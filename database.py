@@ -2058,6 +2058,15 @@ def mark_review_request_reviewed(request_id: int, reviewed_at: str) -> None:
 def delete_booking(booking_id: int) -> bool:
     with get_connection() as conn:
         conn.execute("DELETE FROM wg_stops WHERE booking_id = ?", (booking_id,))
+        # Email log (company_gmail.py): keep only the Gmail message id (so the email is never
+        # imported again); remove what was read from it.
+        conn.execute(
+            """
+            UPDATE gmail_confirmations SET summary = '', details_json = '', customer_email = '', subject = ''
+            WHERE booking_id = ? OR related_booking_id = ?
+            """,
+            (booking_id, booking_id),
+        )
         cursor = conn.execute("DELETE FROM bookings WHERE id = ?", (booking_id,))
         conn.commit()
         return cursor.rowcount > 0
@@ -2620,6 +2629,19 @@ def get_gmail_confirmation(confirmation_id: int) -> Optional[Dict[str, Any]]:
             "SELECT * FROM gmail_confirmations WHERE id = ?", (int(confirmation_id),)
         ).fetchone()
     return dict(row) if row else None
+
+
+def clear_gmail_confirmation_details() -> int:
+    """Remove what was read from emails; message ids stay so nothing is imported twice."""
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE gmail_confirmations SET summary = '', details_json = '', customer_email = '', subject = ''
+            WHERE summary <> '' OR details_json <> '' OR customer_email <> '' OR subject <> ''
+            """
+        )
+        conn.commit()
+        return max(cursor.rowcount, 0)
 
 
 def set_gmail_confirmation_booking(confirmation_id: int, booking_id: int) -> None:

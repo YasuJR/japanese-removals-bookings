@@ -597,6 +597,27 @@ def test_case_j_normal_bookings_unchanged():
     return True
 
 
+def test_case_k_public_pages_and_delete_clears_email_details():
+    anon = app.test_client()
+    for path, must in (("/about", ("JR Booking System", "read-only", "/privacy")),
+                       ("/privacy", ("Limited Use", "gmail.readonly", "Anthropic", "myaccount.google.com/permissions",
+                                     "Clear stored email details", COMPANY))):
+        resp = anon.get(path)
+        text = resp.get_data(as_text=True)
+        assert resp.status_code == 200, path
+        for word in must:
+            assert word in text, (path, word)
+    assert "/privacy" in anon.get("/login").get_data(as_text=True)
+    booking_id, tag, _day, _tid = _make_check_booking()
+    rec = _booking_for_message("m4-" + tag)
+    assert rec["summary"] and rec["customer_email"]
+    db.delete_booking(booking_id)
+    rec = _booking_for_message("m4-" + tag)
+    assert rec is not None and rec["summary"] == "" and rec["details_json"] == "" and rec["customer_email"] == ""
+    assert db.gmail_confirmation_exists("m4-" + tag)  # never imported again
+    return True
+
+
 def main():
     tests = [
         test_case_a_creates_check_to_confirm,
@@ -609,6 +630,7 @@ def main():
         test_case_h_lease_and_start_from_now,
         test_case_i_parser,
         test_case_j_normal_bookings_unchanged,
+        test_case_k_public_pages_and_delete_clears_email_details,
     ]
     passed = 0
     try:

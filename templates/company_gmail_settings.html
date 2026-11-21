@@ -78,6 +78,12 @@
       </tbody>
     </table>
   </div>
+  <form method="post" class="form-actions">
+    <button type="submit" name="action" value="clear_details" class="btn-secondary btn-sm"
+            onclick="return confirm('Clear the subject, customer email and extracted details of every email in this list? Bookings are not changed.');">Clear stored email details</button>
+    <span class="muted">Only the Gmail message id stays, so an email is never imported twice.
+      <a href="{{ url_for('privacy_policy') }}">Privacy policy</a></span>
+  </form>
   {% else %}
   <p class="muted">Nothing yet.</p>
   {% endif %}

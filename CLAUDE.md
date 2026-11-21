@@ -70,6 +70,7 @@ Auth key: **P** public · **L** `login_required` (office) · **A** `admin_requir
 | Calendar (L) | `/calendar`, `/calendar/daily/<date_iso>`, `/calendar/weekly[/<date_iso>]`, `/calendar/weekly/<date_iso>/schedule.pdf` |
 | Bookings (L) | `/bookings/new`, `/bookings/search` (also matches `INV56`, `inv 56`, `56`, `INV-56`), `/bookings/export.csv`, `/bookings/upcoming`, `/bookings/all`, `/bookings/<id>`, `/bookings/<id>/edit`, `/bookings/<id>/payment` POST, `/bookings/<id>/status` POST, `/bookings/<id>/delete`, `/bookings/<id>/job-sheet.pdf`, `/bookings/<id>/actual-times` POST (**O**) |
 | WG Days (L) | `/wg-orders` GET/POST, `/wg-orders/import` POST, `/wg-orders/adopt/<id>` POST, `/wg-orders/move/<id>` POST (§7c) |
+| Public (no login) | `/about` (app homepage for Google OAuth branding), `/privacy` (privacy policy: Gmail / Calendar data, Limited Use, Anthropic, deletion) — `templates/public/`. Keep the policy in step with §7d if the Gmail import changes. |
 | Check to Confirm (L) | `/settings/company-gmail` GET/POST, `/integrations/company-gmail/connect`, `/bookings/<id>/confirm-check` POST, `/gmail-reviews/<id>/done` POST (§7d) |
 | Invoice (L) | `/bookings/invoice/preview-calculate` POST, `/bookings/<id>/invoice/calculate` POST, `/bookings/<id>/invoice/preview`, `/bookings/<id>/invoice.pdf` (served as attachment for iOS share), `/bookings/<id>/stripe/checkout` POST, `/bookings/<id>/stripe/success` |
 | Staff Portal | `/staff/login`, `/staff/logout` P · `/staff` S · `/staff/wg/<id>[/run-sheet.pdf]` S · `/staff/weekly/schedule.pdf` S · `/staff/furniture/<signed>[/panel|/list.pdf|/photos/<id>]` S · `/staff/crew/<id>/rename` O · `/staff/crew/<id>/star-points/adjust` O · `/staff/crew/<id>/star-points/reset` O · `/staff/bookings/<id>/edit` O |
@@ -332,6 +333,8 @@ Actual and Extra Pay come from the per-crew `effective_row`. Break and call-out 
 - **Polling**: daemon thread per gunicorn worker (`wsgi.py` → `company_gmail.start_background_polling`), only one runs per 5 min via `db.try_acquire_lease` (table `job_leases`, TEXT times). On by default on Render (`PRODUCTION`), off locally; `COMPANY_GMAIL_POLLING=false|true` overrides. "Check now" on the settings page runs one check. No Render cron (no extra cost).
 - **Gmail links**: `https://mail.google.com/mail/?authuser=<company>#all/<threadId>`.
 - **Google Cloud**: Gmail API enabled in project 415287455858; consent screen must be **In production** (Testing tokens expire in 7 days); redirect URI for production must be registered.
+- **Deletion**: deleting a booking clears subject / customer email / summary / details of its `gmail_confirmations` rows (message id kept → never re-imported); Settings → Company Gmail → "Clear stored email details" does it for all rows. Described in `/privacy`.
+- **Google OAuth branding**: homepage `https://japanese-removals-bookings.onrender.com/about`, privacy `…/privacy`, authorized domain `japanese-removals-bookings.onrender.com` (`onrender.com` is on the Public Suffix List, so the full host is the top private domain).
 - Tests: `scripts/test_check_to_confirm_e2e.py` (fake Gmail + fake Claude, SQLite and Postgres).
 
 ## 8. Truck conflict / double booking

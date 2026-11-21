@@ -1,0 +1,26 @@
+{% extends "public/_public_base.html" %}
+{% block title %}About{% endblock %}
+{% block content %}
+<h1>JR Booking System</h1>
+<p>JR Booking System is the private, internal booking system of <strong>{{ company.company_name }}</strong>
+  ({{ company.company_legal_name }}), a removals company in Perth, Western Australia. Only {{ company.company_name }}'s
+  owner and staff use it, to manage removal jobs: bookings, schedules, crew and trucks, invoices and payments.</p>
+
+<h2>What it does with Google</h2>
+<ul>
+  <li><strong>Gmail (read-only)</strong> — the company account {{ gmail_address }} is connected with read-only access.
+    Every 5 minutes the system looks at emails the company has <em>sent</em> that say “Confirmed”, reads that email
+    conversation and creates a draft booking with the status <em>Check to Confirm</em>. The owner checks and edits it,
+    then confirms it. The system never sends, changes, moves or deletes email.</li>
+  <li><strong>Google Calendar</strong> — when a booking is confirmed, the system can add or update an event in the
+    company's own calendar so the team can see the job.</li>
+</ul>
+<p>Customers do not sign in to this system, and it is not offered to other businesses.</p>
+
+<div class="box">
+  <p><strong>Privacy:</strong> read the <a href="{{ url_for('privacy_policy') }}">JR Booking System privacy policy</a> —
+    what Google data is read, why, how it is stored, who it is shared with and how to have it deleted.</p>
+  <p><strong>Staff sign-in:</strong> <a href="{{ url_for('login') }}">Sign in</a> (staff only).</p>
+  <p class="muted">Contact: {{ company.company_email }} · {{ company.company_phone }}</p>
+</div>
+{% endblock %}

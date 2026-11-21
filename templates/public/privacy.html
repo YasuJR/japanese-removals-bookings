@@ -1,0 +1,99 @@
+{% extends "public/_public_base.html" %}
+{% block title %}Privacy policy{% endblock %}
+{% block description %}How JR Booking System (Japanese Removals) uses Gmail and Google Calendar data.{% endblock %}
+{% block content %}
+<h1>Privacy policy — JR Booking System</h1>
+<p class="muted">Effective {{ effective_date }} · {{ company.company_legal_name }} trading as {{ company.company_name }}, Perth, Western Australia</p>
+
+<p>JR Booking System (“the system”) is the internal booking system of {{ company.company_name }}. Only the company's
+  owner and staff use it. This policy explains which Google user data the system accesses, how it is used, stored and
+  shared, and how it can be deleted. It also covers the customer details the system keeps for removal jobs.</p>
+
+<div class="box">
+  <p><strong>Limited Use.</strong> JR Booking System's use and transfer to any other app of information received from
+    Google APIs will adhere to the
+    <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+    including the Limited Use requirements.</p>
+</div>
+
+<h2>1. Google accounts that are connected</h2>
+<p>Only the company's own Google accounts are connected, by the owner:</p>
+<ul>
+  <li><strong>Company Gmail</strong> — {{ gmail_address }}, permission <code>gmail.readonly</code> (read only).</li>
+  <li><strong>Google Calendar</strong> — the company calendar, permission <code>calendar.events</code>.</li>
+</ul>
+<p>Customers and other people never sign in with Google to this system.</p>
+
+<h2>2. What Gmail data is read</h2>
+<p>The system reads email only from the connected company account, and only:</p>
+<ul>
+  <li>emails the company has <strong>sent</strong> that contain the word “Confirmed”, sent <strong>after</strong> the owner
+    turned the check on (older email is never imported);</li>
+  <li>for each such email, the other messages in the same conversation (thread), and up to three older conversations
+    from the last 180 days that mention the same customer's email address (for example the original quote request).</li>
+</ul>
+<p>From these messages it reads the sender, recipients, subject, date, the text written in each message and the names
+  of attachments. Attachments themselves are not opened or downloaded. Other email in the mailbox is not read. The
+  system never sends, changes, labels, marks as read, moves or deletes any email.</p>
+
+<h2>3. Why it is used</h2>
+<p>Gmail data is used only to prepare booking records for {{ company.company_name }}'s own removal jobs: to tell whether a
+  sent email confirms a booking, a change, a cancellation or only a payment, and to fill in the booking details (customer
+  name, email, phone, moving date and start time, pickup and delivery address, number of movers, hourly rate, call-out,
+  additional charges, furniture and notes). New bookings are created as <em>Check to Confirm</em>; the owner reviews and
+  edits every one before confirming it. Details the email does not state are left empty, not guessed.</p>
+<p>Google Calendar is used only to create, update or remove calendar events for confirmed bookings (customer name, job
+  time, addresses, crew and notes) so the team can see the schedule.</p>
+<p>Google data is not used for advertising, is not sold, and is not used to build profiles. It is not used to train
+  artificial-intelligence models. People only read it when needed for the booking (the company owner and staff), for
+  security, or where the law requires.</p>
+
+<h2>4. How it is stored and protected</h2>
+<table>
+  <tr><th>What is stored</th><td>The booking fields listed above (as an ordinary booking); for each processed email: the
+    Gmail message and conversation IDs, sent time, subject, the customer's email address, a one-line summary and the
+    extracted details; the Google sign-in token. The full text of emails is <strong>not</strong> stored.</td></tr>
+  <tr><th>Where</th><td>A PostgreSQL database hosted by Render (Oregon, United States). The Google sign-in token is kept in
+    that database, never in source code or files.</td></tr>
+  <tr><th>Protection</th><td>Encrypted connections (HTTPS) only; the system is behind a staff login; secrets are kept in
+    the hosting provider's protected settings.</td></tr>
+</table>
+
+<h2>5. Sharing with third parties</h2>
+<ul>
+  <li><strong>Anthropic (Claude API)</strong> — to extract the booking details, the text of the email conversation is sent
+    to Anthropic's API and the answer is returned to the system. Anthropic processes it as a service provider for this
+    purpose only and, under its commercial terms, does not use it to train its models.</li>
+  <li><strong>Render</strong> — hosts the system and its database.</li>
+  <li><strong>Google</strong> — provides Gmail and Google Calendar.</li>
+</ul>
+<p>Email content is not shared with anyone else. After the owner confirms a booking it is handled like any other booking
+  (for example an invoice in Xero, a card payment with Stripe, or a text message to the customer through Twilio when the
+  owner uses those features); email content itself is never sent to those services. Google user data is not sold or
+  transferred for any other purpose.</p>
+
+<h2>6. How long it is kept and how to delete it</h2>
+<ul>
+  <li><strong>Stop access</strong> — the owner can disconnect the company Gmail in the system (Settings → Company Gmail →
+    Disconnect), which deletes the stored token, and can remove the app's access at any time at
+    <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+  <li><strong>Email details</strong> — “Clear stored email details” (Settings → Company Gmail) removes the subject,
+    customer email address, summary and extracted details of every processed email. Deleting a booking also removes
+    those details for the emails linked to it. Only the Gmail message ID is kept so that the same email is never imported
+    twice.</li>
+  <li><strong>Bookings</strong> — kept as business records for as long as Australian law requires (generally five years
+    for tax records), then deleted on request.</li>
+  <li><strong>Requests</strong> — customers and anyone else can ask to see, correct or delete their information by
+    contacting us (below). We reply within 30 days.</li>
+</ul>
+
+<h2>7. Customer information</h2>
+<p>For removal jobs the system keeps customer names, phone numbers, email addresses, addresses, job details, invoices and
+  payment status. It is used only to provide the removal service and is handled under the Australian Privacy Principles.</p>
+
+<h2>8. Changes and contact</h2>
+<p>If this policy changes, the new version is published on this page with a new effective date.</p>
+<p>Questions or requests: {{ company.company_name }} ({{ company.company_legal_name }}) ·
+  <a href="mailto:{{ company.company_email }}">{{ company.company_email }}</a> · {{ company.company_phone }} ·
+  Perth, Western Australia.</p>
+{% endblock %}
